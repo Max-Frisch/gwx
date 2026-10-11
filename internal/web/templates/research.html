@@ -1,0 +1,39 @@
+{{define "research"}}
+{{template "head" .}}
+<h1>Research <span class="muted">(account-wide)</span></h1>
+
+{{if .Queue}}
+<div class="panel row">
+  <span>Researching <b>{{.Queue.Name}}</b> — finishes in {{.Queue.Remaining}}</span>
+  <form method="post" action="/queue/{{.Queue.ID}}/cancel" class="spacer"><button class="bad" type="submit">Cancel (refund)</button></form>
+</div>
+{{end}}
+
+<div class="panel">
+<table>
+  <tr><th>Technology</th><th>Level</th><th>Next cost</th><th>Time</th><th></th></tr>
+  {{range .Rows}}
+  <tr>
+    <td>{{.Name}}{{if .Queued}} <span class="tag busy">researching</span>{{end}}</td>
+    <td>{{.Level}}</td>
+    {{if .Unlocked}}
+      <td class="muted">{{.CostStr}}</td>
+      <td class="muted">{{.TimeStr}}</td>
+      <td>
+        {{if and .Affordable (not .Queued)}}
+        <form method="post" action="/research/{{$.ActivePlanetID}}/start">
+          <input type="hidden" name="code" value="{{.Code}}">
+          <button type="submit">Research</button>
+        </form>
+        {{else if .Queued}}<span class="muted">queued</span>{{else}}<span class="muted">unaffordable</span>{{end}}
+      </td>
+    {{else}}
+      <td class="muted" colspan="2">Requires: {{range $i, $m := .Missing}}{{if $i}}, {{end}}{{$m}}{{end}}</td>
+      <td></td>
+    {{end}}
+  </tr>
+  {{end}}
+</table>
+</div>
+{{template "foot" .}}
+{{end}}

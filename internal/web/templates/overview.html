@@ -1,0 +1,54 @@
+{{define "overview"}}
+{{template "head" .}}
+<h1>{{.Planet.Name}} <span class="muted">{{coords .Planet.Galaxy .Planet.System .Planet.Position}}</span></h1>
+
+<div class="grid">
+  <div class="card">
+    <h3>Empire</h3>
+    <table>
+      <tr><td class="muted">Fields</td><td>{{.Planet.FieldsUsed}} / {{.Planet.FieldsMax}}</td></tr>
+      <tr><td class="muted">Diameter</td><td>{{n .Planet.DiameterKM}} km</td></tr>
+      <tr><td class="muted">Energy</td><td>{{n .Planet.EnergyProd}} / {{n .Planet.EnergyUsed}}</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Stockpile</h3>
+    <table>
+      <tr><td class="m">Iron</td><td>{{nf .Planet.Metal}} <span class="muted">/ {{n .Planet.MetalCap}}</span></td><td class="muted">protected {{n .Planet.ProtectedMetal}}</td></tr>
+      <tr><td class="l">Lutinum</td><td>{{nf .Planet.Lutinum}} <span class="muted">/ {{n .Planet.LutinumCap}}</span></td><td class="muted">protected {{n .Planet.ProtectedLutinum}}</td></tr>
+      <tr><td class="w">Water</td><td>{{nf .Planet.Water}} <span class="muted">/ {{n .Planet.WaterCap}}</span></td><td class="muted">protected {{n .Planet.ProtectedWater}}</td></tr>
+      <tr><td class="h">Hydrogen</td><td>{{nf .Planet.Hydrogen}} <span class="muted">/ {{n .Planet.HydrogenCap}}</span></td><td class="muted">protected {{n .Planet.ProtectedHydrogen}}</td></tr>
+    </table>
+    <small>The protected amount can never be plundered.</small>
+  </div>
+</div>
+
+<h2>Active queues</h2>
+<div class="panel">
+{{if .Queues}}
+<table>
+  <tr><th>Type</th><th>Item</th><th>Finishes</th><th></th></tr>
+  {{range .Queues}}
+  <tr>
+    <td class="muted">{{.Kind}}</td>
+    <td>{{.Name}}</td>
+    <td>{{.Remaining}}</td>
+  </tr>
+  {{end}}
+</table>
+{{else}}<span class="muted">Nothing under construction.</span>{{end}}
+</div>
+
+<h2>Incoming fleets</h2>
+<div class="panel">
+{{if .Incoming}}
+<table>
+  <tr><th>Mission</th><th>From</th><th>Arrives</th></tr>
+  {{range .Incoming}}
+  <tr><td class="bad">{{.Mission}}</td><td>{{coords .OriginG .OriginS .OriginP}}</td><td>{{.Remaining}}</td></tr>
+  {{end}}
+</table>
+{{else}}<span class="muted">No incoming fleets detected.</span>{{end}}
+</div>
+{{template "foot" .}}
+{{end}}

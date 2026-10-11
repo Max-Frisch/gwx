@@ -1,0 +1,104 @@
+# gwx
+
+A deliberately small, self-contained **GalaxyWars-style** browser game — a hobby
+retro revival of the classic German `.de` game, not a clone of any live service.
+Four resources, one catalog, no moons, no expeditions, no premium, no academy.
+
+The design goal is **simplicity + fog of war**: there is no military score, so
+nobody can tell a 20-ship trader from a hidden monster fleet, and every planet's
+storage protects a share of its resources from plunder.
+
+## Stack
+
+- **Go 1.24**, single binary (`cmd/server`).
+- **PostgreSQL 16** as the sole source of truth.
+- **Standard-library** server-rendered UI (`html/template`) + hand-written CSS.
+  No Node, no build step, no templ codegen.
+- No Redis, no cron: a durable scheduler polls Postgres.
+
+## Quickstart
+
+```bash
+cp .env.example .env          # edit DATABASE_URL if needed
+docker compose up -d          # Postgres 16 on :5433
+make migrate                  # apply migrations/0001_init.sql
+make run                      # http://localhost:8090
+```
+
+Register an account in the browser; you spawn on a random homeworld with a
+level-1 Command Center.
+
+`make build`, `make test`, `make lint` work as expected. On Windows, run the
+underlying `go` commands directly if `make` is unavailable.
+
+## Configuration (per server start)
+
+The universe block is **applied/upserted on every start**, so tuning a round is
+just editing `.env` and restarting:
+
+| Variable | Meaning |
+|---|---|
+| `UNIVERSE_CODE` | stable key, e.g. `universe_gwx_1` |
+| `GAME_SPEED` | build + research speed multiplier (higher = faster) |
+| `RESOURCE_SPEED` | mine / refinery / hydrogen production multiplier |
+| `FLEET_SPEED` | fleet travel speed multiplier |
+| `MAX_GALAXIES`, `MAX_SYSTEMS` | universe bounds |
+| `ENDS_AT` | optional RFC3339 seasonal end (empty = long-term universe) |
+
+Two flavours of round therefore come from the same binary: a slow long-term
+universe, or a fast seasonal one.
+
+## The game
+
+- **Resources:** Iron, Lutinum, Water, Hydrogen. Water is pumped by the Drilling
+  Tower and converted **1:1 into hydrogen** by the Chemical Factory — if water
+  runs dry, hydrogen stops.
+- **Buildings:** Command Center (faster builds), Research Center, the three
+  extraction buildings, Chemical Factory, Fusion Reactor (energy), four storages,
+  Shipyard, Orbital Defense Station, Planetary Shield.
+- **Research (account-wide):** Energy, Combustion/Ion/Space-Folding drives,
+  Weapons, Defense, Cargo, Espionage. Drives gate the bigger hulls.
+- **Ships:** Spy Probe, Trade Ship, Cougar, Longeagle X, Colony Ship, Recycler.
+- **Defense:** Turrets, lasers, ion/gauss/plasma, shield domes.
+- **Missions:** Transport, Deploy, Attack, Espionage, Colonize.
+
+### Signature mechanics
+
+1. **Fog of war.** No points, no fleet-strength readout anywhere. The galaxy
+   view shows owners only; you learn composition by scouting or by getting hit.
+2. **Protected storage floor.** `loot = min(cargo capacity, max(0, stored −
+   protected))`, where `protected = 20%` of that resource's storage capacity.
+   A cushion always survives a raid.
+
+Combat is a simple aggregate, simultaneous-fire model with **rapid-fire off**
+(see the backlog). Shields fully regenerate each round.
+
+## Architecture
+
+```
+cmd/server            wiring: HTTP + one durable scheduler
+internal/config       env + universe configuration
+internal/auth         PBKDF2 passwords, opaque hashed session tokens
+internal/game         PURE domain: catalog, economy, tech tree, flight, combat
+internal/store        Postgres access (planets, queues, fleets, reports, auth)
+internal/engine       durable scheduler: claim due rows, resolve idempotently
+internal/web          html/template UI + embedded static assets
+migrations            numbered idempotent SQL + update_planet_resources()
+```
+
+Key ideas (borrowed from the sibling `neoxnova` project):
+
+- **On-demand accrual.** `update_planet_resources(id)` (PL/pgSQL) row-locks the
+  planet and accrues resources from the last calculation. Never cron-updated.
+- **Durable scheduler.** Each tick claims due `queues` / `fleets` with
+  `FOR UPDATE SKIP LOCKED`, re-checks the condition inside the transaction and
+  applies the effect idempotently. Safe to restart; multi-instance safe.
+- **One generic queue table** drives construction, research and ship/defense
+  production; partial unique indexes enforce one active order per scope.
+- **Catalog-keyed store.** `planet_items` holds buildings (as levels) and
+  ships/defense (as counts); `user_techs` holds account-wide research.
+
+## License / intent
+
+Hobby project for personal retro play. Names are drawn from the original
+GalaxyWars for authenticity and can be renamed; assets are placeholders.

@@ -1,0 +1,28 @@
+{{define "login"}}
+{{template "head" .}}
+<h1>Log in</h1>
+<div class="panel" style="max-width:420px">
+  <form method="post" action="/login">
+    <div class="field"><label>Username or email</label><input name="login" value="{{.Login}}" autofocus required style="width:100%"></div>
+    <div class="field"><label>Password</label><input type="password" name="password" required style="width:100%"></div>
+    <button type="submit">Log in</button>
+    <a href="/register" style="margin-left:12px">Create an account</a>
+  </form>
+</div>
+{{template "foot" .}}
+{{end}}
+
+{{define "register"}}
+{{template "head" .}}
+<h1>Register</h1>
+<div class="panel" style="max-width:420px">
+  <form method="post" action="/register">
+    <div class="field"><label>Username</label><input name="username" value="{{.Login}}" required style="width:100%"></div>
+    <div class="field"><label>Email</label><input type="email" name="email" value="{{.Email}}" required style="width:100%"></div>
+    <div class="field"><label>Password (min 10 chars)</label><input type="password" name="password" required style="width:100%"></div>
+    <button type="submit">Register</button>
+    <a href="/login" style="margin-left:12px">I already have an account</a>
+  </form>
+</div>
+{{template "foot" .}}
+{{end}}

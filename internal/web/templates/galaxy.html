@@ -1,0 +1,31 @@
+{{define "galaxy"}}
+{{template "head" .}}
+<h1>Galaxy <span class="muted">{{.Galaxy}}:{{.System}}</span></h1>
+
+<div class="panel row">
+  <a class="btn ghost" href="/galaxy/{{.Galaxy}}/{{.PrevSystem}}">&laquo; prev system</a>
+  <a class="btn ghost" href="/galaxy/{{.Galaxy}}/{{.NextSystem}}">next system &raquo;</a>
+  <span class="spacer"></span>
+  <form method="get" action="/galaxy" class="row">
+    <input type="number" name="g" value="{{.Galaxy}}" min="1" style="width:60px">
+    <input type="number" name="s" value="{{.System}}" min="1" style="width:70px">
+    <button type="submit">Go</button>
+  </form>
+</div>
+
+<div class="panel">
+<table>
+  <tr><th>Pos</th><th>Planet</th><th>Owner</th><th></th></tr>
+  {{range .Rows}}
+  <tr>
+    <td>{{.Position}}</td>
+    <td>{{if .PlanetID}}<a href="/galaxy/{{$.Galaxy}}/{{$.System}}">{{.Name}}</a>{{else}}<span class="muted">empty</span>{{end}}</td>
+    <td>{{if .OwnerName}}{{.OwnerName}}{{else}}<span class="muted">—</span>{{end}}{{if .IsHomeworld}} <span class="tag">homeworld</span>{{end}}</td>
+    <td></td>
+  </tr>
+  {{end}}
+</table>
+<small class="muted">Fleet strength is hidden. You only learn what a scout reveals — or what hits you.</small>
+</div>
+{{template "foot" .}}
+{{end}}

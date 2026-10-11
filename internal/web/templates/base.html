@@ -1,0 +1,54 @@
+{{define "head"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · gwx</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap row" style="padding-top:8px;padding-bottom:8px">
+    <a class="brand" href="/">gwx</a>
+    {{if .ActivePlanetID}}
+    <nav class="nav row">
+      <a href="/overview/{{.ActivePlanetID}}">Overview</a>
+      <a href="/buildings/{{.ActivePlanetID}}">Buildings</a>
+      <a href="/shipyard/{{.ActivePlanetID}}">Shipyard</a>
+      <a href="/research/{{.ActivePlanetID}}">Research</a>
+      <a href="/fleet/{{.ActivePlanetID}}">Fleet</a>
+      <a href="/galaxy">Galaxy</a>
+      <a href="/reports">Reports</a>
+    </nav>
+    {{end}}
+    <span class="spacer"></span>
+    <span class="muted">{{.Username}}</span>
+    <form method="post" action="/logout"><button class="ghost" type="submit">Logout</button></form>
+  </div>
+  {{if .Resources}}
+  <div class="resbar"><div class="wrap">
+    <span><span class="muted">Iron</span> <b class="m">{{nf .Resources.Metal}}</b> <span class="muted">/ {{n .Resources.MetalCap}}</span> <small>+{{nf .Resources.MetalProd}}/h</small></span>
+    <span><span class="muted">Lutinum</span> <b class="l">{{nf .Resources.Lutinum}}</b> <span class="muted">/ {{n .Resources.LutinumCap}}</span> <small>+{{nf .Resources.LutinumProd}}/h</small></span>
+    <span><span class="muted">Water</span> <b class="w">{{nf .Resources.Water}}</b> <span class="muted">/ {{n .Resources.WaterCap}}</span> <small>+{{nf .Resources.WaterProd}}/h</small></span>
+    <span><span class="muted">Hydrogen</span> <b class="h">{{nf .Resources.Hydrogen}}</b> <span class="muted">/ {{n .Resources.HydrogenCap}}</span> <small>+{{nf .Resources.HydrogenProd}}/h</small></span>
+    <span><span class="muted">Energy</span> <b>{{n .Resources.EnergyProd}}</b> <span class="muted">/ {{n .Resources.EnergyUsed}}</span></span>
+  </div></div>
+  {{end}}
+  {{if .Planets}}
+  <div class="wrap row" style="padding-bottom:6px;font-size:12px">
+    <span class="muted">Planets:</span>
+    {{range .Planets}}<a class="tag {{if eq .ID $.ActivePlanetID}}ok{{end}}" href="/overview/{{.ID}}">{{.Name}} {{coords .Galaxy .System .Position}}</a>{{end}}
+  </div>
+  {{end}}
+</header>
+<main><div class="wrap">
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+{{end}}
+
+{{define "foot"}}
+</div></main>
+</body>
+</html>
+{{end}}
