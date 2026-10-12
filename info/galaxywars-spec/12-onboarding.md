@@ -75,6 +75,33 @@ Key observations:
 - `[M]` = **Main Planet** (homeworld), per the locked decision; the switcher also
   lists the account's other coords without the tag.
 
+## Fresh colony defaults (`12:147:5`)
+
+A fourth capture (`extra_recording_new_colony.har`) follows the same account to a
+**newly colonized planet** `12:147:5`, giving the spawn state the mid-game
+homeworld can't show:
+
+- **Buildings:** only the **Command Center at level 1** ("Stufe 1", next cost
+  500 Iron / 200 Lutinum → *Upgrade to level 2*); every other building is level 0
+  (Research Center "Stufe 0", cost 300 / 100).
+- **Starting resources:** planet creation seeds **500 Iron / 500 Lutinum /
+  500 Water / 0 Hydrogen**. Anything above that is **colony-ship cargo** (the
+  sender loaded 20.000 Iron + 10.000 Lutinum): the observed stock was 20.519 /
+  10.519 / 520 / 46, i.e. seed + cargo + a trickle of the (negligible, ignored)
+  20/h base output; the 46 Hydrogen is cargo-only residue.
+- **Storage:** `300.000` per resource with `6.000` unplunderable (the `L=0` term
+  of the storage formula).
+- **Ships / Defenses:** none; **Trading-post storage:** empty.
+- The **Buildings / Resources** sub-navigation (`/building` ⇄ `/resource`) is
+  present on both pages.
+
+### gwx choice
+
+gwx deliberately differs: a newly colonized planet is seeded with **1000 Iron /
+500 Lutinum / 500 Water / 0 Hydrogen** on top of the colony ship's cargo
+(`internal/engine/event_engine.go`, `colonyStart*`). The reference's flat 20/h
+base output is intentionally **not** modelled.
+
 ## gwx today (for the gap checklist)
 
 - **Routes:** `GET /login`, `POST /login`, `GET /register`, `POST /register`,

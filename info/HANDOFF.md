@@ -40,6 +40,22 @@ missed). They were mined in self-contained sessions; the whole spec set
 queue (ordered by difficulty) and the dependency graph; raw HARs stay
 git-ignored, intermediate dumps live in `info/captures/derived/`.
 
+### Update — fresh-colony HAR (`extra_recording_new_colony.har`)
+
+A fourth Uni5 HAR followed the same account to a **newly colonized planet**
+`12:147:5`. Almost everything was already in the spec; the additions:
+
+- **`/resource` page** (Buildings → *Resources* sub-tab) was **not captured
+  before** — folded into `05-ui-flows.md`.
+- **Planet-creation seed = 500 Iron / 500 Lutinum / 500 Water / 0 Hydrogen** (the
+  rest of the observed stock is colony-ship cargo). Recorded in
+  `12-onboarding.md`. The reference's 20/h base output is treated as noise and
+  deliberately **not** modelled.
+- **gwx change (this session):** a newly colonized planet now seeds **1000 Iron /
+  500 Lutinum / 500 Water** (was 500/500/200) on top of the colony ship's cargo —
+  `internal/engine/event_engine.go` (`colonyStart*`). Homeworld spawn unchanged
+  (1000/1000/500).
+
 ## Prior state
 
 ## Repo state

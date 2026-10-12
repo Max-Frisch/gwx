@@ -27,7 +27,7 @@ Reference client `GalaxyWars v3.16.19-beta`, universe `uni5`, account
 
 ```
 PLANET     Overview      /planet
-           Construction  /building
+           Construction  /building    (+ /resource — Buildings/Resources sub-tabs)
            Research      /research
            Ships/Defense /ship   (+ /defense)
            Trade         /trading
@@ -52,7 +52,7 @@ All routes are relative to `/app/<galaxy>:<system>:<position>` unless noted.
 | Surface | Key endpoints | Spec | Notes to copy |
 |---|---|---|---|
 | **Overview** | `/planet` | [12](12-onboarding.md) | Messages badges, fleet activity, building/research order widgets, Ships/Defenses (ckk), trading storage, Points block |
-| **Construction** | `/building`, `/building/append/<ident>`, `/building/remove/<id>` | [01](01-catalog.md), [06](06-queue-management.md) | Grouped cards, level badge, cost pills, duration, affordability, upgrade link |
+| **Construction** | `/building`, `/building/append/<ident>`, `/building/remove/<id>`, `/resource` | [01](01-catalog.md), [06](06-queue-management.md), [02](02-economy-formulas.md) | Grouped cards, level badge, cost pills, duration, affordability, upgrade link; `/resource` = *Resources* sub-tab: per-building + total production table, storage capacity & unplunderable table |
 | **Research** | `/research`, `/research/append/<ident>`, `/research/remove/<id>` | [01](01-catalog.md) | Grouped by Drive / Weapons / Ship research; per-level effect text |
 | **Ships/Defense** | `/ship` (GET/POST), `/defense` | [01](01-catalog.md), [03](03-combat.md) | Card per unit: cost, time, quantity input, `max. N`; batch queue form |
 | **Technology** | `/technology-tree/{building,research,ship,defense}[/<ident>]` | [01](01-catalog.md) | Info + prereqs + points/level + **adaptive level-calculator** (cost/time/effect table) |

@@ -24,6 +24,14 @@ type EventEngine struct {
 // NewEventEngine constructs an EventEngine.
 func NewEventEngine(db *sql.DB) *EventEngine { return &EventEngine{db: db} }
 
+// A newly colonized planet is seeded with this flat grant on top of whatever the
+// colony ship carried (hydrogen is cargo-only; there is no base hydrogen).
+const (
+	colonyStartMetal = 1000
+	colonyStartLut   = 500
+	colonyStartWater = 500
+)
+
 // StartScheduler blocks, resolving due work roughly once per second.
 func (e *EventEngine) StartScheduler(ctx context.Context) {
 	log.Println("[ENGINE] durable scheduler online (1s poll)")
@@ -456,7 +464,8 @@ func (e *EventEngine) resolveColonizeTx(ctx context.Context, tx *sql.Tx, fleetID
 		ON CONFLICT (universe_id, galaxy, system, position) DO NOTHING
 		RETURNING id
 	`, universeID, userID, tg, ts, tp,
-		float64(cm)+500, float64(cl)+500, float64(cw)+200, float64(ch)).Scan(&colonyID)
+		float64(cm)+colonyStartMetal, float64(cl)+colonyStartLut,
+		float64(cw)+colonyStartWater, float64(ch)).Scan(&colonyID)
 	if errors.Is(err, sql.ErrNoRows) {
 		// Slot taken meanwhile: send the colony ship home.
 		techs, _ := loadLevelsTx(ctx, tx, `SELECT code, level FROM user_techs WHERE user_id = $1`, userID)
