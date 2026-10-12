@@ -2,7 +2,7 @@
 {{template "head" .}}
 <div class="tabs">
   <a href="/highscore?tab=players" class="{{if eq .Tab "players"}}active{{end}}">Players</a>
-  <span class="disabled" title="Alliances arrive with the alliance update">Alliances</span>
+  <a href="/highscore?tab=alliances" class="{{if eq .Tab "alliances"}}active{{end}}">Alliances</a>
   <a href="/highscore?tab=planets" class="{{if eq .Tab "planets"}}active{{end}}">Planets</a>
   <a href="/highscore?tab=battles" class="{{if eq .Tab "battles"}}active{{end}}">Battles</a>
 </div>
@@ -21,7 +21,7 @@
   <tr>
     <td class="muted">{{.Rank}}</td>
     <td>{{.Name}} <span class="muted">{{.Coords}}</span></td>
-    <td>{{if .OwnerName}}<a href="/player/{{.OwnerID}}">{{.OwnerName}}</a>{{else}}<span class="muted">Uncolonized</span>{{end}}</td>
+    <td>{{if .OwnerName}}<a href="/player/{{.OwnerID}}">{{.OwnerName}}</a>{{if .OwnerTag}} <a class="tag" href="/alliance?q={{.OwnerTag}}">[{{.OwnerTag}}]</a>{{end}}{{else}}<span class="muted">Uncolonized</span>{{end}}</td>
     <td>{{n .Points}}</td>
   </tr>
   {{else}}
@@ -62,6 +62,32 @@
 {{template "highscore-pager" .}}
 <small class="muted">Headlines only — total resource value destroyed and plundered. No fleet or defense composition is ever shown.</small>
 
+{{else if eq .Tab "alliances"}}
+<h1>Highscore <span class="muted">Alliances</span></h1>
+<div class="panel">
+<table>
+  <tr>
+    <th>#</th>
+    <th><a href="{{.SortURL "name"}}">Alliance{{.SortMark "name"}}</a></th>
+    <th>Tag</th>
+    <th><a href="{{.SortURL "points"}}">Points{{.SortMark "points"}}</a></th>
+    <th><a href="{{.SortURL "members"}}">Members{{.SortMark "members"}}</a></th>
+  </tr>
+  {{range .Alliances}}
+  <tr>
+    <td class="muted">{{.Rank}}</td>
+    <td><a href="/alliance/{{.ID}}">{{.Name}}</a></td>
+    <td><span class="tag">[{{.Tag}}]</span></td>
+    <td><b>{{n .Points}}</b></td>
+    <td>{{.Members}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="5" class="muted">No alliances yet.</td></tr>
+  {{end}}
+</table>
+</div>
+{{template "highscore-pager" .}}
+
 {{else}}
 <h1>Highscore <span class="muted">Players</span></h1>
 <div class="panel">
@@ -77,7 +103,7 @@
   {{range .Players}}
   <tr>
     <td class="muted">{{.Rank}}</td>
-    <td><a href="/player/{{.UserID}}">{{.Username}}</a>{{if .IsMe}} <span class="tag ok">you</span>{{end}}</td>
+    <td><a href="/player/{{.UserID}}">{{.Username}}</a>{{if .Tag}} <a class="tag" href="/alliance?q={{.Tag}}">[{{.Tag}}]</a>{{end}}{{if .IsMe}} <span class="tag ok">you</span>{{end}}</td>
     <td>{{n .PlanetPoints}}</td>
     <td>{{n .ResearchPoints}}</td>
     <td><b>{{n .Total}}</b></td>

@@ -1,6 +1,6 @@
 {{define "player"}}
 {{template "head" .}}
-<h1>{{.Username}}{{if .IsMe}} <span class="tag ok">you</span>{{end}}</h1>
+<h1>{{.Username}}{{if .Tag}} <a class="tag" href="/alliance/{{.AllianceID}}">[{{.Tag}}]</a>{{end}}{{if .IsMe}} <span class="tag ok">you</span>{{end}}</h1>
 
 <div class="panel">
   <div class="row">

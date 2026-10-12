@@ -21,7 +21,7 @@
   </tr>
   {{range .Players}}
   <tr>
-    <td><a href="/player/{{.UserID}}">{{.Username}}</a>{{if .IsMe}} <span class="tag ok">you</span>{{end}}</td>
+    <td><a href="/player/{{.UserID}}">{{.Username}}</a>{{if .Tag}} <span class="tag">[{{.Tag}}]</span>{{end}}{{if .IsMe}} <span class="tag ok">you</span>{{end}}</td>
     <td>{{n .PlanetPoints}}</td>
     <td>{{n .ResearchPoints}}</td>
     <td><b>{{n .Total}}</b></td>

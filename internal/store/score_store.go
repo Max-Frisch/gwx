@@ -227,6 +227,95 @@ func (s *ScoreStore) Planets(ctx context.Context, universeCode string) ([]Planet
 	return out, nil
 }
 
+// AllianceScore is one row of the alliances leaderboard. Points are the sum of
+// members' economy points; no military score anywhere.
+type AllianceScore struct {
+	ID      int64
+	Tag     string
+	Name    string
+	Points  float64
+	Members int
+	IsOpen  bool
+}
+
+// Alliances returns economy points per alliance in the universe.
+func (s *ScoreStore) Alliances(ctx context.Context, universeCode string) ([]AllianceScore, error) {
+	players, err := s.Players(ctx, universeCode)
+	if err != nil {
+		return nil, err
+	}
+	points := make(map[int64]float64, len(players))
+	for _, p := range players {
+		points[p.UserID] = p.Total()
+	}
+
+	scores := map[int64]*AllianceScore{}
+	order := make([]int64, 0)
+	get := func(id int64) *AllianceScore {
+		a, ok := scores[id]
+		if !ok {
+			a = &AllianceScore{ID: id}
+			scores[id] = a
+			order = append(order, id)
+		}
+		return a
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT a.id, a.tag, a.name, a.is_open
+		FROM alliances a
+		WHERE a.universe_id = (SELECT id FROM universes WHERE code_name = $1)
+	`, universeCode)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var id int64
+		var tag, name string
+		var open bool
+		if err := rows.Scan(&id, &tag, &name, &open); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		a := get(id)
+		a.Tag, a.Name, a.IsOpen = tag, name, open
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	mrows, err := s.db.QueryContext(ctx, `
+		SELECT am.alliance_id, am.user_id
+		FROM alliance_members am
+		JOIN alliances a ON a.id = am.alliance_id
+		WHERE a.universe_id = (SELECT id FROM universes WHERE code_name = $1)
+	`, universeCode)
+	if err != nil {
+		return nil, err
+	}
+	for mrows.Next() {
+		var aid, uid int64
+		if err := mrows.Scan(&aid, &uid); err != nil {
+			mrows.Close()
+			return nil, err
+		}
+		a := get(aid)
+		a.Members++
+		a.Points += points[uid]
+	}
+	mrows.Close()
+	if err := mrows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]AllianceScore, 0, len(order))
+	for _, id := range order {
+		out = append(out, *scores[id])
+	}
+	return out, nil
+}
+
 // BattleRow is one public battle headline. It never carries fleet or defense
 // composition — only the total resource value destroyed/plundered, the two
 // player names and the target coordinates. Fog of war holds.

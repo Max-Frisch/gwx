@@ -17,6 +17,7 @@ Append one line per completed session: `date | session | result | commit`.
 2026-10-12 | I3 | /events timeline: in-progress queues (all planets), own + incoming fleets, recent messages; derived, no new table | (this commit)
 2026-10-12 | I4 | /statistics (battle balance / farming / resources) from per-unit combat reports; StatsStore + game aggregation | (this commit)
 2026-10-12 | I5 | highscore expansion: Alliances placeholder + Planets/Battles tabs, sort/direction/page; Battles headline view from reports (ScoreStore.Battles) | (this commit)
+2026-10-12 | I6 | alliances: directory/profile/create/apply/accept, internal members/board/management; fixed MEMBER/OFFICER/LEADER rights in AllianceStore; 0003 migration; highscore Alliances tab + [TAG] in galaxy/highscore/search/player | (this commit)
 ```
 
 ## Recon (2026-10-12)

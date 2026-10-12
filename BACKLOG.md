@@ -45,17 +45,26 @@ Read first; one item per session. Keep this file short.
   win/loss/tie), Farming balance (raids, loot totals, average haul) and Resources
   (plundered vs lost). Combat reports now record per-unit losses and the viewer's
   role; `StatsStore` aggregates the player's own JSONB payloads (`I4-statistics.md`).
-- **I5 highscore expansion** — Highscore now has Players / Alliances (disabled
-  placeholder, pending I6) / Planets / Battles tabs with server-side
-  `?sort=&direction=&page=` (100/page, reference query shape). Battles is a
-  gwx-native headline view built from `reports` (`ScoreStore.Battles`): date,
-  attacker/defender, coordinates, total destroyed + plundered resource value.
-  No fleet/defense composition is ever exposed (`I5-highscore-expansion.md`).
+- **I5 highscore expansion** — Highscore now has Players / Alliances / Planets /
+  Battles tabs with server-side `?sort=&direction=&page=` (100/page, reference
+  query shape). Battles is a gwx-native headline view built from `reports`
+  (`ScoreStore.Battles`): date, attacker/defender, coordinates, total destroyed +
+  plundered resource value. No fleet/defense composition is ever exposed
+  (`I5-highscore-expansion.md`).
+- **I6 alliances** — `/alliance` directory (paged search), public profile,
+  create/apply/withdraw, and an internal member area (overview, members, board,
+  applications, management). Fixed rank model `MEMBER`/`OFFICER`/`LEADER` with
+  rights enforced transactionally in `AllianceStore`; open/closed joining,
+  `min_points` gate, leader transfer on leave, founder close. `alliances` +
+  `alliance_members` + `alliance_applications` + `alliance_posts` (migration
+  `0003`). `ScoreStore.Alliances` powers the Highscore Alliances tab; `[TAG]`
+  now shows next to usernames in galaxy/highscore/search/player.
 
 ## Todo (ordered)
 - [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
 - [ ] **Player trading** — Trade Ship + resource trade offers between players.
-- [ ] **Alliances** — membership, diplomacy (NAP/war), shared board.
+- [ ] **Alliance diplomacy** — NAP/war declarations between alliances (follow-up
+      to I6; membership, ranks, applications and the shared board already land).
 - [ ] **Debris + Recycler** — battle debris field at `debris_rate`, recycle mission.
 - [ ] **Moon** — optional moon chance on large attacks; jump gate later.
       (Legacy/misread: reference GW has no moons; `[M]` means *main planet*.)
@@ -115,7 +124,7 @@ Settings**, Logout. (Bold = we don't have it.)
 - **Alliance**: tags (e.g. `[ThF-]`), membership, diplomacy, shared board.
 - **Highscore**: tabs for Players / Alliances / Planets / Battles; columns
   Planet points / Research points / Total points / Planets. *(Players + Planets +
-  Battles done in I5; Alliances placeholder until I6.)*
+  Battles done in I5; Alliances done in I6.)*
   NOTE: this does **not** conflict with fog-of-war. The game HAS points, but
   only **economy points (buildings + research)** — there are **no military
   points** (no fleet/defense score). That is the whole point: a 10k-point player
@@ -189,8 +198,8 @@ build task in `info/sessions/`:
    Explosive Projectiles, Energy Focusing) can gate them.
 
 **Bigger but still self-contained** (own tables, no external dependency):
-Alliances (`I6`), Trade/market (`I7`), Events feed (`I3`, *done* — derived,
-no table), Vacation mode (`I9`).
+Alliances (`I6`, *done* — diplomacy still open), Trade/market (`I7`), Events feed
+(`I3`, *done* — derived, no table), Vacation mode (`I9`).
 
 **Not standalone** (need a new mechanic first): debris + Recycling Technology,
 Advanced Ship Armor hull bonus, extra cargo tech, Space Curvature Drive

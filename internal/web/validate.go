@@ -25,3 +25,37 @@ func validatePassword(password string) string {
 	}
 	return ""
 }
+
+// validateAllianceTag accepts a short, uppercase-friendly abbreviation made of
+// letters, digits and hyphens (reference tags look like [ThF-], [Linux]).
+func validateAllianceTag(tag string) string {
+	tag = strings.TrimSpace(tag)
+	if len(tag) < 2 || len(tag) > 8 {
+		return "Tag must be 2-8 characters"
+	}
+	for _, r := range tag {
+		ok := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-'
+		if !ok {
+			return "Tag may only contain letters, digits and hyphens"
+		}
+	}
+	return ""
+}
+
+func validateAllianceName(name string) string {
+	name = strings.TrimSpace(name)
+	if len(name) < 3 || len(name) > 64 {
+		return "Alliance name must be 3-64 characters"
+	}
+	return ""
+}
+
+func validatePost(title, body string) string {
+	if len(strings.TrimSpace(title)) < 3 || len(title) > 120 {
+		return "Title must be 3-120 characters"
+	}
+	if strings.TrimSpace(body) == "" {
+		return "Post body cannot be empty"
+	}
+	return ""
+}

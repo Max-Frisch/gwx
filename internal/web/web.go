@@ -45,6 +45,7 @@ type Handler struct {
 	auth         *store.AuthStore
 	scores       *store.ScoreStore
 	stats        *store.StatsStore
+	alliances    *store.AllianceStore
 	tmpl         *template.Template
 }
 
@@ -67,6 +68,7 @@ func New(db *sql.DB, universeCode string) *Handler {
 		auth:         store.NewAuthStore(db),
 		scores:       store.NewScoreStore(db),
 		stats:        store.NewStatsStore(db),
+		alliances:    store.NewAllianceStore(db),
 		tmpl:         tmpl,
 	}
 }
@@ -110,6 +112,27 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /settings/game", h.requireUser(h.SettingsGamePage))
 	mux.HandleFunc("POST /settings/game", h.requireUser(h.SettingsGameSubmit))
 	mux.HandleFunc("POST /queue/{qid}/cancel", h.requireUser(h.QueueCancelSubmit))
+
+	mux.HandleFunc("GET /alliance", h.requireUser(h.AlliancePage))
+	mux.HandleFunc("GET /alliance/create", h.requireUser(h.AllianceCreatePage))
+	mux.HandleFunc("POST /alliance/create", h.requireUser(h.AllianceCreateSubmit))
+	mux.HandleFunc("GET /alliance/applications", h.requireUser(h.AllianceApplicationsPage))
+	mux.HandleFunc("POST /alliance/applications/{id}/withdraw", h.requireUser(h.AllianceWithdrawSubmit))
+	mux.HandleFunc("GET /alliance/internal", h.requireUser(h.AllianceInternalPage))
+	mux.HandleFunc("GET /alliance/internal/members", h.requireUser(h.AllianceMembersPage))
+	mux.HandleFunc("POST /alliance/internal/leave", h.requireUser(h.AllianceLeaveSubmit))
+	mux.HandleFunc("POST /alliance/internal/members/{id}/rank", h.requireUser(h.AllianceRankSubmit))
+	mux.HandleFunc("GET /alliance/internal/board", h.requireUser(h.AllianceBoardPage))
+	mux.HandleFunc("POST /alliance/internal/board", h.requireUser(h.AllianceBoardSubmit))
+	mux.HandleFunc("POST /alliance/internal/board/{id}/delete", h.requireUser(h.AlliancePostDeleteSubmit))
+	mux.HandleFunc("GET /alliance/internal/applications", h.requireUser(h.AllianceApplicationsInternalPage))
+	mux.HandleFunc("POST /alliance/internal/applications/{id}/decide", h.requireUser(h.AllianceApplicationDecideSubmit))
+	mux.HandleFunc("GET /alliance/internal/settings", h.requireUser(h.AllianceSettingsPage))
+	mux.HandleFunc("POST /alliance/internal/settings", h.requireUser(h.AllianceSettingsSubmit))
+	mux.HandleFunc("POST /alliance/internal/close", h.requireUser(h.AllianceCloseSubmit))
+	mux.HandleFunc("POST /alliance/{id}/join", h.requireUser(h.AllianceJoinSubmit))
+	mux.HandleFunc("POST /alliance/{id}/apply", h.requireUser(h.AllianceApplySubmit))
+	mux.HandleFunc("GET /alliance/{id}", h.requireUser(h.AllianceProfilePage))
 }
 
 func mustSub(fsys embed.FS, dir string) fs.FS {
@@ -252,6 +275,16 @@ func msg(err error) string {
 		return "Target planet does not exist."
 	case errors.Is(err, store.ErrNotOwner):
 		return "You do not own that planet."
+	case errors.Is(err, store.ErrAllianceTagTaken):
+		return "That alliance tag is already taken."
+	case errors.Is(err, store.ErrAlreadyMember):
+		return "You are already in an alliance."
+	case errors.Is(err, store.ErrNotMember):
+		return "You are not a member of that alliance."
+	case errors.Is(err, store.ErrAllianceClosed):
+		return "That alliance is closed — send an application instead."
+	case errors.Is(err, store.ErrForbidden):
+		return "You do not have the rights to do that."
 	case errors.Is(err, store.ErrUserExists):
 		return "That username or email is already taken."
 	case errors.Is(err, store.ErrUnknownCode):
@@ -589,6 +622,7 @@ func (h *Handler) GalaxyPage(w http.ResponseWriter, r *http.Request) {
 		NextSystem: minInt(maxS, s+1),
 	}
 	rows, _ := h.planets.Scan(ctx, h.universeCode, g, s)
+	tags, _ := h.alliances.TagsByUser(ctx, h.universeCode)
 	byPos := map[int]store.ScanRow{}
 	for _, row := range rows {
 		byPos[row.Position] = row
@@ -601,6 +635,7 @@ func (h *Handler) GalaxyPage(w http.ResponseWriter, r *http.Request) {
 			}
 			if row.OwnerID.Valid {
 				gr.OwnerID = row.OwnerID.Int64
+				gr.OwnerTag = tags[row.OwnerID.Int64]
 			}
 			gr.Name = row.Name.String
 			gr.OwnerName = row.OwnerName.String
@@ -805,7 +840,7 @@ func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
 
 	tab := q.Get("tab")
 	switch tab {
-	case "planets", "battles":
+	case "planets", "battles", "alliances":
 	default:
 		tab = "players"
 	}
@@ -820,6 +855,7 @@ func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	d := highscoreData{baseData: h.base(ctx, r, userID, "Highscore", h.homeID(ctx, userID)), Tab: tab, Direction: direction}
+	tags, _ := h.alliances.TagsByUser(ctx, h.universeCode)
 
 	switch tab {
 	case "planets":
@@ -838,7 +874,28 @@ func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
 				Coords:    coords(p.Galaxy, p.System, p.Position),
 				OwnerID:   p.OwnerID,
 				OwnerName: p.OwnerName,
+				OwnerTag:  tags[p.OwnerID],
 				Points:    int64(p.Points + 0.5),
+			})
+		}
+	case "alliances":
+		d.Sort = allianceSort(q.Get("sort"))
+		rows, _ := h.scores.Alliances(ctx, h.universeCode)
+		sort.SliceStable(rows, func(i, j int) bool {
+			return ordered(compareAlliances(rows[i], rows[j], d.Sort), direction)
+		})
+		start, end, pages, page := pageWindow(len(rows), page, highscorePageSize)
+		d.Page, d.Pages, d.PrevPage, d.NextPage = page, pages, page-1, page+1
+		for i := start; i < end; i++ {
+			a := rows[i]
+			d.Alliances = append(d.Alliances, allianceScoreRow{
+				Rank:    i + 1,
+				ID:      a.ID,
+				Tag:     a.Tag,
+				Name:    a.Name,
+				Points:  int64(a.Points + 0.5),
+				Members: a.Members,
+				IsOpen:  a.IsOpen,
 			})
 		}
 	case "battles":
@@ -876,6 +933,7 @@ func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
 				Rank:           i + 1,
 				UserID:         p.UserID,
 				Username:       p.Username,
+				Tag:            tags[p.UserID],
 				PlanetPoints:   int64(p.PlanetPoints + 0.5),
 				ResearchPoints: int64(p.ResearchPoints + 0.5),
 				Total:          int64(p.Total() + 0.5),
@@ -921,6 +979,27 @@ func battleSort(key string) string {
 		return key
 	default:
 		return "destroyed"
+	}
+}
+
+// allianceSort normalises an Alliances-tab sort key.
+func allianceSort(key string) string {
+	switch key {
+	case "name", "members":
+		return key
+	default:
+		return "points"
+	}
+}
+
+func compareAlliances(a, b store.AllianceScore, key string) int {
+	switch key {
+	case "name":
+		return strings.Compare(a.Name, b.Name)
+	case "members":
+		return cmpInt(int64(a.Members), int64(b.Members))
+	default:
+		return cmpFloat(a.Points, b.Points)
 	}
 }
 
@@ -1073,6 +1152,7 @@ func (h *Handler) SearchPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	needle := strings.ToLower(q)
+	tags, _ := h.alliances.TagsByUser(ctx, h.universeCode)
 	if players, err := h.scores.Players(ctx, h.universeCode); err == nil {
 		var matches []store.PlayerScore
 		for _, p := range players {
@@ -1085,6 +1165,7 @@ func (h *Handler) SearchPage(w http.ResponseWriter, r *http.Request) {
 			d.Players = append(d.Players, playerScoreRow{
 				UserID:         p.UserID,
 				Username:       p.Username,
+				Tag:            tags[p.UserID],
 				PlanetPoints:   int64(p.PlanetPoints + 0.5),
 				ResearchPoints: int64(p.ResearchPoints + 0.5),
 				Total:          int64(p.Total() + 0.5),
@@ -1111,6 +1192,12 @@ func (h *Handler) PlayerPage(w http.ResponseWriter, r *http.Request) {
 		PlayerID: playerID,
 		Username: name,
 		IsMe:     playerID == userID,
+	}
+	if tags, err := h.alliances.TagsByUser(ctx, h.universeCode); err == nil {
+		d.Tag = tags[playerID]
+	}
+	if m, err := h.alliances.Membership(ctx, playerID); err == nil {
+		d.AllianceID = m.AllianceID
 	}
 
 	if players, err := h.scores.Players(ctx, h.universeCode); err == nil {
@@ -1144,6 +1231,402 @@ func (h *Handler) PlayerPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	h.render(w, "player", http.StatusOK, d)
+}
+
+// ---- alliance handlers ----
+
+// allianceScores maps every player id to their total economy points.
+func (h *Handler) allianceScores(ctx context.Context) map[int64]float64 {
+	out := map[int64]float64{}
+	if players, err := h.scores.Players(ctx, h.universeCode); err == nil {
+		for _, p := range players {
+			out[p.UserID] = p.Total()
+		}
+	}
+	return out
+}
+
+// memberContext resolves the caller's alliance, or ok=false when not a member.
+func (h *Handler) memberContext(ctx context.Context, userID int64) (*store.Alliance, store.Membership, bool) {
+	m, err := h.alliances.Membership(ctx, userID)
+	if err != nil {
+		return nil, store.Membership{}, false
+	}
+	a, err := h.alliances.Get(ctx, m.AllianceID)
+	if err != nil {
+		return nil, store.Membership{}, false
+	}
+	return a, m, true
+}
+
+// allianceDetailView builds the header detail (points summed over members) and
+// the member list for an alliance.
+func (h *Handler) allianceDetailView(ctx context.Context, a *store.Alliance, scores map[int64]float64) (*allianceDetail, []store.AllianceMember) {
+	members, _ := h.alliances.Members(ctx, a.ID)
+	d := &allianceDetail{
+		ID: a.ID, Tag: a.Tag, Name: a.Name, Description: a.Description,
+		FounderID: a.FounderID, FounderName: a.FounderName,
+		IsOpen: a.IsOpen, MinPoints: a.MinPoints,
+		CreatedAt: a.CreatedAt.Format("2006-01-02"), Members: len(members),
+	}
+	var total float64
+	for _, m := range members {
+		total += scores[m.UserID]
+	}
+	d.Points = int64(total + 0.5)
+	return d, members
+}
+
+// allianceScaffold loads the shared membership context used by every internal
+// page. It redirects to /alliance and returns ok=false for non-members.
+func (h *Handler) allianceScaffold(w http.ResponseWriter, r *http.Request, tab string) (allianceData, *store.Alliance, bool) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	a, m, ok := h.memberContext(ctx, userID)
+	if !ok {
+		http.Redirect(w, r, "/alliance", http.StatusSeeOther)
+		return allianceData{}, nil, false
+	}
+	d := allianceData{
+		baseData:              h.base(ctx, r, userID, "Alliance", h.homeID(ctx, userID)),
+		Tab:                   tab,
+		InAlliance:            true,
+		MyRank:                string(m.Rank),
+		CanManageApplications: m.Rank.CanManageApplications(),
+		CanModerateBoard:      m.Rank.CanModerateBoard(),
+		CanManageAlliance:     m.Rank.CanManageAlliance(),
+	}
+	detail, members := h.allianceDetailView(ctx, a, h.allianceScores(ctx))
+	d.Alliance = detail
+	d.Members = newMemberRows(members, userID)
+	return d, a, true
+}
+
+// AlliancePage is the public hub: the alliance directory (paged + searchable).
+// Members are redirected to their internal dashboard.
+func (h *Handler) AlliancePage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	if _, _, ok := h.memberContext(ctx, userID); ok {
+		http.Redirect(w, r, "/alliance/internal", http.StatusSeeOther)
+		return
+	}
+
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	list, total, _ := h.alliances.List(ctx, h.universeCode, q, page, browsePageSize)
+	d := allianceData{
+		baseData: h.base(ctx, r, userID, "Alliance", h.homeID(ctx, userID)),
+		Tab:      "browse", Query: q, Total: total,
+	}
+	d.Pages = (total + browsePageSize - 1) / browsePageSize
+	if d.Pages < 1 {
+		d.Pages = 1
+	}
+	if page > d.Pages {
+		page = d.Pages
+	}
+	d.Page, d.PrevPage, d.NextPage = page, page-1, page+1
+
+	agg, _ := h.scores.Alliances(ctx, h.universeCode)
+	byID := make(map[int64]store.AllianceScore, len(agg))
+	for _, a := range agg {
+		byID[a.ID] = a
+	}
+	for _, a := range list {
+		row := allianceListRow{ID: a.ID, Tag: a.Tag, Name: a.Name, IsOpen: a.IsOpen}
+		if s, ok := byID[a.ID]; ok {
+			row.Points = int64(s.Points + 0.5)
+			row.Members = s.Members
+		}
+		d.Alliances = append(d.Alliances, row)
+	}
+	if apps, err := h.alliances.MyApplications(ctx, userID); err == nil {
+		d.MyApps = newApplicationRows(apps)
+	}
+	h.render(w, "alliance", http.StatusOK, d)
+}
+
+// AllianceProfilePage is the public profile of one alliance.
+func (h *Handler) AllianceProfilePage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	a, err := h.alliances.Get(ctx, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	d := allianceData{baseData: h.base(ctx, r, userID, "Alliance", h.homeID(ctx, userID)), Tab: "profile"}
+	detail, members := h.allianceDetailView(ctx, a, h.allianceScores(ctx))
+	d.Alliance = detail
+	d.Members = newMemberRows(members, userID)
+	if _, m, ok := h.memberContext(ctx, userID); ok {
+		d.InAlliance = true
+		d.IsMyAlliance = m.AllianceID == id
+		d.MyRank = string(m.Rank)
+		d.CanManageApplications = m.Rank.CanManageApplications()
+		d.CanModerateBoard = m.Rank.CanModerateBoard()
+		d.CanManageAlliance = m.Rank.CanManageAlliance()
+	}
+	if apps, err := h.alliances.MyApplications(ctx, userID); err == nil {
+		for _, ap := range apps {
+			if ap.AllianceID == id {
+				d.Applied, d.AppID = true, ap.ID
+			}
+		}
+	}
+	h.render(w, "alliance", http.StatusOK, d)
+}
+
+func (h *Handler) AllianceCreatePage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	if _, _, ok := h.memberContext(ctx, userID); ok {
+		http.Redirect(w, r, "/alliance/internal", http.StatusSeeOther)
+		return
+	}
+	d := allianceData{baseData: h.base(ctx, r, userID, "Alliance", h.homeID(ctx, userID)), Tab: "create"}
+	h.render(w, "alliance", http.StatusOK, d)
+}
+
+func (h *Handler) AllianceCreateSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	tag := strings.TrimSpace(r.FormValue("tag"))
+	name := strings.TrimSpace(r.FormValue("name"))
+	description := strings.TrimSpace(r.FormValue("description"))
+	if m := validateAllianceTag(tag); m != "" {
+		flashRedirect(w, r, "/alliance/create", "", m)
+		return
+	}
+	if m := validateAllianceName(name); m != "" {
+		flashRedirect(w, r, "/alliance/create", "", m)
+		return
+	}
+	if _, err := h.alliances.Create(r.Context(), h.universeCode, userID, tag, name, description); err != nil {
+		flashRedirect(w, r, "/alliance/create", "", msg(err))
+		return
+	}
+	flashRedirect(w, r, "/alliance/internal", "Alliance founded.", "")
+}
+
+// AllianceApplicationsPage lists the caller's own open applications.
+func (h *Handler) AllianceApplicationsPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	d := allianceData{baseData: h.base(ctx, r, userID, "Alliance", h.homeID(ctx, userID)), Tab: "myapps"}
+	if _, _, ok := h.memberContext(ctx, userID); ok {
+		d.InAlliance = true
+	}
+	if apps, err := h.alliances.MyApplications(ctx, userID); err == nil {
+		d.MyApps = newApplicationRows(apps)
+	}
+	h.render(w, "alliance", http.StatusOK, d)
+}
+
+func (h *Handler) AllianceJoinSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	a, err := h.alliances.Get(ctx, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if a.MinPoints > 0 {
+		if pts := h.allianceScores(ctx)[userID]; int(pts) < a.MinPoints {
+			flashRedirect(w, r, "/alliance/"+strconv.FormatInt(id, 10), "",
+				"Your economy points are below this alliance's minimum.")
+			return
+		}
+	}
+	if err := h.alliances.Join(ctx, userID, id); err != nil {
+		flashRedirect(w, r, "/alliance/"+strconv.FormatInt(id, 10), "", msg(err))
+		return
+	}
+	flashRedirect(w, r, "/alliance/internal", "Welcome to the alliance.", "")
+}
+
+func (h *Handler) AllianceApplySubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	message := strings.TrimSpace(r.FormValue("message"))
+	err := h.alliances.Apply(r.Context(), userID, id, message)
+	flashRedirect(w, r, "/alliance/applications", "Application sent.", msg(err))
+}
+
+func (h *Handler) AllianceWithdrawSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	err := h.alliances.Withdraw(r.Context(), userID, id)
+	flashRedirect(w, r, "/alliance/applications", "Application withdrawn.", msg(err))
+}
+
+func (h *Handler) AllianceInternalPage(w http.ResponseWriter, r *http.Request) {
+	d, _, ok := h.allianceScaffold(w, r, "dashboard")
+	if !ok {
+		return
+	}
+	h.render(w, "alliance", http.StatusOK, d)
+}
+
+func (h *Handler) AllianceMembersPage(w http.ResponseWriter, r *http.Request) {
+	d, _, ok := h.allianceScaffold(w, r, "members")
+	if !ok {
+		return
+	}
+	h.render(w, "alliance", http.StatusOK, d)
+}
+
+func (h *Handler) AllianceBoardPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	d, a, ok := h.allianceScaffold(w, r, "board")
+	if !ok {
+		return
+	}
+	posts, _ := h.alliances.Posts(r.Context(), a.ID)
+	d.Posts = newPostRows(posts, userID, d.CanModerateBoard)
+	h.render(w, "alliance", http.StatusOK, d)
+}
+
+func (h *Handler) AllianceApplicationsInternalPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	d, a, ok := h.allianceScaffold(w, r, "applications")
+	if !ok {
+		return
+	}
+	if apps, err := h.alliances.PendingApplications(r.Context(), userID, a.ID); err == nil {
+		d.Pending = newApplicationRows(apps)
+	}
+	h.render(w, "alliance", http.StatusOK, d)
+}
+
+func (h *Handler) AllianceSettingsPage(w http.ResponseWriter, r *http.Request) {
+	d, _, ok := h.allianceScaffold(w, r, "settings")
+	if !ok {
+		return
+	}
+	h.render(w, "alliance", http.StatusOK, d)
+}
+
+func (h *Handler) AllianceLeaveSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	err := h.alliances.Leave(r.Context(), userID)
+	flashRedirect(w, r, "/alliance", "You left the alliance.", msg(err))
+}
+
+func (h *Handler) AllianceRankSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	targetID, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	rank := store.ParseRank(r.FormValue("rank"))
+	_, m, ok := h.memberContext(r.Context(), userID)
+	if !ok {
+		http.Redirect(w, r, "/alliance", http.StatusSeeOther)
+		return
+	}
+	err := h.alliances.SetRank(r.Context(), userID, m.AllianceID, targetID, rank)
+	flashRedirect(w, r, "/alliance/internal/members", "Rank updated.", msg(err))
+}
+
+func (h *Handler) AllianceBoardSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	_, m, ok := h.memberContext(r.Context(), userID)
+	if !ok {
+		http.Redirect(w, r, "/alliance", http.StatusSeeOther)
+		return
+	}
+	title := strings.TrimSpace(r.FormValue("title"))
+	body := strings.TrimSpace(r.FormValue("body"))
+	pinned := r.FormValue("pinned") != ""
+	if v := validatePost(title, body); v != "" {
+		flashRedirect(w, r, "/alliance/internal/board", "", v)
+		return
+	}
+	err := h.alliances.AddPost(r.Context(), userID, m.AllianceID, title, body, pinned)
+	flashRedirect(w, r, "/alliance/internal/board", "Posted.", msg(err))
+}
+
+func (h *Handler) AlliancePostDeleteSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	err := h.alliances.DeletePost(r.Context(), userID, id)
+	flashRedirect(w, r, "/alliance/internal/board", "Post deleted.", msg(err))
+}
+
+func (h *Handler) AllianceApplicationDecideSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	accept := r.FormValue("decision") == "accept"
+	err := h.alliances.Decide(r.Context(), userID, id, accept)
+	flashRedirect(w, r, "/alliance/internal/applications", "Application reviewed.", msg(err))
+}
+
+func (h *Handler) AllianceSettingsSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	_, m, ok := h.memberContext(r.Context(), userID)
+	if !ok {
+		http.Redirect(w, r, "/alliance", http.StatusSeeOther)
+		return
+	}
+	description := strings.TrimSpace(r.FormValue("description"))
+	isOpen := r.FormValue("isOpen") != ""
+	minPoints := atoiDefault(r.FormValue("minPoints"), 0)
+	if minPoints < 0 {
+		minPoints = 0
+	}
+	err := h.alliances.UpdateSettings(r.Context(), userID, m.AllianceID, description, isOpen, minPoints)
+	flashRedirect(w, r, "/alliance/internal/settings", "Settings saved.", msg(err))
+}
+
+func (h *Handler) AllianceCloseSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	_, m, ok := h.memberContext(r.Context(), userID)
+	if !ok {
+		http.Redirect(w, r, "/alliance", http.StatusSeeOther)
+		return
+	}
+	err := h.alliances.Close(r.Context(), userID, m.AllianceID)
+	flashRedirect(w, r, "/alliance", "Alliance closed.", msg(err))
+}
+
+func newApplicationRows(apps []store.AllianceApplication) []allianceApplicationRow {
+	var out []allianceApplicationRow
+	for _, a := range apps {
+		out = append(out, allianceApplicationRow{
+			ID: a.ID, AllianceID: a.AllianceID, Tag: a.Tag, Name: a.Name,
+			Username: a.Username, UserID: a.UserID, Message: a.Message,
+			When: a.CreatedAt.Format("2006-01-02 15:04"),
+		})
+	}
+	return out
+}
+
+func newMemberRows(members []store.AllianceMember, meID int64) []allianceMemberRow {
+	var out []allianceMemberRow
+	for _, m := range members {
+		out = append(out, allianceMemberRow{
+			UserID: m.UserID, Username: m.Username, Rank: m.Rank,
+			Joined: m.JoinedAt.Format("2006-01-02"), IsFounder: m.IsFounder, IsMe: m.UserID == meID,
+		})
+	}
+	return out
+}
+
+func newPostRows(posts []store.AlliancePost, meID int64, canModerate bool) []alliancePostRow {
+	var out []alliancePostRow
+	for _, p := range posts {
+		out = append(out, alliancePostRow{
+			ID: p.ID, AuthorID: p.AuthorID, AuthorName: p.AuthorName,
+			Title: p.Title, Body: p.Body, IsPinned: p.IsPinned,
+			When:      p.CreatedAt.Format("2006-01-02 15:04"),
+			CanDelete: p.AuthorID == meID || canModerate,
+		})
+	}
+	return out
 }
 
 func (h *Handler) SettingsRedirect(w http.ResponseWriter, r *http.Request) {

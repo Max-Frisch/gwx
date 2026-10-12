@@ -1,0 +1,267 @@
+{{define "alliance"}}
+{{template "head" .}}
+
+{{if eq .Tab "browse"}}
+<h1>Alliances</h1>
+<div class="panel">
+  <form method="get" action="/alliance" class="row">
+    <input type="text" name="q" value="{{.Query}}" placeholder="Search by name or tag" style="width:280px">
+    <button type="submit">Search</button>
+    <span class="spacer"></span>
+    <a class="btn ghost" href="/alliance/applications">My applications</a>
+    <a class="btn" href="/alliance/create">Create alliance</a>
+  </form>
+</div>
+
+<div class="panel">
+<table>
+  <tr>
+    <th>Alliance</th>
+    <th style="width:90px">Members</th>
+    <th style="width:120px">Points</th>
+    <th style="width:90px">Status</th>
+  </tr>
+  {{range .Alliances}}
+  <tr>
+    <td><a href="/alliance/{{.ID}}"><b>[{{.Tag}}]</b> {{.Name}}</a></td>
+    <td>{{.Members}}</td>
+    <td>{{n .Points}}</td>
+    <td>{{if .IsOpen}}<span class="tag ok">open</span>{{else}}<span class="tag">closed</span>{{end}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="4" class="muted">No alliances yet. Be the first to found one.</td></tr>
+  {{end}}
+</table>
+</div>
+{{if gt .Pages 1}}
+<div class="pager">
+  {{if gt .Page 1}}<a class="btn ghost" href="{{.PageURL .PrevPage}}">← Newer</a>{{end}}
+  <span class="muted">Page {{.Page}} / {{.Pages}} ({{n .Total}})</span>
+  {{if lt .Page .Pages}}<a class="btn ghost" href="{{.PageURL .NextPage}}">Older →</a>{{end}}
+</div>
+{{end}}
+
+{{else if eq .Tab "create"}}
+<h1>Found an alliance</h1>
+<div class="panel" style="max-width:520px">
+  <form method="post" action="/alliance/create">
+    <div class="field"><label>Abbreviation / tag</label><input name="tag" required maxlength="8" placeholder="e.g. nWo" style="width:100%"></div>
+    <div class="field"><label>Name</label><input name="name" required maxlength="64" placeholder="e.g. new World order" style="width:100%"></div>
+    <div class="field"><label>Description</label><textarea name="description" rows="4" style="width:100%"></textarea></div>
+    <button type="submit">Found alliance</button>
+    <a class="btn ghost" href="/alliance">Cancel</a>
+  </form>
+  <small class="muted">Tags are unique in this universe, 2-8 letters/digits/hyphens. You become the founder.</small>
+</div>
+
+{{else if eq .Tab "myapps"}}
+<h1>My applications</h1>
+<div class="panel">
+{{range .MyApps}}
+  <div class="row" style="border-bottom:1px solid rgba(255,255,255,.06); padding:8px 0">
+    <b><a href="/alliance/{{.AllianceID}}">[{{.Tag}}] {{.Name}}</a></b>
+    <span class="muted">{{.When}}</span>
+    <span class="spacer"></span>
+    <form method="post" action="/alliance/applications/{{.ID}}/withdraw"><button class="ghost" type="submit">Withdraw</button></form>
+  </div>
+  {{if .Message}}<div class="muted" style="padding:0 0 6px">{{.Message}}</div>{{end}}
+{{else}}
+  <span class="muted">No applications available.</span>
+{{end}}
+</div>
+<p><a class="btn ghost" href="/alliance">← Back to alliances</a></p>
+
+{{else if eq .Tab "profile"}}
+<h1>Alliance <span class="muted">[{{.Alliance.Tag}}]</span></h1>
+{{template "alliance-header" .}}
+
+{{if .IsMyAlliance}}
+  <div class="panel row">
+    <span class="muted">This is your alliance.</span>
+    <span class="spacer"></span>
+    <a class="btn" href="/alliance/internal">Enter alliance</a>
+  </div>
+{{else if .InAlliance}}
+  <div class="panel muted">You already belong to an alliance — leave it before applying elsewhere.</div>
+{{else if .Applied}}
+  <div class="panel">
+    <span>Your application is pending.</span>
+    <form method="post" action="/alliance/applications/{{.AppID}}/withdraw" style="display:inline"><button class="ghost" type="submit">Withdraw</button></form>
+  </div>
+{{else if .Alliance.IsOpen}}
+  <div class="panel">
+    <form method="post" action="/alliance/{{.Alliance.ID}}/join">
+      <button type="submit">Join alliance</button>
+    </form>
+    <small class="muted">This alliance is open — joining is immediate.</small>
+  </div>
+{{else}}
+  <div class="panel" style="max-width:520px">
+    <h3>Apply to [{{.Alliance.Tag}}] {{.Alliance.Name}}</h3>
+    <form method="post" action="/alliance/{{.Alliance.ID}}/apply">
+      <div class="field"><label>Message</label><textarea name="message" rows="4" style="width:100%"></textarea></div>
+      <button type="submit">Send application</button>
+    </form>
+  </div>
+{{end}}
+
+<h2>Members</h2>
+{{template "alliance-members" .}}
+
+{{else}}
+{{/* internal member area */}}
+{{template "alliance-nav" .}}
+
+{{if eq .Tab "dashboard"}}
+{{template "alliance-header" .}}
+<h2>Members</h2>
+{{template "alliance-members" .}}
+<form method="post" action="/alliance/internal/leave" onsubmit="return confirm('Leave this alliance?')">
+  <button class="bad" type="submit">Leave alliance</button>
+</form>
+
+{{else if eq .Tab "members"}}
+<h2>Members</h2>
+{{template "alliance-members" .}}
+
+{{else if eq .Tab "board"}}
+<h2>Board</h2>
+<div class="panel">
+  <form method="post" action="/alliance/internal/board">
+    <div class="field"><label>Title</label><input name="title" required maxlength="120" style="width:100%"></div>
+    <div class="field"><label>Message</label><textarea name="body" rows="4" style="width:100%"></textarea></div>
+    {{if .CanModerateBoard}}<label><input type="checkbox" name="pinned" value="1"> Pin topic to the top</label>{{end}}
+    <button type="submit">Create topic</button>
+  </form>
+</div>
+{{range .Posts}}
+<div class="panel">
+  <div class="row">
+    <b>{{.Title}}</b>
+    {{if .IsPinned}}<span class="tag busy">pinned</span>{{end}}
+    <span class="spacer"></span>
+    <span class="muted">{{.AuthorName}} · {{.When}}</span>
+  </div>
+  <p style="white-space:pre-wrap">{{.Body}}</p>
+  {{if .CanDelete}}
+  <form method="post" action="/alliance/internal/board/{{.ID}}/delete" onsubmit="return confirm('Delete this post?')">
+    <button class="bad" type="submit">Delete</button>
+  </form>
+  {{end}}
+</div>
+{{else}}
+<div class="panel muted">No posts yet.</div>
+{{end}}
+
+{{else if eq .Tab "applications"}}
+<h2>Applications</h2>
+{{if .CanManageApplications}}
+{{range .Pending}}
+<div class="panel">
+  <div class="row">
+    <b><a href="/player/{{.UserID}}">{{.Username}}</a></b>
+    <span class="spacer"></span>
+    <span class="muted">{{.When}}</span>
+  </div>
+  {{if .Message}}<p style="white-space:pre-wrap">{{.Message}}</p>{{end}}
+  <div class="row">
+    <form method="post" action="/alliance/internal/applications/{{.ID}}/decide">
+      <input type="hidden" name="decision" value="accept">
+      <button type="submit">Accept</button>
+    </form>
+    <form method="post" action="/alliance/internal/applications/{{.ID}}/decide">
+      <input type="hidden" name="decision" value="reject">
+      <button class="ghost" type="submit">Reject</button>
+    </form>
+  </div>
+</div>
+{{else}}
+<div class="panel muted">No applications available.</div>
+{{end}}
+{{else}}
+<div class="panel muted">Only officers and the leader may review applications.</div>
+{{end}}
+
+{{else if eq .Tab "settings"}}
+<h2>Management</h2>
+{{if .CanManageAlliance}}
+<div class="panel" style="max-width:520px">
+  <form method="post" action="/alliance/internal/settings">
+    <div class="field"><label>Tag</label><input value="{{.Alliance.Tag}}" disabled style="width:100%"></div>
+    <div class="field"><label>Name</label><input value="{{.Alliance.Name}}" disabled style="width:100%"></div>
+    <div class="field"><label>Description</label><textarea name="description" rows="4" style="width:100%">{{.Alliance.Description}}</textarea></div>
+    <div class="field"><label>Minimum points to join</label><input type="number" name="minPoints" value="{{.Alliance.MinPoints}}" min="0"></div>
+    <label><input type="checkbox" name="isOpen" value="1" {{if .Alliance.IsOpen}}checked{{end}}> Open — players may join directly (closed = apply)</label>
+    <div style="margin-top:10px"><button type="submit">Save settings</button></div>
+  </form>
+</div>
+<form method="post" action="/alliance/internal/close" onsubmit="return confirm('Close this alliance for everyone?')">
+  <button class="bad" type="submit">Close alliance</button>
+</form>
+{{else}}
+<div class="panel muted">Only the founder may manage this alliance.</div>
+{{end}}
+{{end}}
+
+{{end}}
+{{template "foot" .}}
+{{end}}
+
+{{define "alliance-header"}}
+<div class="panel">
+  <h2 style="margin-top:0">[{{.Alliance.Tag}}] {{.Alliance.Name}}</h2>
+  <div class="row">
+    <span class="muted">Points</span><b>{{n .Alliance.Points}}</b>
+    <span class="muted">Members</span><b>{{.Alliance.Members}}</b>
+    <span class="muted">Founder</span><b><a href="/player/{{.Alliance.FounderID}}">{{.Alliance.FounderName}}</a></b>
+    <span class="muted">Founded</span><span>{{.Alliance.CreatedAt}}</span>
+    {{if .Alliance.IsOpen}}<span class="tag ok">open</span>{{else}}<span class="tag">closed</span>{{end}}
+  </div>
+  {{if .Alliance.Description}}<p style="white-space:pre-wrap">{{.Alliance.Description}}</p>{{end}}
+</div>
+{{end}}
+
+{{define "alliance-nav"}}
+<div class="tabs">
+  <a href="/alliance/internal" class="{{if eq .Tab "dashboard"}}active{{end}}">Overview</a>
+  <a href="/alliance/internal/members" class="{{if eq .Tab "members"}}active{{end}}">Members</a>
+  <a href="/alliance/internal/board" class="{{if eq .Tab "board"}}active{{end}}">Board</a>
+  <a href="/alliance/internal/applications" class="{{if eq .Tab "applications"}}active{{end}}">Applications</a>
+  <a href="/alliance/internal/settings" class="{{if eq .Tab "settings"}}active{{end}}">Management</a>
+</div>
+{{end}}
+
+{{define "alliance-members"}}
+<div class="panel">
+<table>
+  <tr>
+    <th>Name</th>
+    <th style="width:120px">Rank</th>
+    <th style="width:130px">Joined</th>
+    {{if .CanManageAlliance}}<th style="width:200px"></th>{{end}}
+  </tr>
+  {{range .Members}}
+  <tr>
+    <td>
+      <a href="/player/{{.UserID}}">{{.Username}}</a>
+      {{if .IsMe}}<span class="tag ok">you</span>{{end}}
+      {{if .IsFounder}}<span class="tag">founder</span>{{end}}
+    </td>
+    <td>{{.Rank}}</td>
+    <td class="muted">{{.Joined}}</td>
+    {{if $.CanManageAlliance}}
+    <td>
+      {{if ne .Rank "LEADER"}}
+      {{if eq .Rank "MEMBER"}}
+      <form method="post" action="/alliance/internal/members/{{.UserID}}/rank"><input type="hidden" name="rank" value="OFFICER"><button class="ghost" type="submit">Promote</button></form>
+      {{else if eq .Rank "OFFICER"}}
+      <form method="post" action="/alliance/internal/members/{{.UserID}}/rank"><input type="hidden" name="rank" value="MEMBER"><button class="ghost" type="submit">Demote</button></form>
+      {{end}}
+      {{end}}
+    </td>
+    {{end}}
+  </tr>
+  {{end}}
+</table>
+</div>
+{{end}}

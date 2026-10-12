@@ -135,3 +135,49 @@ type Message struct {
 	IsRead    bool
 	CreatedAt time.Time
 }
+
+// Alliance is one alliance row.
+type Alliance struct {
+	ID          int64
+	Tag         string
+	Name        string
+	Description string
+	FounderID   int64
+	FounderName string
+	IsOpen      bool
+	MinPoints   int
+	CreatedAt   time.Time
+}
+
+// AllianceMember is one membership row plus the player's display name.
+type AllianceMember struct {
+	UserID    int64
+	Username  string
+	Rank      string
+	JoinedAt  time.Time
+	IsFounder bool
+}
+
+// AllianceApplication is one application row with its alliance + applicant.
+type AllianceApplication struct {
+	ID         int64
+	AllianceID int64
+	Tag        string
+	Name       string
+	UserID     int64
+	Username   string
+	Message    string
+	Status     string
+	CreatedAt  time.Time
+}
+
+// AlliancePost is one shared-board entry.
+type AlliancePost struct {
+	ID         int64
+	AuthorID   int64
+	AuthorName string
+	Title      string
+	Body       string
+	IsPinned   bool
+	CreatedAt  time.Time
+}

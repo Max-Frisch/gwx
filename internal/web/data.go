@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -102,6 +103,7 @@ type galaxyRow struct {
 	Name        string
 	OwnerID     int64
 	OwnerName   string
+	OwnerTag    string
 	IsHomeworld bool
 }
 
@@ -117,6 +119,7 @@ type playerScoreRow struct {
 	Rank           int
 	UserID         int64
 	Username       string
+	Tag            string
 	PlanetPoints   int64
 	ResearchPoints int64
 	Total          int64
@@ -130,7 +133,18 @@ type planetScoreRow struct {
 	Coords    string
 	OwnerID   int64
 	OwnerName string
+	OwnerTag  string
 	Points    int64
+}
+
+type allianceScoreRow struct {
+	Rank    int
+	ID      int64
+	Tag     string
+	Name    string
+	Points  int64
+	Members int
+	IsOpen  bool
 }
 
 type battleRow struct {
@@ -155,6 +169,7 @@ type highscoreData struct {
 	Players    []playerScoreRow
 	PlanetRows []planetScoreRow
 	Battles    []battleRow
+	Alliances  []allianceScoreRow
 	Page       int
 	Pages      int
 	PrevPage   int
@@ -232,6 +247,8 @@ type playerData struct {
 	baseData
 	PlayerID       int64
 	Username       string
+	Tag            string
+	AllianceID     int64
 	Rank           int
 	PlanetPoints   int64
 	ResearchPoints int64
@@ -256,6 +273,113 @@ type authData struct {
 	baseData
 	Login string
 	Email string
+}
+
+// ---- alliances ----
+
+// allianceDetail is the public/dashboard view of one alliance.
+type allianceDetail struct {
+	ID          int64
+	Tag         string
+	Name        string
+	Description string
+	FounderID   int64
+	FounderName string
+	IsOpen      bool
+	MinPoints   int
+	Points      int64
+	Members     int
+	CreatedAt   string
+}
+
+type allianceListRow struct {
+	ID      int64
+	Tag     string
+	Name    string
+	Points  int64
+	Members int
+	IsOpen  bool
+}
+
+type allianceMemberRow struct {
+	UserID    int64
+	Username  string
+	Rank      string
+	Joined    string
+	IsFounder bool
+	IsMe      bool
+}
+
+type allianceApplicationRow struct {
+	ID         int64
+	AllianceID int64
+	Tag        string
+	Name       string
+	Username   string
+	UserID     int64
+	Message    string
+	When       string
+}
+
+type alliancePostRow struct {
+	ID         int64
+	AuthorID   int64
+	AuthorName string
+	Title      string
+	Body       string
+	IsPinned   bool
+	When       string
+	CanDelete  bool
+}
+
+// allianceData backs both the public hub and the internal member area.
+type allianceData struct {
+	baseData
+	Tab      string
+	Query    string
+	Page     int
+	Pages    int
+	PrevPage int
+	NextPage int
+	Total    int
+
+	// browse
+	Alliances []allianceListRow
+	MyApps    []allianceApplicationRow
+
+	// membership context (internal pages)
+	InAlliance            bool
+	IsMyAlliance          bool
+	Alliance              *allianceDetail
+	MyRank                string
+	CanManageApplications bool
+	CanModerateBoard      bool
+	CanManageAlliance     bool
+
+	// my own application to the alliance currently being viewed
+	Applied bool
+	AppID   int64
+
+	// pending applications (internal)
+	Pending []allianceApplicationRow
+
+	// members
+	Members []allianceMemberRow
+
+	// board
+	Posts []alliancePostRow
+}
+
+// browsePageSize is the alliance directory page length (reference: 20).
+const browsePageSize = 20
+
+// PageURL links to another directory page while keeping the search term.
+func (d allianceData) PageURL(n int) string {
+	u := "/alliance?page=" + strconv.Itoa(n)
+	if d.Query != "" {
+		u += "&q=" + url.QueryEscape(d.Query)
+	}
+	return u
 }
 
 type overviewData struct {
