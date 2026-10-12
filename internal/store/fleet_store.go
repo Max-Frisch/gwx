@@ -318,6 +318,29 @@ func (s *FleetStore) Incoming(ctx context.Context, planetID int64) ([]Fleet, err
 	return out, rows.Err()
 }
 
+// IncomingForUser returns hostile fleets headed to any of a user's planets.
+func (s *FleetStore) IncomingForUser(ctx context.Context, userID int64) ([]Fleet, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT `+fleetCols+` FROM fleets f
+		JOIN planets p ON p.id = f.target_id
+		WHERE p.user_id = $1 AND f.phase = 'OUTBOUND'
+		ORDER BY f.arrival_at
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Fleet
+	for rows.Next() {
+		f, err := scanFleet(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *f)
+	}
+	return out, rows.Err()
+}
+
 // Recall turns an outbound fleet around mid-flight.
 func (s *FleetStore) Recall(ctx context.Context, fleetID, userID int64) error {
 	res, err := s.db.ExecContext(ctx, `

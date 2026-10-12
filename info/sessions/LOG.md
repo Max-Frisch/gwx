@@ -14,6 +14,7 @@ Append one line per completed session: `date | session | result | commit`.
 2026-10-12 | E8 | consolidated 01-12 spec; rewrote 05 nav; gen_spec owns 01-04/06; refreshed BACKLOG/HANDOFF | (this commit)
 2026-10-12 | I1 | /search (planets+players) + /player/{id} profile + /settings (Account rename/email/password, Game prefs); users.settings JSONB | (this commit)
 2026-10-12 | I2 | message centre: /messages inbox (system + report notifications), read/delete/archive, unread badge, report deep-links; messages table + engine emission | (this commit)
+2026-10-12 | I3 | /events timeline: in-progress queues (all planets), own + incoming fleets, recent messages; derived, no new table | (this commit)
 ```
 
 ## Recon (2026-10-12)

@@ -36,6 +36,10 @@ Read first; one item per session. Keep this file short.
   the sidebar, and deep links to the matching `/reports#report-{id}` entry.
   New `messages` table; emitted from the engine where queues/fleets resolve and
   reports are written. (`10-messages-events-search.md`)
+- **I3 events** — `/events` timeline (nav: UNIVERSE): in-progress building/
+  research/unit queues across all planets, own fleets in flight and hostile
+  incoming, plus recent resolved activity from `messages`. Purely derived from
+  `queues`/`fleets`/`messages` — no new table (`I3-events.md`).
 
 ## Todo (ordered)
 - [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
@@ -173,7 +177,8 @@ build task in `info/sessions/`:
    Explosive Projectiles, Energy Focusing) can gate them.
 
 **Bigger but still self-contained** (own tables, no external dependency):
-Alliances (`I6`), Trade/market (`I7`), Events feed (`I3`), Vacation mode (`I9`).
+Alliances (`I6`), Trade/market (`I7`), Events feed (`I3`, *done* — derived,
+no table), Vacation mode (`I9`).
 
 **Not standalone** (need a new mechanic first): debris + Recycling Technology,
 Advanced Ship Armor hull bonus, extra cargo tech, Space Curvature Drive

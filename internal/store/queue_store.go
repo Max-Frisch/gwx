@@ -291,7 +291,7 @@ func (s *QueueStore) StartUnits(ctx context.Context, universeCode string, userID
 // Active returns in-progress queues for a planet and account.
 func (s *QueueStore) Active(ctx context.Context, planetID, userID int64) ([]Queue, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, kind, code, target_level, quantity, quantity_done, start_at, finish_at, status
+		SELECT id, planet_id, kind, code, target_level, quantity, quantity_done, start_at, finish_at, status
 		FROM queues
 		WHERE status = 'IN_PROGRESS'
 		  AND ((kind IN ('building','ship','defense') AND planet_id = $1) OR (kind = 'research' AND user_id = $2))
@@ -304,7 +304,32 @@ func (s *QueueStore) Active(ctx context.Context, planetID, userID int64) ([]Queu
 	var out []Queue
 	for rows.Next() {
 		var q Queue
-		if err := rows.Scan(&q.ID, &q.Kind, &q.Code, &q.TargetLevel, &q.Quantity,
+		if err := rows.Scan(&q.ID, &q.PlanetID, &q.Kind, &q.Code, &q.TargetLevel, &q.Quantity,
+			&q.QuantityDone, &q.StartAt, &q.FinishAt, &q.Status); err != nil {
+			return nil, err
+		}
+		out = append(out, q)
+	}
+	return out, rows.Err()
+}
+
+// ActiveForUser returns every in-progress queue for an account, across all of
+// its planets. Used by the events timeline.
+func (s *QueueStore) ActiveForUser(ctx context.Context, userID int64) ([]Queue, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, planet_id, kind, code, target_level, quantity, quantity_done, start_at, finish_at, status
+		FROM queues
+		WHERE status = 'IN_PROGRESS' AND user_id = $1
+		ORDER BY finish_at
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Queue
+	for rows.Next() {
+		var q Queue
+		if err := rows.Scan(&q.ID, &q.PlanetID, &q.Kind, &q.Code, &q.TargetLevel, &q.Quantity,
 			&q.QuantityDone, &q.StartAt, &q.FinishAt, &q.Status); err != nil {
 			return nil, err
 		}

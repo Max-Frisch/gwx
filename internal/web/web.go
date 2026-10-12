@@ -93,6 +93,7 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /galaxy", h.requireUser(h.GalaxyRedirect))
 	mux.HandleFunc("GET /galaxy/{galaxy}/{system}", h.requireUser(h.GalaxyPage))
 	mux.HandleFunc("GET /reports", h.requireUser(h.ReportsPage))
+	mux.HandleFunc("GET /events", h.requireUser(h.EventsPage))
 	mux.HandleFunc("GET /messages", h.requireUser(h.MessagesPage))
 	mux.HandleFunc("POST /messages/{id}/read", h.requireUser(h.MessageReadSubmit))
 	mux.HandleFunc("POST /messages/{id}/delete", h.requireUser(h.MessageDeleteSubmit))
@@ -623,6 +624,94 @@ func (h *Handler) ReportsPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	h.render(w, "reports", http.StatusOK, d)
+}
+
+// EventsPage renders the derived "activity timeline": running builds/research/
+// unit orders, fleets in flight (own and incoming) and recent resolved items.
+// No new state — everything is read from queues, fleets and messages.
+func (h *Handler) EventsPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	d := eventsData{baseData: h.base(ctx, r, userID, "Events", h.homeID(ctx, userID))}
+
+	owned, _ := h.planets.ListOwned(ctx, userID)
+	byID := make(map[int64]store.OwnedPlanet, len(owned))
+	for _, p := range owned {
+		byID[p.ID] = p
+	}
+	where := func(id int64) string {
+		if p, ok := byID[id]; ok {
+			return coords(p.Galaxy, p.System, p.Position)
+		}
+		return ""
+	}
+
+	qs, _ := h.queues.ActiveForUser(ctx, userID)
+	for _, q := range qs {
+		d.Rows = append(d.Rows, eventRow{
+			Kind:      q.Kind,
+			Title:     queueEventName(q),
+			Where:     where(q.PlanetID),
+			Status:    "in progress",
+			Remaining: until(q.FinishAt),
+			Link:      queueLink(q),
+			When:      q.FinishAt,
+		})
+	}
+
+	active, _ := h.fleets.ListActive(ctx, userID)
+	for _, f := range active {
+		status := "arriving"
+		if f.Phase == "RETURNING" {
+			status = "returning"
+		}
+		d.Rows = append(d.Rows, eventRow{
+			Kind:      "fleet",
+			Title:     missionLabel(f.Mission),
+			Where:     coords(f.TargetG, f.TargetS, f.TargetP),
+			Status:    status,
+			Remaining: until(f.ArrivalAt),
+			Link:      "/fleet/" + strconv.FormatInt(f.OriginID, 10),
+			When:      f.ArrivalAt,
+		})
+	}
+
+	incoming, _ := h.fleets.IncomingForUser(ctx, userID)
+	for _, f := range incoming {
+		link := "/fleet/" + strconv.FormatInt(h.homeID(ctx, userID), 10)
+		if f.TargetID.Valid {
+			link = "/overview/" + strconv.FormatInt(f.TargetID.Int64, 10)
+		}
+		d.Rows = append(d.Rows, eventRow{
+			Kind:      "fleet",
+			Title:     missionLabel(f.Mission),
+			Where:     coords(f.TargetG, f.TargetS, f.TargetP),
+			Status:    "incoming",
+			Remaining: until(f.ArrivalAt),
+			Link:      link,
+			Incoming:  true,
+			When:      f.ArrivalAt,
+		})
+	}
+
+	sort.SliceStable(d.Rows, func(i, j int) bool { return d.Rows[i].When.Before(d.Rows[j].When) })
+
+	msgs, _ := h.messages.List(ctx, userID, 1, 10, store.MessageFilter{})
+	for _, m := range msgs {
+		link := "/messages"
+		if m.ReportID.Valid {
+			link = "/reports#report-" + strconv.FormatInt(m.ReportID.Int64, 10)
+		}
+		d.Recent = append(d.Recent, eventRow{
+			Kind:      m.Kind,
+			Title:     m.Title,
+			Status:    "done",
+			Remaining: ago(m.CreatedAt),
+			Link:      link,
+		})
+	}
+
+	h.render(w, "events", http.StatusOK, d)
 }
 
 func (h *Handler) MessagesPage(w http.ResponseWriter, r *http.Request) {

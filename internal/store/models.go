@@ -79,6 +79,7 @@ type ScanRow struct {
 // Queue is a row in the generic queues table.
 type Queue struct {
 	ID           int64
+	PlanetID     int64
 	Kind         string
 	Code         string
 	TargetLevel  sql.NullInt64

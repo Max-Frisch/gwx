@@ -1,0 +1,50 @@
+{{define "events"}}
+{{template "head" .}}
+<h1>Events</h1>
+<p class="muted">Everything the empire has on the move — orders, fleets and recent activity in one timeline.</p>
+
+<h2>Upcoming</h2>
+<div class="panel">
+{{if .Rows}}
+<table>
+  <tr>
+    <th style="width:110px">Type</th>
+    <th>Activity</th>
+    <th style="width:110px">Where</th>
+    <th style="width:120px">Status</th>
+    <th style="width:130px">When</th>
+  </tr>
+  {{range .Rows}}
+  <tr>
+    <td><span class="tag">{{.Kind}}</span></td>
+    <td><a href="{{.Link}}">{{.Title}}</a></td>
+    <td class="muted">{{if .Where}}{{.Where}}{{else}}—{{end}}</td>
+    <td class="{{if .Incoming}}bad{{end}}">{{.Status}}</td>
+    <td class="muted">{{.Remaining}}</td>
+  </tr>
+  {{end}}
+</table>
+{{else}}<span class="muted">Nothing on the horizon.</span>{{end}}
+</div>
+
+<h2>Recent</h2>
+<div class="panel">
+{{if .Recent}}
+<table>
+  <tr>
+    <th style="width:110px">Type</th>
+    <th>Activity</th>
+    <th style="width:130px">When</th>
+  </tr>
+  {{range .Recent}}
+  <tr>
+    <td><span class="tag">{{.Kind}}</span></td>
+    <td><a href="{{.Link}}">{{.Title}}</a></td>
+    <td class="muted">{{.Remaining}}</td>
+  </tr>
+  {{end}}
+</table>
+{{else}}<span class="muted">No recent activity.</span>{{end}}
+</div>
+{{template "foot" .}}
+{{end}}

@@ -262,6 +262,81 @@ type messagesData struct {
 	Rows     []messageRow
 }
 
+// eventRow is one line of the events timeline: an in-progress queue or a
+// fleet movement (upcoming), or a recently resolved item (recent).
+type eventRow struct {
+	Kind      string
+	Title     string
+	Where     string
+	Status    string
+	Remaining string
+	Link      string
+	Incoming  bool
+	When      time.Time
+}
+
+type eventsData struct {
+	baseData
+	Rows   []eventRow
+	Recent []eventRow
+}
+
+// queueEventName renders a queue's human title: "Iron Mine → 3" for
+// buildings/research and "5 × Spy Probe" for unit batches.
+func queueEventName(q store.Queue) string {
+	def, ok := game.Get(q.Code)
+	if !ok {
+		return q.Code
+	}
+	if q.Quantity.Valid && q.Quantity.Int64 > 0 {
+		return fmt.Sprintf("%d × %s", q.Quantity.Int64, def.Name)
+	}
+	if q.TargetLevel.Valid {
+		return fmt.Sprintf("%s → %d", def.Name, q.TargetLevel.Int64)
+	}
+	return def.Name
+}
+
+// missionLabel maps an engine mission code to a display name.
+func missionLabel(mission string) string {
+	switch mission {
+	case "TRANSPORT":
+		return "Transport"
+	case "DEPLOY":
+		return "Deploy"
+	case "ATTACK":
+		return "Attack"
+	case "ESPIONAGE":
+		return "Espionage"
+	case "COLONIZE":
+		return "Colonize"
+	default:
+		return mission
+	}
+}
+
+// queueLink returns the page a queue's item is managed from.
+func queueLink(q store.Queue) string {
+	id := strconv.FormatInt(q.PlanetID, 10)
+	switch q.Kind {
+	case "building":
+		return "/buildings/" + id
+	case "research":
+		return "/research/" + id
+	default:
+		return "/shipyard/" + id
+	}
+}
+
+// ago renders a past timestamp as a relative "… ago" string.
+func ago(t time.Time) string {
+	d := time.Since(t)
+	if d < 0 {
+		d = 0
+	}
+	return humanDur(int64(d.Seconds())) + " ago"
+}
+
 // ---- formatting helpers (also exposed to templates) ----
 
 // fmtInt accepts any integer-ish value so templates can format int and int64
