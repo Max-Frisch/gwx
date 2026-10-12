@@ -16,22 +16,22 @@ func TestUnitValue(t *testing.T) {
 }
 
 func TestLossValue(t *testing.T) {
-	units := map[string]int64{"cougar": 1, "defense_turret": 2}
-	// Cougar 4100 + 2 × Defense Turret 2500 = 9100.
-	if got := LossValue(units); got != 9100 {
-		t.Errorf("LossValue = %v, want 9100", got)
+	units := map[string]int64{"cougar": 1, "heavy_laser": 2}
+	// Cougar 4100 + 2 × Laser Turret 2200 = 8500.
+	if got := LossValue(units); got != 8500 {
+		t.Errorf("LossValue = %v, want 8500", got)
 	}
 }
 
 func TestCombatReportValues(t *testing.T) {
 	rep := CombatReport{
 		AttackerLosses: map[string]int64{"cougar": 1},
-		DefenderLosses: map[string]int64{"defense_turret": 2},
+		DefenderLosses: map[string]int64{"heavy_laser": 2},
 		Loot:           Loot{Metal: 1000, Hydrogen: 500},
 	}
-	// Cougar 4100 + 2 × Defense Turret 2500 = 9100.
-	if got := rep.DestroyedValue(); got != 9100 {
-		t.Errorf("DestroyedValue = %v, want 9100", got)
+	// Cougar 4100 + 2 × Laser Turret 2200 = 8500.
+	if got := rep.DestroyedValue(); got != 8500 {
+		t.Errorf("DestroyedValue = %v, want 8500", got)
 	}
 	if got := rep.LootValue(); got != 1500 {
 		t.Errorf("LootValue = %v, want 1500", got)
@@ -39,9 +39,9 @@ func TestCombatReportValues(t *testing.T) {
 }
 
 func TestSimulateRecordsPerUnitLosses(t *testing.T) {
-	res := Simulate(map[string]int64{"longeagle_x": 50}, map[string]int64{"defense_turret": 5}, 0, 0, 6)
-	if got := res.DefenderLosses["defense_turret"]; got != 5 {
-		t.Errorf("defenderLosses[defense_turret] = %d, want 5", got)
+	res := Simulate(map[string]int64{"longeagle_x": 50}, map[string]int64{"light_laser": 5}, 0, 0, 6)
+	if got := res.DefenderLosses["light_laser"]; got != 5 {
+		t.Errorf("defenderLosses[light_laser] = %d, want 5", got)
 	}
 	if len(res.AttackerLosses) != 0 {
 		t.Errorf("attackerLosses = %v, want empty", res.AttackerLosses)
@@ -53,7 +53,7 @@ func TestSimulateRecordsPerUnitLosses(t *testing.T) {
 
 func TestAggregateBattle(t *testing.T) {
 	reports := []CombatReport{
-		{Role: "attacker", AttackerLosses: map[string]int64{"cougar": 1}, DefenderLosses: map[string]int64{"defense_turret": 2}, Loot: Loot{Metal: 1000}},
+		{Role: "attacker", AttackerLosses: map[string]int64{"cougar": 1}, DefenderLosses: map[string]int64{"heavy_laser": 2}, Loot: Loot{Metal: 1000}},
 		{Role: "defender", AttackerLosses: map[string]int64{"cougar": 5}, DefenderLosses: map[string]int64{"light_laser": 1}, Loot: Loot{Hydrogen: 500}},
 		{Role: "attacker", AttackerLosses: map[string]int64{"longeagle_x": 2}},
 		{Role: "attacker"},
@@ -79,8 +79,8 @@ func TestAggregateBattle(t *testing.T) {
 	}
 
 	defense := unitByCode(bb.Defense)
-	if got := defense["defense_turret"]; got.Destroyed != 2 {
-		t.Errorf("defense_turret destroyed = %d, want 2", got.Destroyed)
+	if got := defense["heavy_laser"]; got.Destroyed != 2 {
+		t.Errorf("heavy_laser destroyed = %d, want 2", got.Destroyed)
 	}
 	if got := defense["light_laser"]; got.Lost != 1 {
 		t.Errorf("light_laser lost = %d, want 1", got.Lost)

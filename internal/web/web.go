@@ -93,6 +93,8 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("POST /research/{id}/start", h.requireUser(h.ResearchSubmit))
 	mux.HandleFunc("GET /shipyard/{id}", h.requireUser(h.ShipyardPage))
 	mux.HandleFunc("POST /shipyard/{id}/build", h.requireUser(h.ShipyardSubmit))
+	mux.HandleFunc("GET /defense/{id}", h.requireUser(h.DefensePage))
+	mux.HandleFunc("POST /defense/{id}/build", h.requireUser(h.DefenseSubmit))
 	mux.HandleFunc("GET /fleet/{id}", h.requireUser(h.FleetPage))
 	mux.HandleFunc("POST /fleet/{id}/dispatch", h.requireUser(h.FleetDispatchSubmit))
 	mux.HandleFunc("POST /fleet/{id}/recall", h.requireUser(h.FleetRecallSubmit))
@@ -531,13 +533,31 @@ func (h *Handler) ShipyardPage(w http.ResponseWriter, r *http.Request) {
 	if q, ok := h.activeQueue(ctx, id, userID, "ship"); ok {
 		v := newQueueView(q)
 		d.Queue = &v
-	} else if q, ok := h.activeQueue(ctx, id, userID, "defense"); ok {
+	}
+	d.Ships = h.unitRows(ctx, p, structs, techs, game.KindShip, gameSpeed)
+	h.render(w, "shipyard", http.StatusOK, d)
+}
+
+func (h *Handler) DefensePage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id := pathID(r)
+	p, ok := h.owned(r.Context(), userID, id)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	ctx := r.Context()
+	structs, _ := h.planets.Structures(ctx, id)
+	techs, _ := h.planets.Techs(ctx, userID)
+	gameSpeed, _ := h.gameSpeed(ctx)
+
+	d := defenseData{baseData: h.base(ctx, r, userID, "Defense", id)}
+	if q, ok := h.activeQueue(ctx, id, userID, "defense"); ok {
 		v := newQueueView(q)
 		d.Queue = &v
 	}
-	d.Ships = h.unitRows(ctx, p, structs, techs, game.KindShip, gameSpeed)
-	d.Defense = h.unitRows(ctx, p, structs, techs, game.KindDefense, gameSpeed)
-	h.render(w, "shipyard", http.StatusOK, d)
+	d.Units = h.unitRows(ctx, p, structs, techs, game.KindDefense, gameSpeed)
+	h.render(w, "defense", http.StatusOK, d)
 }
 
 func (h *Handler) unitRows(ctx context.Context, p *store.Planet, structs, techs map[string]int, kind game.Kind, gameSpeed float64) []unitRow {
@@ -549,6 +569,9 @@ func (h *Handler) unitRows(ctx context.Context, p *store.Planet, structs, techs 
 			Unlocked:   game.PrereqsMet(def, structs, techs),
 			CostStr:    costString(def.Cost),
 			PerTimeStr: humanDur(int64(def.TimeSecs / gameSpeed)),
+		}
+		if kind == game.KindDefense {
+			row.Stats = "Atk " + fmtInt(def.Attack) + " · Def " + fmtInt(def.Shield) + " · Hull " + fmtInt(def.Hull)
 		}
 		if !row.Unlocked {
 			row.Missing = game.MissingPrereqs(def, structs, techs)
@@ -1791,12 +1814,30 @@ func (h *Handler) ShipyardSubmit(w http.ResponseWriter, r *http.Request) {
 	code := r.FormValue("code")
 	qty, _ := strconv.ParseInt(r.FormValue("qty"), 10, 64)
 	def, ok := game.Get(code)
-	if !ok {
+	if !ok || def.Kind != game.KindShip {
 		flashRedirect(w, r, "/shipyard/"+strconv.FormatInt(id, 10), "", "Unknown item.")
 		return
 	}
 	err := h.queues.StartUnits(r.Context(), h.universeCode, userID, id, string(def.Kind), code, qty)
 	flashRedirect(w, r, "/shipyard/"+strconv.FormatInt(id, 10), "Production queued.", msg(err))
+}
+
+func (h *Handler) DefenseSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id := pathID(r)
+	if _, ok := h.owned(r.Context(), userID, id); !ok {
+		http.NotFound(w, r)
+		return
+	}
+	code := r.FormValue("code")
+	qty, _ := strconv.ParseInt(r.FormValue("qty"), 10, 64)
+	def, ok := game.Get(code)
+	if !ok || def.Kind != game.KindDefense {
+		flashRedirect(w, r, "/defense/"+strconv.FormatInt(id, 10), "", "Unknown item.")
+		return
+	}
+	err := h.queues.StartUnits(r.Context(), h.universeCode, userID, id, string(def.Kind), code, qty)
+	flashRedirect(w, r, "/defense/"+strconv.FormatInt(id, 10), "Production queued.", msg(err))
 }
 
 func (h *Handler) FleetDispatchSubmit(w http.ResponseWriter, r *http.Request) {

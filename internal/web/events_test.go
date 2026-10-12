@@ -50,7 +50,7 @@ func TestQueueLink(t *testing.T) {
 		{"building", "/buildings/7"},
 		{"research", "/research/7"},
 		{"ship", "/shipyard/7"},
-		{"defense", "/shipyard/7"},
+		{"defense", "/defense/7"},
 	}
 	for _, c := range cases {
 		q := store.Queue{Kind: c.kind, PlanetID: 7}

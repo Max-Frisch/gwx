@@ -82,7 +82,7 @@ func TestCargoCapacityScalesWithResearch(t *testing.T) {
 
 func TestSimulateOverwhelmingForceWins(t *testing.T) {
 	attacker := map[string]int64{"longeagle_x": 50}
-	defender := map[string]int64{"defense_turret": 5}
+	defender := map[string]int64{"light_laser": 5}
 	res := Simulate(attacker, defender, 0, 0, 6)
 	if res.DefenderLost != 5 {
 		t.Errorf("expected all 5 turrets destroyed, got %d", res.DefenderLost)
@@ -99,5 +99,82 @@ func TestPrereqsMet(t *testing.T) {
 	}
 	if !PrereqsMet(def, map[string]int{"shipyard": 4}, map[string]int{"spacefold_drive": 2}) {
 		t.Error("expected met prereqs")
+	}
+}
+
+// TestDefenseRoster pins the GalaxyWars-aligned defense units (real costs and
+// stats from 03-combat.md), the dropped placeholders, and the prereqs.
+func TestDefenseRoster(t *testing.T) {
+	want := map[string]struct {
+		attack, shield, hull  float64
+		metal, lutinum, water float64
+	}{
+		"light_laser":     {350, 150, 500, 600, 0, 0},
+		"heavy_laser":     {1000, 700, 1700, 2000, 200, 0},
+		"emp_launcher":    {1800, 1000, 2800, 200, 5000, 0},
+		"plasma_turret":   {700, 1400, 2100, 2000, 2000, 50},
+		"rocket_launcher": {4500, 8100, 12600, 15000, 2000, 2000},
+	}
+	if n := len(DefsOf(KindDefense)); n != len(want) {
+		t.Fatalf("defense roster size = %d, want %d", n, len(want))
+	}
+	for code, w := range want {
+		d, ok := Get(code)
+		if !ok {
+			t.Fatalf("defense %q missing", code)
+		}
+		if d.Kind != KindDefense {
+			t.Errorf("%s kind = %s, want defense", code, d.Kind)
+		}
+		if d.Attack != w.attack || d.Shield != w.shield || d.Hull != w.hull {
+			t.Errorf("%s stats = %v/%v/%v, want %v/%v/%v", code, d.Attack, d.Shield, d.Hull, w.attack, w.shield, w.hull)
+		}
+		c := d.Cost
+		if c.Metal != w.metal || c.Lutinum != w.lutinum || c.Water != w.water {
+			t.Errorf("%s cost = Fe %v / Lu %v / Wa %v, want %v/%v/%v", code, c.Metal, c.Lutinum, c.Water, w.metal, w.lutinum, w.water)
+		}
+	}
+
+	for _, dropped := range []string{"defense_turret", "ion_cannon", "gauss_cannon", "small_shield_dome", "large_shield_dome"} {
+		if _, ok := Get(dropped); ok {
+			t.Errorf("placeholder %q should be dropped", dropped)
+		}
+	}
+
+	prereqs := map[string]map[string]int{
+		"light_laser":     {"orbital_defense": 1},
+		"heavy_laser":     {"orbital_defense": 1, "combustion_drive": 1},
+		"emp_launcher":    {"orbital_defense": 1},
+		"plasma_turret":   {"orbital_defense": 1, "ionization": 4},
+		"rocket_launcher": {"orbital_defense": 1, "explosive_projectiles": 10},
+	}
+	for code, want := range prereqs {
+		d := Catalog[code]
+		if len(d.Prereqs) != len(want) {
+			t.Errorf("%s prereqs = %v, want %v", code, d.Prereqs, want)
+			continue
+		}
+		for k, v := range want {
+			if d.Prereqs[k] != v {
+				t.Errorf("%s prereq %s = %d, want %d", code, k, d.Prereqs[k], v)
+			}
+		}
+	}
+	for _, tech := range []string{"ionization", "explosive_projectiles"} {
+		if _, ok := Get(tech); !ok {
+			t.Errorf("prereq-only tech %q missing", tech)
+		}
+	}
+
+	if PrereqsMet(Catalog["plasma_turret"], map[string]int{"orbital_defense": 1}, map[string]int{"ionization": 3}) {
+		t.Error("plasma_turret should require ionization 4")
+	}
+	if !PrereqsMet(Catalog["plasma_turret"], map[string]int{"orbital_defense": 1}, map[string]int{"ionization": 4}) {
+		t.Error("plasma_turret should build with ionization 4")
+	}
+
+	res := Simulate(map[string]int64{"cougar": 1}, map[string]int64{"rocket_launcher": 1}, 0, 0, 6)
+	if res.AttackerLost != 1 {
+		t.Errorf("rocket_launcher should destroy the cougar, attackerLost = %d", res.AttackerLost)
 	}
 }

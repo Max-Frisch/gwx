@@ -61,9 +61,11 @@ universe, or a fast seasonal one.
   Station, Planetary Shield.
 - **No energy.** There is no electricity system: mines always produce at 100%.
 - **Research (account-wide):** Energy, Combustion/Ion/Space-Folding drives,
-  Weapons, Defense, Cargo, Espionage. Drives gate the bigger hulls.
+  Weapons, Defense, Cargo, Espionage, Ionization, Explosive Projectiles. Drives
+  gate the bigger hulls.
 - **Ships:** Spy Probe, Trade Ship, Cougar, Longeagle X, Colony Ship, Recycler.
-- **Defense:** Turrets, lasers, ion/gauss/plasma, shield domes.
+- **Defense:** Light Laser Turret, Laser Turret, EMP Launcher, Plasma Turret,
+  Rocket Launchers.
 - **Missions:** Transport, Deploy, Attack, Espionage, Colonize.
 
 ### Signature mechanics

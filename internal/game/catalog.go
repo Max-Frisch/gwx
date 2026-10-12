@@ -91,6 +91,8 @@ var Catalog = func() map[string]Def {
 		{Code: "shield_tech", Name: "Defense Research", Kind: KindResearch, Cost: Resources{Metal: 200, Lutinum: 600}, CostFactor: 2.0, TimeSecs: 200, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1, "energy_tech": 1}},
 		{Code: "cargo_tech", Name: "Cargo Research", Kind: KindResearch, Cost: Resources{Metal: 1000, Lutinum: 500}, CostFactor: 2.0, TimeSecs: 250, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1, "combustion_drive": 1}},
 		{Code: "espionage_tech", Name: "Espionage Research", Kind: KindResearch, Cost: Resources{Metal: 200, Lutinum: 1000}, CostFactor: 2.0, TimeSecs: 200, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1}},
+		{Code: "ionization", Name: "Ionization", Kind: KindResearch, Cost: Resources{Metal: 1000, Lutinum: 400, Water: 200}, CostFactor: 2.0, TimeSecs: 200, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1, "energy_tech": 1}},
+		{Code: "explosive_projectiles", Name: "Explosive Projectiles", Kind: KindResearch, Cost: Resources{Metal: 1000, Lutinum: 600, Water: 200}, CostFactor: 2.0, TimeSecs: 220, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1, "energy_tech": 1}},
 
 		// ---- Ships ----
 		{Code: "spy_probe", Name: "Spy Probe", Kind: KindShip, Cost: Resources{Lutinum: 50, Hydrogen: 10}, TimeSecs: 8, Attack: 1, Shield: 0, Hull: 100, Speed: 100000000, Fuel: 1, Prereqs: map[string]int{"shipyard": 1}},
@@ -100,15 +102,12 @@ var Catalog = func() map[string]Def {
 		{Code: "colony_ship", Name: "Colony Ship", Kind: KindShip, Cost: Resources{Metal: 10000, Lutinum: 20000, Hydrogen: 2000}, TimeSecs: 400, Attack: 50, Shield: 100, Hull: 3000, Cargo: 7500, Speed: 2500, Fuel: 1000, Prereqs: map[string]int{"shipyard": 4, "ion_drive": 3}},
 		{Code: "recycler", Name: "Recycler", Kind: KindShip, Cost: Resources{Metal: 10000, Lutinum: 6000, Hydrogen: 2000}, TimeSecs: 200, Attack: 1, Shield: 10, Hull: 1600, Cargo: 20000, Speed: 2000, Fuel: 300, Prereqs: map[string]int{"shipyard": 4, "combustion_drive": 2}},
 
-		// ---- Defense ----
-		{Code: "defense_turret", Name: "Defense Turret", Kind: KindDefense, Cost: Resources{Metal: 2000, Lutinum: 500}, TimeSecs: 60, Attack: 80, Shield: 20, Hull: 200, Prereqs: map[string]int{"orbital_defense": 1}},
-		{Code: "light_laser", Name: "Light Laser", Kind: KindDefense, Cost: Resources{Metal: 1500, Lutinum: 500}, TimeSecs: 50, Attack: 100, Shield: 25, Hull: 200, Prereqs: map[string]int{"orbital_defense": 1}},
-		{Code: "heavy_laser", Name: "Heavy Laser", Kind: KindDefense, Cost: Resources{Metal: 6000, Lutinum: 2000}, TimeSecs: 120, Attack: 250, Shield: 100, Hull: 800, Prereqs: map[string]int{"orbital_defense": 3}},
-		{Code: "ion_cannon", Name: "Ion Cannon", Kind: KindDefense, Cost: Resources{Metal: 5000, Lutinum: 2000, Hydrogen: 500}, TimeSecs: 120, Attack: 150, Shield: 500, Hull: 800, Prereqs: map[string]int{"orbital_defense": 2, "shield_tech": 2}},
-		{Code: "gauss_cannon", Name: "Gauss Cannon", Kind: KindDefense, Cost: Resources{Metal: 20000, Lutinum: 15000, Hydrogen: 2000}, TimeSecs: 240, Attack: 1100, Shield: 200, Hull: 3500, Prereqs: map[string]int{"orbital_defense": 4, "weapon_tech": 3}},
-		{Code: "plasma_turret", Name: "Plasma Turret", Kind: KindDefense, Cost: Resources{Metal: 50000, Lutinum: 50000, Hydrogen: 30000}, TimeSecs: 480, Attack: 3000, Shield: 300, Hull: 10000, Prereqs: map[string]int{"orbital_defense": 6, "weapon_tech": 6}},
-		{Code: "small_shield_dome", Name: "Small Shield Dome", Kind: KindDefense, Cost: Resources{Metal: 10000, Lutinum: 10000}, TimeSecs: 300, Attack: 0, Shield: 2000, Hull: 1, Prereqs: map[string]int{"orbital_defense": 2, "shield_tech": 2}},
-		{Code: "large_shield_dome", Name: "Large Shield Dome", Kind: KindDefense, Cost: Resources{Metal: 50000, Lutinum: 50000}, TimeSecs: 600, Attack: 0, Shield: 10000, Hull: 1, Prereqs: map[string]int{"orbital_defense": 5, "shield_tech": 5}},
+		// ---- Defense (GalaxyWars Uni5 roster; see 03-combat.md for the mapping) ----
+		{Code: "light_laser", Name: "Light Laser Turret", Kind: KindDefense, Cost: Resources{Metal: 600}, TimeSecs: 90, Attack: 350, Shield: 150, Hull: 500, Prereqs: map[string]int{"orbital_defense": 1}},
+		{Code: "heavy_laser", Name: "Laser Turret", Kind: KindDefense, Cost: Resources{Metal: 2000, Lutinum: 200}, TimeSecs: 909, Attack: 1000, Shield: 700, Hull: 1700, Prereqs: map[string]int{"orbital_defense": 1, "combustion_drive": 1}},
+		{Code: "emp_launcher", Name: "EMP Launcher", Kind: KindDefense, Cost: Resources{Metal: 200, Lutinum: 5000}, TimeSecs: 2272, Attack: 1800, Shield: 1000, Hull: 2800, Prereqs: map[string]int{"orbital_defense": 1}},
+		{Code: "plasma_turret", Name: "Plasma Turret", Kind: KindDefense, Cost: Resources{Metal: 2000, Lutinum: 2000, Water: 50}, TimeSecs: 77, Attack: 700, Shield: 1400, Hull: 2100, Prereqs: map[string]int{"orbital_defense": 1, "ionization": 4}},
+		{Code: "rocket_launcher", Name: "Rocket Launchers", Kind: KindDefense, Cost: Resources{Metal: 15000, Lutinum: 2000, Water: 2000}, TimeSecs: 909, Attack: 4500, Shield: 8100, Hull: 12600, Prereqs: map[string]int{"orbital_defense": 1, "explosive_projectiles": 10}},
 	}
 	m := make(map[string]Def, len(defs))
 	for _, d := range defs {

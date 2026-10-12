@@ -71,6 +71,14 @@ Read first; one item per session. Keep this file short.
   with *credit all*. New **Trading Post** building gates offer creation and sets
   the per-planet offer slots (= level). `trade_offers` + `trade_history` +
   `trade_storage` (migration `0004`); `game.Settle` fee math (`07-trade.md`).
+- **I8 defense roster** — defense retuned to the 5 real GalaxyWars units (Light
+  Laser Turret, Laser Turret, EMP Launcher, Plasma Turret, Rocket Launchers)
+  with captured costs/stats; the gwx-specific placeholders (`defense_turret`,
+  `ion_cannon`, `gauss_cannon`, `small/large_shield_dome`) are dropped
+  (migration `0007`). Prereq-only **Ionization** + **Explosive Projectiles**
+  techs added to gate Plasma/Rocket. Defense split out of the shipyard into its
+  own `/defense` page + nav entry; `ckk` documented as a derived
+  `(Attack+Defense)/8000` coefficient (`I8-defense-roster.md`).
 
 ## Todo (ordered)
 - [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
@@ -193,8 +201,9 @@ build task in `info/sessions/`:
 4. **Statistics from `reports` (`I4`)** — *done.* `/statistics` aggregates per-unit
    destroyed/lost resource value, looted/lost resources and farming totals from
    the player's own combat reports. ("Recycled" needs debris first.)
-5. **Defense roster (`I8`)** — the five units are catalog rows + prereqs and
-   immediately build/fight; real costs/stats in `03-combat.md`.
+5. **Defense roster (`I8`)** — *done.* The five reference units are catalog rows
+   with real costs/stats + prereqs and immediately build/fight from `/defense`;
+   the placeholder emplacements are gone.
 6. **Messages from `reports` + system feed (`I2`)** — *done.* `/messages` lists
    combat/espionage reports by kind plus system notifications with read/archive/
    delete and an unread badge (`10-messages-events-search.md`).

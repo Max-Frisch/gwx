@@ -15,7 +15,7 @@ func TestStatisticsTemplateRenders(t *testing.T) {
 	tmpl := template.Must(template.New("").Funcs(fm).ParseFS(templatesFS, "templates/*.html"))
 
 	battle := game.AggregateBattle([]game.CombatReport{
-		{Role: "attacker", DefenderLosses: map[string]int64{"defense_turret": 2}, Loot: game.Loot{Metal: 1000}},
+		{Role: "attacker", DefenderLosses: map[string]int64{"heavy_laser": 2}, Loot: game.Loot{Metal: 1000}},
 		{Role: "defender", AttackerLosses: map[string]int64{"cougar": 1}, Loot: game.Loot{Hydrogen: 500}},
 	})
 	cases := []statisticsData{

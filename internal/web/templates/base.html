@@ -14,6 +14,7 @@
   <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5.2 8.3A1.8 1.8 0 0 0 6.3 20h11.4a1.8 1.8 0 0 0 1.5-2.7L14 9V3"/><path d="M8.5 14h7"/></symbol>
   <symbol id="i-ship" viewBox="0 0 24 24"><path d="M12 2.5c2.8 2 4.2 5.4 4.2 8.6l2.9 3.6-3.9-.9-3.2 3.7-3.2-3.7-3.9.9 2.9-3.6C7.8 7.9 9.2 4.5 12 2.5z"/><circle cx="12" cy="9" r="1.4"/></symbol>
   <symbol id="i-fleet" viewBox="0 0 24 24"><path d="M3 12l16-7-4 16-3.2-6.2z"/><path d="M11.8 14.8L19 5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 2.8v5.7c0 4.4-2.9 7.6-7 9-4.1-1.4-7-4.6-7-9V5.8z"/><path d="M9.5 12l1.8 1.8 3.4-3.6"/></symbol>
   <symbol id="i-galaxy" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><ellipse cx="12" cy="12" rx="9.5" ry="3.6" transform="rotate(-24 12 12)"/></symbol>
   <symbol id="i-event" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="1.5"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/></symbol>
   <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 3h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4M8.5 12.5h7M8.5 16h7"/></symbol>
@@ -41,7 +42,8 @@
         <a href="/overview/{{.ActivePlanetID}}" class="{{if eq .Title "Overview"}}active{{end}}"><svg class="ic"><use href="#i-home"/></svg>Overview</a>
         <a href="/buildings/{{.ActivePlanetID}}" class="{{if eq .Title "Buildings"}}active{{end}}"><svg class="ic"><use href="#i-build"/></svg>Construction</a>
         <a href="/research/{{.ActivePlanetID}}" class="{{if eq .Title "Research"}}active{{end}}"><svg class="ic"><use href="#i-flask"/></svg>Research</a>
-        <a href="/shipyard/{{.ActivePlanetID}}" class="{{if eq .Title "Shipyard"}}active{{end}}"><svg class="ic"><use href="#i-ship"/></svg>Ships/Defense</a>
+        <a href="/shipyard/{{.ActivePlanetID}}" class="{{if eq .Title "Shipyard"}}active{{end}}"><svg class="ic"><use href="#i-ship"/></svg>Ships</a>
+        <a href="/defense/{{.ActivePlanetID}}" class="{{if eq .Title "Defense"}}active{{end}}"><svg class="ic"><use href="#i-shield"/></svg>Defense</a>
         <a href="/trade" class="{{if eq .Title "Trade"}}active{{end}}"><svg class="ic"><use href="#i-fleet"/></svg>Trade</a>
       </div>
       <div class="side-group">
@@ -90,7 +92,7 @@
     </header>
     {{end}}
     <main class="content"><div class="inner">
-      {{if or (eq .Title "Buildings") (eq .Title "Research") (eq .Title "Shipyard")}}{{template "tabs" .}}{{end}}
+      {{if or (eq .Title "Buildings") (eq .Title "Research") (eq .Title "Shipyard") (eq .Title "Defense")}}{{template "tabs" .}}{{end}}
       {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
       {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
 {{end}}
@@ -99,7 +101,8 @@
 <div class="tabs">
   <a href="/buildings/{{.ActivePlanetID}}" class="{{if eq .Title "Buildings"}}active{{end}}">Buildings</a>
   <a href="/research/{{.ActivePlanetID}}" class="{{if eq .Title "Research"}}active{{end}}">Research</a>
-  <a href="/shipyard/{{.ActivePlanetID}}" class="{{if eq .Title "Shipyard"}}active{{end}}">Ships/Defense</a>
+  <a href="/shipyard/{{.ActivePlanetID}}" class="{{if eq .Title "Shipyard"}}active{{end}}">Ships</a>
+  <a href="/defense/{{.ActivePlanetID}}" class="{{if eq .Title "Defense"}}active{{end}}">Defense</a>
 </div>
 {{end}}
 

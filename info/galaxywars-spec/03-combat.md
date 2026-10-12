@@ -1,6 +1,6 @@
 # GWX ↔ GalaxyWars spec — 03 Combat & units
 
-Ship stat block is taken from the technology-tree ship pages (`Base` = hull default, `Current` = with this account's research). The last stat row is literally labelled **`ckk`** in the client (unknown meaning; possibly an internal/opaque value) — recorded as-is.
+Ship stat block is taken from the technology-tree ship pages (`Base` = hull default, `Current` = with this account's research). The last stat row is literally labelled **`ckk`** in the client — recorded as-is. Fitting the captured values shows `ckk` is **not an independent stat**: for the combat units it is `(Attack + Defense) / 8000` (e.g. Rocket Launchers `(4500 + 8100) / 8000 = 1.58`; Light Laser Turret `(350 + 150) / 8000 = 0.06`), i.e. a derived combat-strength coefficient.
 
 ## Ships
 
@@ -59,17 +59,39 @@ Defense units are fixed emplacements: they have **no cargo, speed or consumption
 | Rocket Launchers | `rocketDefenseCannons` | 15.000 Iron, 2.000 Lutinum, 2.000 Water | 4.500→4.500 | 8.100→10.084 | 1.58→1.76 | 00:15:09 | Orbital Defense Station  (1/1); Explosive Projectiles  (0/10) |
 
 
-### Client ident → gwx code mapping
+### Implemented roster (I8)
 
-The client idents differ from gwx's codes; the roster (`internal/game/catalog.go`) adopts this mapping:
+The roster (`internal/game/catalog.go`) now matches the reference **exactly**; the
+client idents map onto gwx codes as follows:
 
-| GW ident | Label | gwx code |
-|---|---|---|
-| lightLaserTower | Light Laser Turret | `light_laser` (retune) |
-| laserTower | Laser Turret | `heavy_laser` → rename/replace |
-| empLauncher | EMP Launcher | `emp_launcher` (new) |
-| plasmaTower | Plasma Turret | `plasma_turret` (retune) |
-| rocketDefenseCannons | Rocket Launchers | `rocket_launcher` (new) |
+| GW ident | Label | gwx code | Cost | Attack | Defense→`Shield` | `Hull` | Prereqs |
+|---|---|---|---|---|---|---|---|
+| `lightLaserTower` | Light Laser Turret | `light_laser` | 600 Iron | 350 | 150 | 500 | Orbital Defense Station 1 |
+| `laserTower` | Laser Turret | `heavy_laser` | 2.000 Iron, 200 Lutinum | 1.000 | 700 | 1.700 | Orbital Defense Station 1; Combustion Drive 1 |
+| `empLauncher` | EMP Launcher | `emp_launcher` | 200 Iron, 5.000 Lutinum | 1.800 | 1.000 | 2.800 | Orbital Defense Station 1 |
+| `plasmaTower` | Plasma Turret | `plasma_turret` | 2.000 Iron, 2.000 Lutinum, 50 Water | 700 | 1.400 | 2.100 | Orbital Defense Station 1; Ionization 4 |
+| `rocketDefenseCannons` | Rocket Launchers | `rocket_launcher` | 15.000 Iron, 2.000 Lutinum, 2.000 Water | 4.500 | 8.100 | 12.600 | Orbital Defense Station 1; Explosive Projectiles 10 |
+
+Stat-mapping decisions:
+
+- **Attack** → `Attack`; reference **Defense** → `Shield` (it is the stat raised by
+  the defensive research and our shields regenerate each round, exactly like the
+  reference's defence value).
+- The reference exposes **no hull** for emplacements, and `ckk` turns out to be a
+  derived coefficient (see the header). We set `Hull = Attack + Defense`
+  (equivalently `ckk × 8000`) so durability scales with the captured combat
+  weight; `ckk` itself is not stored.
+- **Build time.** The reference calculator scales unit time by the Orbital
+  Defense Station level, but gwx already keeps unit build time factory-independent
+  for ships; defence follows the same rule, so `TimeSecs` is the captured
+  per-unit duration (ODS L4 in the capture).
+- **Dropped placeholders:** the gwx-specific `defense_turret`, `ion_cannon`,
+  `gauss_cannon`, `small_shield_dome` and `large_shield_dome` are removed
+  (migration `0007`). They were invented stand-ins with no GalaxyWars counterpart.
+- **Prereq-only techs.** `plasma_turret` needs **Ionization 4** and
+  `rocket_launcher` needs **Explosive Projectiles 10**; neither tech existed in
+  gwx, so both are added as research rows (gwx placeholder costs — the capture
+  lists them only as prerequisites).
 
 Planetary Shield + Fusion Reactor are the two defense-relevant *buildings*: the Fusion Reactor is the Planetary Shield's building prerequisite (and adds a base attack value), while the shield adds a base defense value; there is no energy coupling.
 

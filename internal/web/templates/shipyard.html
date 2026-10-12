@@ -38,35 +38,5 @@
   {{end}}
 </table>
 </div>
-
-<h2>Defense</h2>
-<div class="panel">
-<table>
-  <tr><th>Defense</th><th>Owned</th><th>Unit cost</th><th>Time/unit</th><th>Order</th></tr>
-  {{range .Defense}}
-  <tr>
-    <td>{{.Name}}</td>
-    <td>{{.Count}}</td>
-    {{if .Unlocked}}
-      <td class="muted">{{.CostStr}}</td>
-      <td class="muted">{{.PerTimeStr}}</td>
-      <td>
-        {{if gt .MaxAffordable 0}}
-        <form method="post" action="/shipyard/{{$.ActivePlanetID}}/build" class="row">
-          <input type="hidden" name="code" value="{{.Code}}">
-          <input type="number" name="qty" value="1" min="1" max="{{.MaxAffordable}}">
-          <button type="submit">Build</button>
-          <small class="muted">max {{.MaxAffordable}}</small>
-        </form>
-        {{else}}<span class="muted">cannot afford</span>{{end}}
-      </td>
-    {{else}}
-      <td class="muted" colspan="2">Requires: {{range $i, $m := .Missing}}{{if $i}}, {{end}}{{$m}}{{end}}</td>
-      <td></td>
-    {{end}}
-  </tr>
-  {{end}}
-</table>
-</div>
 {{template "foot" .}}
 {{end}}

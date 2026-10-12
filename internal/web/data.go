@@ -77,6 +77,7 @@ type unitRow struct {
 	Unlocked      bool
 	Missing       []string
 	CostStr       string
+	Stats         string
 	PerTimeStr    string
 	MaxAffordable int64
 }
@@ -403,9 +404,14 @@ type researchData struct {
 
 type shipyardData struct {
 	baseData
-	Ships   []unitRow
-	Defense []unitRow
-	Queue   *queueView
+	Ships []unitRow
+	Queue *queueView
+}
+
+type defenseData struct {
+	baseData
+	Units []unitRow
+	Queue *queueView
 }
 
 type fleetData struct {
@@ -514,6 +520,8 @@ func queueLink(q store.Queue) string {
 		return "/buildings/" + id
 	case "research":
 		return "/research/" + id
+	case "defense":
+		return "/defense/" + id
 	default:
 		return "/shipyard/" + id
 	}
