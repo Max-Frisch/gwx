@@ -39,22 +39,20 @@ func TestFullLoop(t *testing.T) {
 	})
 
 	t.Run("research", func(t *testing.T) {
-		// Cougar gate: Shipyard 1 + Combustion Drive 2 (via Energy 1).
-		h.research(t, attacker, "energy_tech", 1)
+		// Jackal gate: Ship Factory 1 + Combustion Drive 1.
 		h.research(t, attacker, "combustion_drive", 1)
-		h.research(t, attacker, "combustion_drive", 2)
 		h.build(t, attacker, "shipyard", 1)
 	})
 
 	t.Run("shipyard", func(t *testing.T) {
-		h.buildUnits(t, attacker, "shipyard", "cougar", 50, 50)
+		h.buildUnits(t, attacker, "shipyard", "jackal", 50, 50)
 		// The resolved production queue must leave the finished ships stationed.
 		got := h.queryInt(t, `
 			SELECT amount FROM planet_items
-			WHERE planet_id = $1 AND kind = 'ship' AND code = 'cougar'
+			WHERE planet_id = $1 AND kind = 'ship' AND code = 'jackal'
 		`, attacker.home)
 		if got != 50 {
-			t.Fatalf("cougars stationed = %d, want 50", got)
+			t.Fatalf("jackals stationed = %d, want 50", got)
 		}
 	})
 
@@ -67,7 +65,7 @@ func TestFullLoop(t *testing.T) {
 		beforeAttacker := h.resourcesOf(t, attacker.home)
 		beforeDefender := h.resourcesOf(t, defender.home)
 
-		h.dispatch(t, attacker, "ATTACK", target, map[string]int64{"cougar": 50}, nil)
+		h.dispatch(t, attacker, "ATTACK", target, map[string]int64{"jackal": 50}, nil)
 
 		waitFor(t, "attack fleet to turn around", func() bool {
 			return h.queryInt(t, `
@@ -111,10 +109,11 @@ func TestFullLoop(t *testing.T) {
 	})
 
 	t.Run("colonize", func(t *testing.T) {
-		// Colony Ship needs Shipyard 4 + Ion Drive 3. Seed those directly so the
-		// test focuses on the colonisation flight, not the deep tech grind.
-		h.setBuilding(t, attacker.home, "shipyard", 4)
-		h.setTech(t, attacker.id, "ion_drive", 3)
+		// Colony Ship needs Ship Factory 1 + Ion Drive 4. Seed those directly so
+		// the test focuses on the colonisation flight, not the deep tech grind
+		// (a level-10 factory keeps the captured build time short at test speed).
+		h.setBuilding(t, attacker.home, "shipyard", 10)
+		h.setTech(t, attacker.id, "ion_drive", 4)
 
 		h.buildUnits(t, attacker, "shipyard", "colony_ship", 1, 1)
 
@@ -152,6 +151,10 @@ func TestFullLoop(t *testing.T) {
 	t.Run("surfaces", func(t *testing.T) {
 		for _, path := range []string{
 			fmt.Sprintf("/overview/%d", attacker.home),
+			fmt.Sprintf("/buildings/%d", attacker.home),
+			fmt.Sprintf("/research/%d", attacker.home),
+			fmt.Sprintf("/shipyard/%d", attacker.home),
+			fmt.Sprintf("/defense/%d", attacker.home),
 			"/messages",
 			"/events",
 			"/highscore",
@@ -177,17 +180,17 @@ func TestTransportMovesResources(t *testing.T) {
 	sender := h.register(t, "sender")
 	receiver := h.register(t, "receiver")
 
-	// Trade Ship gate: Shipyard 2 + Combustion Drive 2.
-	h.setBuilding(t, sender.home, "shipyard", 2)
-	h.setTech(t, sender.id, "combustion_drive", 2)
-	h.buildUnits(t, sender, "shipyard", "handelsschiff", 1, 1)
+	// Small Trader gate: Ship Factory 1 + Combustion Drive 1.
+	h.setBuilding(t, sender.home, "shipyard", 1)
+	h.setTech(t, sender.id, "combustion_drive", 1)
+	h.buildUnits(t, sender, "shipyard", "small_trader", 1, 1)
 
 	target := h.at(t, receiver.home)
 	h.seed(t, receiver.home, 10_000, 10_000, 10_000, 10_000)
 	before := h.resourcesOf(t, receiver.home)
 
 	h.topUp(t, sender)
-	h.dispatch(t, sender, "TRANSPORT", target, map[string]int64{"handelsschiff": 1}, url.Values{
+	h.dispatch(t, sender, "TRANSPORT", target, map[string]int64{"small_trader": 1}, url.Values{
 		"cargo_metal":   {"4000"},
 		"cargo_lutinum": {"1000"},
 	})
@@ -207,8 +210,8 @@ func TestTransportMovesResources(t *testing.T) {
 	})
 	if got := h.queryInt(t, `
 		SELECT amount FROM planet_items
-		WHERE planet_id = $1 AND kind = 'ship' AND code = 'handelsschiff'
+		WHERE planet_id = $1 AND kind = 'ship' AND code = 'small_trader'
 	`, sender.home); got != 1 {
-		t.Errorf("trade ship did not return: stationed = %d, want 1", got)
+		t.Errorf("small trader did not return: stationed = %d, want 1", got)
 	}
 }

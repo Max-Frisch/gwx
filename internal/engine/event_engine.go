@@ -664,7 +664,7 @@ func (e *EventEngine) resolveEspionageTx(ctx context.Context, tx *sql.Tx, fleetI
 			},
 			"ships":             ships,
 			"defense":           defense,
-			"yourEspionageTech": techs["espionage_tech"],
+			"yourEspionageTech": techs["spy_technology"],
 		}
 		raw, _ := json.Marshal(payload)
 		var reportID int64
@@ -714,7 +714,7 @@ func (e *EventEngine) resolveAttackTx(ctx context.Context, tx *sql.Tx, fleetID, 
 		defender[k] += v
 	}
 
-	result := game.Simulate(units, defender, techs["weapon_tech"], defTechs["shield_tech"], 6)
+	result := game.Simulate(units, defender, techs["ionization"], defTechs["advanced_ship_armor"], 6)
 
 	// Persist defender losses (ships + defense) and attacker survivors.
 	if err := persistSideLossesTx(ctx, tx, targetID.Int64, defShips, result.DefenderSurvivors); err != nil {
@@ -730,7 +730,7 @@ func (e *EventEngine) resolveAttackTx(ctx context.Context, tx *sql.Tx, fleetID, 
 	// Plunder: fill the hold from the unprotected remainder.
 	loot := game.Resources{}
 	if len(result.AttackerSurvivors) > 0 {
-		capacity := game.CargoCapacity(result.AttackerSurvivors, techs["cargo_tech"])
+		capacity := game.CargoCapacity(result.AttackerSurvivors, techs["increased_cargo_capacity"])
 		res, err := loadResourcesTx(ctx, tx, targetID.Int64)
 		if err != nil {
 			return err

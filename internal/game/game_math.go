@@ -22,15 +22,23 @@ func CalculateDistance(g1, s1, p1, g2, s2, p2 int) float64 {
 	return d
 }
 
-// driveForTech maps a drive research code to the ships it boosts. Ships without
-// an explicit drive use combustion.
+// shipDrive maps a ship to the drive research that boosts it (from the captured
+// ship prerequisites). Ships without an explicit drive default to combustion.
 var shipDrive = map[string]string{
-	"spy_probe":     "combustion_drive",
-	"handelsschiff": "combustion_drive",
-	"cougar":        "combustion_drive",
-	"recycler":      "combustion_drive",
-	"longeagle_x":   "spacefold_drive",
-	"colony_ship":   "ion_drive",
+	"spy_probe":    "combustion_drive",
+	"jackal":       "combustion_drive",
+	"small_trader": "combustion_drive",
+	"renegade":     "combustion_drive",
+	"raider":       "ion_drive",
+	"recycler":     "combustion_drive",
+	"falcon":       "ion_drive",
+	"colony_ship":  "ion_drive",
+	"tjuger":       "space_curvature_drive",
+	"cougar":       "space_curvature_drive",
+	"longeagle_v":  "space_curvature_drive",
+	"large_trader": "space_curvature_drive",
+	"noah":         "space_folding_drive",
+	"longeagle_x":  "space_folding_drive",
 }
 
 // FleetMaxSpeed returns the slowest ship's speed in the fleet, each boosted
@@ -106,4 +114,25 @@ func CargoCapacity(units map[string]int64, cargoTech int) int64 {
 // center level (higher = faster).
 func BuildTimeMultiplier(cmdLevel int) float64 {
 	return 1.0 / (1.0 + 0.05*float64(cmdLevel))
+}
+
+// UnitFactoryCode returns the building whose level speeds up production of a
+// unit kind: the Ship Factory for ships, the Orbital Defense Station for
+// defense.
+func UnitFactoryCode(kind Kind) string {
+	if kind == KindDefense {
+		return "orbital_defense"
+	}
+	return "shipyard"
+}
+
+// UnitTimeMultiplier returns the per-unit build-time factor for a factory
+// level. Captain times are captured at factory level 1; the reference speeds up
+// faster than linearly, fitted as 4/(1+level)² (level 1 → 1.0, matching the
+// captured level-1 durations).
+func UnitTimeMultiplier(factoryLevel int) float64 {
+	if factoryLevel < 1 {
+		factoryLevel = 1
+	}
+	return 4.0 / math.Pow(1.0+float64(factoryLevel), 2)
 }

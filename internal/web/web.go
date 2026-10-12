@@ -553,7 +553,7 @@ func (h *Handler) ResourcesPage(w http.ResponseWriter, r *http.Request) {
 		waterRatio float64
 	}{
 		{"iron_mine", "Iron Mine", 0},
-		{"lutinum_mine", "Lutinum Mine", 0},
+		{"lutinum_mine", "Lutinum Refinery", 0},
 		{"water_extractor", "Drilling Tower", 0},
 		{"chemical_factory", "Chemical Factory", 5},
 		{"advanced_chemical_factory", "Advanced Chemical Factory", 2},
@@ -624,21 +624,37 @@ func (h *Handler) researchView(ctx context.Context, r *http.Request, userID, id 
 		v := newQueueView(q)
 		d.Queue = &v
 	}
+	byGroup := map[string][]buildRow{}
 	for _, def := range sortedDefs(game.KindResearch) {
 		next := techs[def.Code] + 1
 		cost := def.LevelCost(next)
 		row := buildRow{
-			Code: def.Code, Name: def.Name, Level: techs[def.Code],
+			Code: def.Code, Name: def.Name, Level: techs[def.Code], NextLevel: next,
 			Unlocked:   game.PrereqsMet(def, structs, techs),
 			Queued:     d.Queue != nil && strings.HasPrefix(d.Queue.Name, def.Name),
 			CostStr:    costString(cost),
+			Costs:      costParts(cost, p),
 			TimeStr:    humanDur(int64(def.LevelTime(next) / gameSpeed)),
 			Affordable: p.Metal >= cost.Metal && p.Lutinum >= cost.Lutinum && p.Water >= cost.Water && p.Hydrogen >= cost.Hydrogen,
+			Desc:       def.Desc,
+			Icon:       def.Icon,
+		}
+		if row.Icon == "" {
+			row.Icon = "i-flask"
 		}
 		if !row.Unlocked {
 			row.Missing = game.MissingPrereqs(def, structs, techs)
 		}
-		d.Rows = append(d.Rows, row)
+		group := def.Group
+		if group == "" {
+			group = "Research"
+		}
+		byGroup[group] = append(byGroup[group], row)
+	}
+	for _, g := range researchGroups {
+		if rows := byGroup[g]; len(rows) > 0 {
+			d.Sections = append(d.Sections, buildingSection{Name: g, Rows: rows})
+		}
 	}
 	return d, true
 }
@@ -703,13 +719,20 @@ func (h *Handler) defenseView(ctx context.Context, r *http.Request, userID, id i
 
 func (h *Handler) unitRows(ctx context.Context, p *store.Planet, structs, techs map[string]int, kind game.Kind, gameSpeed float64) []unitRow {
 	owned, _ := h.planets.Units(ctx, p.ID, string(kind))
+	perUnit := game.UnitTimeMultiplier(structs[game.UnitFactoryCode(kind)])
 	var rows []unitRow
 	for _, def := range sortedDefs(kind) {
 		row := unitRow{
-			Code: def.Code, Name: def.Name, Count: owned[def.Code],
+			Code: def.Code, Name: def.Name, Count: owned[def.Code], Kind: string(kind),
 			Unlocked:   game.PrereqsMet(def, structs, techs),
 			CostStr:    costString(def.Cost),
-			PerTimeStr: humanDur(int64(def.TimeSecs / gameSpeed)),
+			Costs:      costParts(def.Cost, p),
+			PerTimeStr: humanDur(int64(def.TimeSecs * perUnit / gameSpeed)),
+			Desc:       def.Desc,
+			Icon:       def.Icon,
+		}
+		if row.Icon == "" {
+			row.Icon = "i-ship"
 		}
 		if kind == game.KindDefense {
 			row.Stats = "Atk " + fmtInt(def.Attack) + " · Def " + fmtInt(def.Shield) + " · Hull " + fmtInt(def.Hull)
@@ -2280,6 +2303,10 @@ func (h *Handler) universeSpeeds(ctx context.Context) (game, resource, fleet flo
 // buildingGroups is the display order of the building card categories. Any
 // group not listed here is appended afterwards.
 var buildingGroups = []string{"Main buildings", "Resource buildings", "Military buildings", "Buildings"}
+
+// researchGroups is the display order of the research categories (the reference
+// groups research into these three headings).
+var researchGroups = []string{"Drive research", "Weapons research", "Ship research"}
 
 func sortedDefs(kind game.Kind) []game.Def {
 	defs := game.DefsOf(kind)

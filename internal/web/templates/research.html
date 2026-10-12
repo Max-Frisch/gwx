@@ -10,32 +10,38 @@
 
 {{template "queue-panel" .}}
 
-<div class="panel">
-<table>
-  <tr><th>Technology</th><th>Level</th><th>Next cost</th><th>Time</th><th></th></tr>
-  {{range .Rows}}
-  <tr>
-    <td>{{.Name}}{{if .Queued}} <span class="tag busy">researching</span>{{end}}</td>
-    <td>{{.Level}}</td>
+{{range .Sections}}
+<h2 class="section-head">{{.Name}}</h2>
+{{range .Rows}}
+<div class="bcard{{if not .Unlocked}} locked{{end}}">
+  <div class="bcard-img">{{if .Art}}<img src="{{.Art}}" alt="{{.Name}}" loading="lazy">{{else}}<svg class="ic-lg"><use href="#{{.Icon}}"/></svg>{{end}}</div>
+  <div class="bcard-body">
+    <div class="bcard-title">{{.Name}} <span class="bcard-level">Level {{.Level}}</span>{{if .Queued}} <span class="tag busy">researching</span>{{end}}</div>
+    <p class="bcard-desc">{{.Desc}}</p>
     {{if .Unlocked}}
-      <td class="muted">{{.CostStr}}</td>
-      <td class="muted">{{.TimeStr}}</td>
-      <td>
-        {{if and .Affordable (not .Queued)}}
-        <form method="post" action="/research/{{$.ActivePlanetID}}/start"
-              hx-post="/research/{{$.ActivePlanetID}}/start" hx-target="#page-content" hx-swap="innerHTML" hx-disabled-elt="find button">
-          <input type="hidden" name="code" value="{{.Code}}">
-          <button type="submit">Research</button>
-        </form>
-        {{else if .Queued}}<span class="muted">queued</span>{{else}}<span class="muted">unaffordable</span>{{end}}
-      </td>
+    <div class="bcard-meta">
+      {{range .Costs}}<span class="cost"><span class="{{.Class}}">{{.Label}}</span> <span class="{{if .OK}}v-ok{{else}}v-bad{{end}}">{{.Amount}}</span></span>{{end}}
+      <span class="dur">Duration {{.TimeStr}}</span>
+    </div>
     {{else}}
-      <td class="muted" colspan="2">Requires: {{range $i, $m := .Missing}}{{if $i}}, {{end}}{{$m}}{{end}}</td>
-      <td></td>
+    <div class="bcard-meta"><span class="req">Requires: {{range $i, $m := .Missing}}{{if $i}}, {{end}}{{$m}}{{end}}</span></div>
     {{end}}
-  </tr>
-  {{end}}
-</table>
+  </div>
+  <div class="bcard-action">
+    {{if not .Unlocked}}
+      <button class="ghost" disabled>Locked</button>
+    {{else if .Queued}}
+      <span class="muted">queued</span>
+    {{else}}
+      <form method="post" action="/research/{{$.ActivePlanetID}}/start"
+            hx-post="/research/{{$.ActivePlanetID}}/start" hx-target="#page-content" hx-swap="innerHTML" hx-disabled-elt="find button">
+        <input type="hidden" name="code" value="{{.Code}}">
+        <button type="submit" {{if not .Affordable}}disabled{{end}}>Research to level {{.NextLevel}}</button>
+      </form>
+    {{end}}
+  </div>
 </div>
+{{end}}
+{{end}}
 {{template "hx-extras" .}}
 {{end}}

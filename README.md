@@ -55,15 +55,18 @@ universe, or a fast seasonal one.
   Tower; the Chemical Factory (**5:1**) and Advanced Chemical Factory (**2:1**)
   convert it into hydrogen, both drawing from the same water pool — if water
   runs dry, hydrogen stops.
-- **Buildings:** Command Center (faster builds), Research Center, the three
-  extraction buildings, Chemical Factory, Advanced Chemical Factory, Fusion
-  Reactor (gates the Planetary Shield), four storages, Shipyard, Orbital Defense
-  Station, Planetary Shield.
+- **Buildings:** Command Center, Research Center, Trading Post, the three
+  extraction buildings (Iron Mine, Lutinum Refinery, Drilling Tower), Chemical
+  Factory, Advanced Chemical Factory, four storages, Ship Factory, Orbital
+  Defense Station, Fusion Reactor and Planetary Shield. Costs, prerequisites and
+  the shared cost-curve multiplier are taken verbatim from the Uni5 capture.
 - **No energy.** There is no electricity system: mines always produce at 100%.
-- **Research (account-wide):** Energy, Combustion/Ion/Space-Folding drives,
-  Weapons, Defense, Cargo, Espionage, Ionization, Explosive Projectiles. Drives
-  gate the bigger hulls.
-- **Ships:** Spy Probe, Trade Ship, Cougar, Longeagle X, Colony Ship, Recycler.
+- **Research (account-wide):** three categories — *Drive* (Combustion, Ion, Space
+  Curvature, Space Folding), *Weapons* (Ionization, Energy Focusing, Explosive
+  Projectiles) and *Ship* (Spy Technology, Advanced Ship Armor, Increased Cargo
+  Capacity, Recycling Technology). Drives gate the bigger hulls.
+- **Ships:** Spy Probe, Jackal, Small/Large Trader, Renegade, Raider, Recycler,
+  Falcon, Colonization Ship, Tjuger, Cougar, Longeagle V, Noah, Longeagle X.
 - **Defense:** Light Laser Turret, Laser Turret, EMP Launcher, Plasma Turret,
   Rocket Launchers.
 - **Missions:** Transport, Deploy, Attack, Espionage, Colonize.
@@ -76,8 +79,9 @@ universe, or a fast seasonal one.
 1. **Fog of war.** No points, no fleet-strength readout anywhere. The galaxy
    view shows owners only; you learn composition by scouting or by getting hit.
 2. **Protected storage floor.** `loot = min(cargo capacity, max(0, stored −
-   protected))`, where `protected = 20%` of that resource's storage capacity.
-   A cushion always survives a raid.
+   protected))`, where `protected = 2%` of that resource's storage capacity
+   (`Storage(L) = 60_000·L² + 300_000` in the capture). A cushion always
+   survives a raid.
 
 Combat is a simple aggregate, simultaneous-fire model with **rapid-fire off**
 (see the backlog). Shields fully regenerate each round.

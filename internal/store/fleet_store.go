@@ -155,7 +155,7 @@ func (s *FleetStore) Dispatch(ctx context.Context, p DispatchParams) (int64, err
 	}
 
 	// Cargo capacity check.
-	cap := game.CargoCapacity(p.Ships, techs["cargo_tech"])
+	cap := game.CargoCapacity(p.Ships, techs["increased_cargo_capacity"])
 	cargoTotal := p.Cargo.Metal + p.Cargo.Lutinum + p.Cargo.Water + p.Cargo.Hydrogen
 	if cargoTotal > float64(cap) {
 		return 0, ErrInsufficientResources

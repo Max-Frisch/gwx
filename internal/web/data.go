@@ -113,9 +113,13 @@ type unitRow struct {
 	Unlocked      bool
 	Missing       []string
 	CostStr       string
+	Costs         []costPart
 	Stats         string
 	PerTimeStr    string
 	MaxAffordable int64
+	Desc          string
+	Icon          string
+	Kind          string
 }
 
 type shipOption struct {
@@ -463,8 +467,8 @@ type resourcesData struct {
 
 type researchData struct {
 	baseData
-	Rows  []buildRow
-	Queue *queueView
+	Sections []buildingSection
+	Queue    *queueView
 }
 
 type shipyardData struct {

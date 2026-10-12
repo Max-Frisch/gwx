@@ -287,7 +287,8 @@ func (s *QueueStore) StartUnits(ctx context.Context, universeCode string, userID
 		return err
 	}
 
-	dur := def.TimeSecs * float64(qty) / u.gameSpeed
+	factoryLevel := structs[game.UnitFactoryCode(def.Kind)]
+	dur := def.TimeSecs * game.UnitTimeMultiplier(factoryLevel) * float64(qty) / u.gameSpeed
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO queues (universe_id, user_id, planet_id, kind, code, quantity, start_at, finish_at)
 		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW() + ($7 * INTERVAL '1 second'))

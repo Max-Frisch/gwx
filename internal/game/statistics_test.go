@@ -3,9 +3,9 @@ package game
 import "testing"
 
 func TestUnitValue(t *testing.T) {
-	// Spy Probe: 50 Lutinum + 10 Hydrogen.
-	if got := UnitValue("spy_probe", 3); got != 180 {
-		t.Errorf("UnitValue(spy_probe,3) = %v, want 180", got)
+	// Spy Probe: 150 Lutinum.
+	if got := UnitValue("spy_probe", 3); got != 450 {
+		t.Errorf("UnitValue(spy_probe,3) = %v, want 450", got)
 	}
 	if got := UnitValue("spy_probe", 0); got != 0 {
 		t.Errorf("zero count = %v, want 0", got)
@@ -17,9 +17,9 @@ func TestUnitValue(t *testing.T) {
 
 func TestLossValue(t *testing.T) {
 	units := map[string]int64{"cougar": 1, "heavy_laser": 2}
-	// Cougar 4100 + 2 × Laser Turret 2200 = 8500.
-	if got := LossValue(units); got != 8500 {
-		t.Errorf("LossValue = %v, want 8500", got)
+	// Cougar 9000 + 2 × Laser Turret 2200 = 13400.
+	if got := LossValue(units); got != 13400 {
+		t.Errorf("LossValue = %v, want 13400", got)
 	}
 }
 
@@ -29,9 +29,9 @@ func TestCombatReportValues(t *testing.T) {
 		DefenderLosses: map[string]int64{"heavy_laser": 2},
 		Loot:           Loot{Metal: 1000, Hydrogen: 500},
 	}
-	// Cougar 4100 + 2 × Laser Turret 2200 = 8500.
-	if got := rep.DestroyedValue(); got != 8500 {
-		t.Errorf("DestroyedValue = %v, want 8500", got)
+	// Cougar 9000 + 2 × Laser Turret 2200 = 13400.
+	if got := rep.DestroyedValue(); got != 13400 {
+		t.Errorf("DestroyedValue = %v, want 13400", got)
 	}
 	if got := rep.LootValue(); got != 1500 {
 		t.Errorf("LootValue = %v, want 1500", got)
@@ -63,8 +63,8 @@ func TestAggregateBattle(t *testing.T) {
 	if bb.Attacked != 3 || bb.Defended != 1 {
 		t.Errorf("attacked/defended = %d/%d, want 3/1", bb.Attacked, bb.Defended)
 	}
-	if bb.Won != 2 || bb.Lost != 1 || bb.Tied != 1 {
-		t.Errorf("won/lost/tied = %d/%d/%d, want 2/1/1", bb.Won, bb.Lost, bb.Tied)
+	if bb.Won != 1 || bb.Lost != 2 || bb.Tied != 1 {
+		t.Errorf("won/lost/tied = %d/%d/%d, want 1/2/1", bb.Won, bb.Lost, bb.Tied)
 	}
 
 	ships := unitByCode(bb.Ships)
@@ -74,8 +74,8 @@ func TestAggregateBattle(t *testing.T) {
 	if got := ships["longeagle_x"]; got.Lost != 2 || got.Destroyed != 0 {
 		t.Errorf("longeagle_x destroyed/lost = %d/%d, want 0/2", got.Destroyed, got.Lost)
 	}
-	if got := ships["cougar"].DestroyedValue(); got != 5*4100 {
-		t.Errorf("cougar destroyed value = %v, want %v", got, 5*4100)
+	if got := ships["cougar"].DestroyedValue(); got != 5*9000 {
+		t.Errorf("cougar destroyed value = %v, want %v", got, 5*9000)
 	}
 
 	defense := unitByCode(bb.Defense)

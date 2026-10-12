@@ -94,6 +94,17 @@ Read first; one item per session. Keep this file short.
   `sanction_reason` gate queues/fleets and show a read-only `/settings/sanction`
   page plus a banner (migration `0008`; `11-premium-settings.md`).
 
+- **Capture-fidelity pass** — catalog realigned to the Uni5 capture: exact
+  building/research/ship/defense base costs (no invented water costs on Research
+  Center / Chemical Factory; Hydro­gen on the Ship Factory, Orbital Defense
+  Station, Advanced Chemical Factory, Fusion Reactor and Planetary Shield), the
+  shared per-level cost multiplier series `1,1,2,4,7,11.5,…`, real prerequisites
+  (storages need their producer at level 5, Planetary Shield needs Ship Factory
+  + Orbital Defense Station + Fusion Reactor), the full 14-ship roster and the
+  three research *categories* (Drive / Weapons / Ship) replacing the OGame-style
+  Energy/Weapons/Defense items. Storage is `60_000·L²+300_000` with a 2%
+  concealed floor. Research and Ships/Defense now reuse the Construction card
+  layout. (`internal/game/catalog.go`, `economy.go`, `web.go`, templates.)
 - **UI: Construction cards + Resources tab** — `/buildings` is now a
   GigraWars-style card list (grouped Main/Resource/Military, SVG tiles,
   per-resource cost tint green/red, `Upgrade to level N` buttons) and the

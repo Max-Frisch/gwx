@@ -12,7 +12,7 @@ func TestQueueMessage(t *testing.T) {
 		wantTitle  string
 	}{
 		{"building", "iron_mine", 3, 0, "1:2:3", "building", "Construction of Iron Mine (level 3) on 1:2:3 has been completed."},
-		{"research", "energy_tech", 2, 0, "1:2:3", "research", "Research of Energy Research (level 2) has been completed."},
+		{"research", "combustion_drive", 2, 0, "1:2:3", "research", "Research of Combustion Drive (level 2) has been completed."},
 		{"ship", "spy_probe", 0, 5, "1:2:3", "ship", "Production of 5 × Spy Probe on 1:2:3 has been completed."},
 		{"defense", "light_laser", 0, 4, "1:2:3", "defense", "Production of 4 × Light Laser Turret on 1:2:3 has been completed."},
 		{"building", "unknown_code", 1, 0, "9:9:9", "building", "Construction of unknown_code (level 1) on 9:9:9 has been completed."},

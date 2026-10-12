@@ -15,7 +15,7 @@ func TestQueueEventName(t *testing.T) {
 		want string
 	}{
 		{"building level", store.Queue{Code: "iron_mine", TargetLevel: sql.NullInt64{Int64: 3, Valid: true}}, "Iron Mine → 3"},
-		{"research level", store.Queue{Code: "energy_tech", TargetLevel: sql.NullInt64{Int64: 2, Valid: true}}, "Energy Research → 2"},
+		{"research level", store.Queue{Code: "combustion_drive", TargetLevel: sql.NullInt64{Int64: 2, Valid: true}}, "Combustion Drive → 2"},
 		{"unit batch", store.Queue{Code: "spy_probe", Quantity: sql.NullInt64{Int64: 5, Valid: true}}, "5 × Spy Probe"},
 		{"unknown code", store.Queue{Code: "mystery"}, "mystery"},
 	}

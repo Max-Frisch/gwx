@@ -17,15 +17,25 @@ func TestCalculateDistance(t *testing.T) {
 	}
 }
 
-func TestLevelCostGrowsGeometrically(t *testing.T) {
+func TestLevelCostGrowsCubically(t *testing.T) {
+	// Captured Iron Mine base cost 250; levels 1 and 2 cost the base, level 3
+	// doubles it, level 4 quadruples it (the shared Uni5 multiplier series).
 	def := Catalog["iron_mine"]
 	c1 := def.LevelCost(1)
 	c2 := def.LevelCost(2)
-	if c1.Metal != 60 {
-		t.Errorf("level 1 metal: want 60, got %v", c1.Metal)
+	c3 := def.LevelCost(3)
+	c4 := def.LevelCost(4)
+	if c1.Metal != 250 {
+		t.Errorf("level 1 metal: want 250, got %v", c1.Metal)
 	}
-	if math.Abs(c2.Metal-90) > 1e-9 {
-		t.Errorf("level 2 metal: want 90, got %v", c2.Metal)
+	if math.Abs(c2.Metal-250) > 1e-9 {
+		t.Errorf("level 2 metal: want 250, got %v", c2.Metal)
+	}
+	if math.Abs(c3.Metal-500) > 1e-9 {
+		t.Errorf("level 3 metal: want 500, got %v", c3.Metal)
+	}
+	if math.Abs(c4.Metal-1000) > 1e-9 {
+		t.Errorf("level 4 metal: want 1000, got %v", c4.Metal)
 	}
 }
 
@@ -70,13 +80,28 @@ func TestProductionMatchesReference(t *testing.T) {
 	}
 }
 
-func TestCargoCapacityScalesWithResearch(t *testing.T) {
-	units := map[string]int64{"handelsschiff": 2}
-	if got := CargoCapacity(units, 0); got != 20000 {
-		t.Errorf("cargo no research: want 20000, got %d", got)
+func TestUnitTimeScalesWithFactoryLevel(t *testing.T) {
+	// Captured Jackal times: F1 00:20:00 (1200s), F2 00:10:00, F11 00:00:32.
+	def := Catalog["jackal"]
+	at := func(level int) float64 { return def.TimeSecs * UnitTimeMultiplier(level) }
+	if at(1) != 1200 {
+		t.Errorf("jackal F1 = %v, want 1200", at(1))
 	}
-	if got := CargoCapacity(units, 5); got != 30000 {
-		t.Errorf("cargo +50%%: want 30000, got %d", got)
+	if got := at(2); math.Abs(got-533.33) > 1 {
+		t.Errorf("jackal F2 = %v, want ~533", got)
+	}
+	if UnitFactoryCode(KindShip) != "shipyard" || UnitFactoryCode(KindDefense) != "orbital_defense" {
+		t.Error("unit factory code mapping wrong")
+	}
+}
+
+func TestCargoCapacityScalesWithResearch(t *testing.T) {
+	units := map[string]int64{"small_trader": 2}
+	if got := CargoCapacity(units, 0); got != 18000 {
+		t.Errorf("cargo no research: want 18000, got %d", got)
+	}
+	if got := CargoCapacity(units, 5); got != 27000 {
+		t.Errorf("cargo +50%%: want 27000, got %d", got)
 	}
 }
 
@@ -97,7 +122,7 @@ func TestPrereqsMet(t *testing.T) {
 	if PrereqsMet(def, map[string]int{"shipyard": 1}, map[string]int{}) {
 		t.Error("expected unmet prereqs")
 	}
-	if !PrereqsMet(def, map[string]int{"shipyard": 4}, map[string]int{"spacefold_drive": 2}) {
+	if !PrereqsMet(def, map[string]int{"shipyard": 1}, map[string]int{"space_folding_drive": 2}) {
 		t.Error("expected met prereqs")
 	}
 }
@@ -173,8 +198,10 @@ func TestDefenseRoster(t *testing.T) {
 		t.Error("plasma_turret should build with ionization 4")
 	}
 
-	res := Simulate(map[string]int64{"cougar": 1}, map[string]int64{"rocket_launcher": 1}, 0, 0, 6)
+	// With the captured stats a rocket launcher out-guns the cougar's shields;
+	// three emplacements break the Cougar's hull in a single round.
+	res := Simulate(map[string]int64{"cougar": 1}, map[string]int64{"rocket_launcher": 3}, 0, 0, 6)
 	if res.AttackerLost != 1 {
-		t.Errorf("rocket_launcher should destroy the cougar, attackerLost = %d", res.AttackerLost)
+		t.Errorf("rocket_launchers should destroy the cougar, attackerLost = %d", res.AttackerLost)
 	}
 }

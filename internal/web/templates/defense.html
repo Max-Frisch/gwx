@@ -10,35 +10,39 @@
 
 {{template "queue-panel" .}}
 
-<div class="panel">
-<table>
-  <tr><th>Defense</th><th>Owned</th><th>Unit cost</th><th>Stats</th><th>Time/unit</th><th>Order</th></tr>
-  {{range .Units}}
-  <tr>
-    <td>{{.Name}}</td>
-    <td>{{.Count}}</td>
+<h2 class="section-head">Defense station</h2>
+{{range .Units}}
+<div class="bcard{{if not .Unlocked}} locked{{end}}">
+  <div class="bcard-img"><svg class="ic-lg"><use href="#{{.Icon}}"/></svg></div>
+  <div class="bcard-body">
+    <div class="bcard-title">{{.Name}} <span class="bcard-level">({{.Count}})</span></div>
+    <p class="bcard-desc">{{.Desc}}</p>
     {{if .Unlocked}}
-      <td class="muted">{{.CostStr}}</td>
-      <td class="muted">{{.Stats}}</td>
-      <td class="muted">{{.PerTimeStr}}</td>
-      <td>
-        {{if gt .MaxAffordable 0}}
-        <form method="post" action="/defense/{{$.ActivePlanetID}}/build" class="row"
-              hx-post="/defense/{{$.ActivePlanetID}}/build" hx-target="#page-content" hx-swap="innerHTML" hx-disabled-elt="find button">
-          <input type="hidden" name="code" value="{{.Code}}">
-          <input type="number" name="qty" value="1" min="1" max="{{.MaxAffordable}}">
-          <button type="submit">Build</button>
-          <small class="muted">max {{.MaxAffordable}}</small>
-        </form>
-        {{else}}<span class="muted">cannot afford</span>{{end}}
-      </td>
+    <div class="bcard-meta">
+      {{range .Costs}}<span class="cost"><span class="{{.Class}}">{{.Label}}</span> <span class="{{if .OK}}v-ok{{else}}v-bad{{end}}">{{.Amount}}</span></span>{{end}}
+      <span class="dur">Duration {{.PerTimeStr}}</span>
+      <span class="dur">{{.Stats}}</span>
+    </div>
     {{else}}
-      <td class="muted" colspan="3">Requires: {{range $i, $m := .Missing}}{{if $i}}, {{end}}{{$m}}{{end}}</td>
-      <td></td>
+    <div class="bcard-meta"><span class="req">Requires: {{range $i, $m := .Missing}}{{if $i}}, {{end}}{{$m}}{{end}}</span></div>
     {{end}}
-  </tr>
-  {{end}}
-</table>
+  </div>
+  <div class="bcard-action">
+    {{if not .Unlocked}}
+      <button class="ghost" disabled>Locked</button>
+    {{else if gt .MaxAffordable 0}}
+      <form method="post" action="/defense/{{$.ActivePlanetID}}/build"
+            hx-post="/defense/{{$.ActivePlanetID}}/build" hx-target="#page-content" hx-swap="innerHTML" hx-disabled-elt="find button">
+        <input type="hidden" name="code" value="{{.Code}}">
+        <input type="number" name="qty" value="1" min="1" max="{{.MaxAffordable}}">
+        <button type="submit">Build</button>
+        <small class="muted">max {{n .MaxAffordable}}</small>
+      </form>
+    {{else}}
+      <span class="muted">cannot afford</span>
+    {{end}}
+  </div>
 </div>
+{{end}}
 {{template "hx-extras" .}}
 {{end}}
