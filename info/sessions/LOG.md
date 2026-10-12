@@ -4,6 +4,8 @@ Append one line per completed session: `date | session | result | commit`.
 
 ```
 2026-10-12 | planning | split Uni5 HAR work into E1-E8 + I1-I9; recon index committed | (this commit)
+2026-10-12 | E1 | defense catalog + combat spec (5 units; 03-combat gap closed) | 074fddc
+2026-10-12 | E2 | trade/marketplace spec (07-trade.md) | (this commit)
 ```
 
 ## Recon (2026-10-12)
