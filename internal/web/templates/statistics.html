@@ -1,0 +1,105 @@
+{{define "statistics"}}
+{{template "head" .}}
+<div class="tabs">
+  <a href="/statistics?tab=battle" class="{{if eq .Tab "battle"}}active{{end}}">Battle balance</a>
+  <a href="/statistics?tab=farming" class="{{if eq .Tab "farming"}}active{{end}}">Farming balance</a>
+  <a href="/statistics?tab=resources" class="{{if eq .Tab "resources"}}active{{end}}">Resources</a>
+</div>
+
+{{if eq .Tab "battle"}}
+<h1>Statistics <span class="muted">Battle balance</span></h1>
+<div class="panel row">
+  <span class="tag">Attacked {{.Battle.Attacked}}</span>
+  <span class="tag">Defended {{.Battle.Defended}}</span>
+  <span class="tag ok">Won {{.Battle.Won}}</span>
+  <span class="tag busy">Tied {{.Battle.Tied}}</span>
+  <span class="tag bad">Lost {{.Battle.Lost}}</span>
+</div>
+
+<h2>Ships</h2>
+<div class="panel">
+<table>
+  <tr><th>Unit</th><th>Destroyed</th><th>Lost</th></tr>
+  {{range .Battle.Ships}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td class="{{if .DestroyedValue}}m{{else}}muted{{end}}">{{nf .DestroyedValue}}</td>
+    <td class="{{if .LostValue}}bad{{else}}muted{{end}}">{{nf .LostValue}}</td>
+  </tr>
+  {{end}}
+</table>
+</div>
+
+<h2>Defense</h2>
+<div class="panel">
+<table>
+  <tr><th>Unit</th><th>Destroyed</th><th>Lost</th></tr>
+  {{range .Battle.Defense}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td class="{{if .DestroyedValue}}m{{else}}muted{{end}}">{{nf .DestroyedValue}}</td>
+    <td class="{{if .LostValue}}bad{{else}}muted{{end}}">{{nf .LostValue}}</td>
+  </tr>
+  {{end}}
+</table>
+</div>
+
+<h2>Resources</h2>
+<div class="panel">
+<table>
+  <tr><th>Resource</th><th>Plundered</th><th>Lost</th></tr>
+  {{range .Battle.Resources}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td class="{{if .Plundered}}m{{else}}muted{{end}}">{{nf .Plundered}}</td>
+    <td class="{{if .Lost}}bad{{else}}muted{{end}}">{{nf .Lost}}</td>
+  </tr>
+  {{end}}
+</table>
+</div>
+
+<h2>Recycled resources</h2>
+<div class="panel"><span class="muted">Nothing recovered yet — debris salvaging arrives with the Recycler update.</span></div>
+<small class="muted">All values are resource value (destroyed / plundered / lost). Your own figures only — fleet composition is never public.</small>
+
+{{else if eq .Tab "farming"}}
+<h1>Statistics <span class="muted">Farming balance</span></h1>
+<p class="muted">Beta — covers every raid in your recent combat reports. Recycled resources are not counted until debris exists.</p>
+<div class="panel row">
+  <span class="tag">Raids {{.Farming.Raids}}</span>
+  <span class="tag ok">Total plundered {{nf .Farming.Total}}</span>
+  <span class="tag">Average haul {{nf .Farming.AverageHaul}}</span>
+</div>
+<div class="panel">
+<table>
+  <tr><th>Resource</th><th>Plundered</th></tr>
+  {{range .Farming.Resources}}
+  <tr><td>{{.Name}}</td><td class="{{if .Plundered}}m{{else}}muted{{end}}">{{nf .Plundered}}</td></tr>
+  {{end}}
+</table>
+</div>
+
+{{else}}
+<h1>Statistics <span class="muted">Resources</span></h1>
+<p class="muted">What your fleets brought home versus what was taken from you.</p>
+<div class="panel row">
+  <span class="tag ok">Plundered {{nf .ResourceBalance.Plundered}}</span>
+  <span class="tag bad">Lost {{nf .ResourceBalance.Lost}}</span>
+</div>
+<div class="panel">
+<table>
+  <tr><th>Resource</th><th>Plundered</th><th>Lost</th><th>Balance</th></tr>
+  {{range .ResourceBalance.Resources}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td class="{{if .Plundered}}m{{else}}muted{{end}}">{{nf .Plundered}}</td>
+    <td class="{{if .Lost}}bad{{else}}muted{{end}}">{{nf .Lost}}</td>
+    <td class="{{if .Balance}}bad{{else}}muted{{end}}">{{nf .Balance}}</td>
+  </tr>
+  {{end}}
+</table>
+</div>
+<small class="muted">Recycled resources (debris gained / lost) will appear here once the debris mechanic exists.</small>
+{{end}}
+{{template "foot" .}}
+{{end}}

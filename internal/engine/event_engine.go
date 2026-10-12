@@ -744,24 +744,26 @@ func (e *EventEngine) resolveAttackTx(ctx context.Context, tx *sql.Tx, fleetID, 
 		}
 	}
 
-	// Report.
+	// Report. Each participant gets their own copy of the payload, tagged with
+	// their role so statistics can read destroyed/lost from the right side.
 	payload := map[string]any{
 		"target":            coords(tg, ts, tp),
 		"rounds":            result.Rounds,
-		"attackerLosses":    result.AttackerLost,
-		"defenderLosses":    result.DefenderLost,
+		"attackerLosses":    result.AttackerLosses,
+		"defenderLosses":    result.DefenderLosses,
 		"attackerSurvivors": result.AttackerSurvivors,
 		"loot": map[string]int64{
 			"metal": int64(loot.Metal), "lutinum": int64(loot.Lutinum),
 			"water": int64(loot.Water), "hydrogen": int64(loot.Hydrogen),
 		},
 	}
-	raw, _ := json.Marshal(payload)
+	payload["role"] = "attacker"
+	rawAttacker, _ := json.Marshal(payload)
 	var attackReportID int64
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO reports (universe_id, user_id, kind, title, payload)
 		VALUES ($1, $2, 'combat', $3, $4) RETURNING id
-	`, universeID, userID, "Attack on "+coords(tg, ts, tp), raw).Scan(&attackReportID); err != nil {
+	`, universeID, userID, "Attack on "+coords(tg, ts, tp), rawAttacker).Scan(&attackReportID); err != nil {
 		return err
 	}
 	if err := insertMessageTx(ctx, tx, universeID, userID, "report", "attack",
@@ -769,11 +771,13 @@ func (e *EventEngine) resolveAttackTx(ctx context.Context, tx *sql.Tx, fleetID, 
 		return err
 	}
 	if defOwner.Valid {
+		payload["role"] = "defender"
+		rawDefender, _ := json.Marshal(payload)
 		var defReportID int64
 		if err := tx.QueryRowContext(ctx, `
 			INSERT INTO reports (universe_id, user_id, kind, title, payload)
 			VALUES ($1, $2, 'combat', $3, $4) RETURNING id
-		`, universeID, defOwner.Int64, "Defense at "+coords(tg, ts, tp), raw).Scan(&defReportID); err != nil {
+		`, universeID, defOwner.Int64, "Defense at "+coords(tg, ts, tp), rawDefender).Scan(&defReportID); err != nil {
 			return err
 		}
 		if err := insertMessageTx(ctx, tx, universeID, defOwner.Int64, "report", "defense",

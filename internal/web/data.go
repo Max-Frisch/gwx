@@ -140,6 +140,14 @@ type highscoreData struct {
 	PlanetRows []planetScoreRow
 }
 
+type statisticsData struct {
+	baseData
+	Tab             string
+	Battle          game.BattleBalance
+	Farming         game.Farming
+	ResourceBalance game.ResourceBalance
+}
+
 type planetSearchRow struct {
 	Name      string
 	Coords    string

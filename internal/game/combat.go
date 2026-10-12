@@ -2,10 +2,13 @@ package game
 
 import "math"
 
-// CombatResult summarises a resolved battle.
+// CombatResult summarises a resolved battle. Losses are recorded per unit so
+// reports and statistics can price what was destroyed.
 type CombatResult struct {
 	AttackerSurvivors map[string]int64
 	DefenderSurvivors map[string]int64
+	AttackerLosses    map[string]int64
+	DefenderLosses    map[string]int64
 	Rounds            int
 	AttackerLost      int64
 	DefenderLost      int64
@@ -19,6 +22,8 @@ type CombatResult struct {
 func Simulate(attacker, defender map[string]int64, weaponTech, shieldTech, maxRounds int) CombatResult {
 	att := copyCounts(attacker)
 	def := copyCounts(defender)
+	attStartCounts := copyCounts(att)
+	defStartCounts := copyCounts(def)
 	attStart := total(att)
 	defStart := total(def)
 
@@ -40,10 +45,24 @@ func Simulate(attacker, defender map[string]int64, weaponTech, shieldTech, maxRo
 	return CombatResult{
 		AttackerSurvivors: att,
 		DefenderSurvivors: def,
+		AttackerLosses:    diffCounts(attStartCounts, att),
+		DefenderLosses:    diffCounts(defStartCounts, def),
 		Rounds:            rounds,
 		AttackerLost:      attStart - total(att),
 		DefenderLost:      defStart - total(def),
 	}
+}
+
+// diffCounts returns the units present in start but no longer in end, keyed by
+// unit code.
+func diffCounts(start, end map[string]int64) map[string]int64 {
+	out := make(map[string]int64)
+	for code, n := range start {
+		if left := end[code]; n > left {
+			out[code] = n - left
+		}
+	}
+	return out
 }
 
 func sideAttack(units map[string]int64, weaponTech int) float64 {

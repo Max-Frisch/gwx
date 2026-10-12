@@ -44,6 +44,7 @@ type Handler struct {
 	messages     *store.MessageStore
 	auth         *store.AuthStore
 	scores       *store.ScoreStore
+	stats        *store.StatsStore
 	tmpl         *template.Template
 }
 
@@ -65,6 +66,7 @@ func New(db *sql.DB, universeCode string) *Handler {
 		messages:     store.NewMessageStore(db),
 		auth:         store.NewAuthStore(db),
 		scores:       store.NewScoreStore(db),
+		stats:        store.NewStatsStore(db),
 		tmpl:         tmpl,
 	}
 }
@@ -99,6 +101,7 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("POST /messages/{id}/delete", h.requireUser(h.MessageDeleteSubmit))
 	mux.HandleFunc("POST /messages/{id}/archive", h.requireUser(h.MessageArchiveSubmit))
 	mux.HandleFunc("GET /highscore", h.requireUser(h.HighscorePage))
+	mux.HandleFunc("GET /statistics", h.requireUser(h.StatisticsPage))
 	mux.HandleFunc("GET /search", h.requireUser(h.SearchPage))
 	mux.HandleFunc("GET /player/{id}", h.requireUser(h.PlayerPage))
 	mux.HandleFunc("GET /settings", h.requireUser(h.SettingsRedirect))
@@ -855,6 +858,28 @@ func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.render(w, "highscore", http.StatusOK, d)
+}
+
+func (h *Handler) StatisticsPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	tab := r.URL.Query().Get("tab")
+	switch tab {
+	case "farming", "resources":
+	default:
+		tab = "battle"
+	}
+
+	d := statisticsData{baseData: h.base(ctx, r, userID, "Statistics", h.homeID(ctx, userID)), Tab: tab}
+	switch tab {
+	case "farming":
+		d.Farming, _ = h.stats.Farming(ctx, userID)
+	case "resources":
+		d.ResourceBalance, _ = h.stats.Resources(ctx, userID)
+	default:
+		d.Battle, _ = h.stats.BattleBalance(ctx, userID)
+	}
+	h.render(w, "statistics", http.StatusOK, d)
 }
 
 func (h *Handler) SearchPage(w http.ResponseWriter, r *http.Request) {

@@ -40,6 +40,11 @@ Read first; one item per session. Keep this file short.
   research/unit queues across all planets, own fleets in flight and hostile
   incoming, plus recent resolved activity from `messages`. Purely derived from
   `queues`/`fleets`/`messages` — no new table (`I3-events.md`).
+- **I4 statistics** — `/statistics` (nav: ACCOUNT): Battle balance (per-unit
+  destroyed/lost resource value for ships + defense, plundered/lost resources,
+  win/loss/tie), Farming balance (raids, loot totals, average haul) and Resources
+  (plundered vs lost). Combat reports now record per-unit losses and the viewer's
+  role; `StatsStore` aggregates the player's own JSONB payloads (`I4-statistics.md`).
 
 ## Todo (ordered)
 - [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
@@ -49,9 +54,9 @@ Read first; one item per session. Keep this file short.
 - [ ] **Moon** — optional moon chance on large attacks; jump gate later.
       (Legacy/misread: reference GW has no moons; `[M]` means *main planet*.)
 - [ ] **Seasonal lifecycle** — automatic archive/reset at `ENDS_AT`; round seeding.
-- [ ] **Hall of Fame / stats** — remaining Highscore tabs (Alliances, Battles)
-      and the Statistics pages (battle/farming/components). Economy/research
-      points only, never fleet composition.
+- [ ] **Highscore expansion** — remaining Highscore tabs (Alliances, Battles).
+      Economy/research points only, never fleet composition. (Statistics pages
+      done — see I4.)
 - [ ] **JSON API** — thin `/api/v1` surface for tooling/bots.
 - [ ] **Full-loop integration test** — register → … → abandon.
 - [ ] **Anti-farm / noob protection** — optional points-ratio guard.
@@ -161,8 +166,9 @@ build task in `info/sessions/`:
 3. **Search + player profile (`I1`)** — *done.* Find planets by name and players
    by username; `/player/{id}` hub with economy points + owned planets
    (`10-messages-events-search.md`).
-4. **Statistics from `reports` (`I4`)** — aggregate the combat JSONB payloads for
-   destroyed / plundered. ("Recycled" needs debris first.)
+4. **Statistics from `reports` (`I4`)** — *done.* `/statistics` aggregates per-unit
+   destroyed/lost resource value, looted/lost resources and farming totals from
+   the player's own combat reports. ("Recycled" needs debris first.)
 5. **Defense roster (`I8`)** — the five units are catalog rows + prereqs and
    immediately build/fight; real costs/stats in `03-combat.md`.
 6. **Messages from `reports` + system feed (`I2`)** — *done.* `/messages` lists
