@@ -155,6 +155,19 @@ func (s *AuthStore) Username(ctx context.Context, userID int64) (string, error) 
 	return name, err
 }
 
+// UserIDByUsername resolves a display name within a universe (case-insensitive).
+func (s *AuthStore) UserIDByUsername(ctx context.Context, universeCode, username string) (int64, error) {
+	var id int64
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id FROM users
+		WHERE username = $1 AND universe_id = (SELECT id FROM universes WHERE code_name = $2)
+	`, username, universeCode).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, ErrNotFound
+	}
+	return id, err
+}
+
 // CreateSession stores a new session token hash.
 func (s *AuthStore) CreateSession(ctx context.Context, userID int64, tokenHash string, expiresAt time.Time, userAgent, ip string) error {
 	_, err := s.db.ExecContext(ctx, `

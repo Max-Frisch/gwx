@@ -18,6 +18,7 @@ Append one line per completed session: `date | session | result | commit`.
 2026-10-12 | I4 | /statistics (battle balance / farming / resources) from per-unit combat reports; StatsStore + game aggregation | (this commit)
 2026-10-12 | I5 | highscore expansion: Alliances placeholder + Planets/Battles tabs, sort/direction/page; Battles headline view from reports (ScoreStore.Battles) | (this commit)
 2026-10-12 | I6 | alliances: directory/profile/create/apply/accept, internal members/board/management; fixed MEMBER/OFFICER/LEADER rights in AllianceStore; 0003 migration; highscore Alliances tab + [TAG] in galaxy/highscore/search/player | (this commit)
+2026-10-12 | I7 | trade: /trade marketplace (public+private offers, filters), /trade/new (escrowed barter + 2% offer fee), accept/revoke, /trade/history, /trade/storage (credit all, expiry); Trading Post building + 0004 migration; game.Settle fee math | (this commit)
 ```
 
 ## Recon (2026-10-12)

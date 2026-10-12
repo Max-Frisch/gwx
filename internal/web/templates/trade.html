@@ -1,0 +1,232 @@
+{{define "trade"}}
+{{template "head" .}}
+{{template "trade-nav" .}}
+
+{{if eq .Tab "market"}}
+<h1>Marketplace</h1>
+<div class="panel">
+  <form method="get" action="/trade" class="row">
+    <label class="muted">Offer</label>
+    <select name="offered">
+      <option value="">any</option>
+      {{range .OfferedOptions}}<option value="{{.Key}}" {{if eq .Key $.Offered}}selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+    <label class="muted">Wants</label>
+    <select name="requested">
+      <option value="">any</option>
+      {{range .OfferedOptions}}<option value="{{.Key}}" {{if eq .Key $.Requested}}selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+    <button type="submit">Filter</button>
+    <span class="spacer"></span>
+    <a class="btn" href="/trade/new">New offer</a>
+  </form>
+</div>
+
+<div class="panel">
+<table>
+  <tr>
+    <th>Offer</th>
+    <th>Wants</th>
+    <th style="width:150px">Trader</th>
+    <th style="width:110px">Planet</th>
+    <th style="width:150px">Expires</th>
+    <th style="width:70px"></th>
+  </tr>
+  {{range .Offers}}
+  <tr>
+    <td><b>{{.GiveStr}}</b> {{if .Private}}<span class="tag">private</span>{{end}}</td>
+    <td>{{.WantStr}}</td>
+    <td><a href="/player/{{.CreatorID}}">{{.CreatorName}}</a></td>
+    <td class="muted">{{.Planet}}</td>
+    <td class="muted">{{.Expires}}</td>
+    <td><a class="btn ghost" href="/trade/offer/{{.ID}}">View</a></td>
+  </tr>
+  {{else}}
+  <tr><td colspan="6" class="muted">No open offers match. Post the first one.</td></tr>
+  {{end}}
+</table>
+</div>
+{{if gt .Pages 1}}
+<div class="pager">
+  {{if gt .Page 1}}<a class="btn ghost" href="{{.PageURL .PrevPage}}">← Newer</a>{{end}}
+  <span class="muted">Page {{.Page}} / {{.Pages}} ({{n .Total}})</span>
+  {{if lt .Page .Pages}}<a class="btn ghost" href="{{.PageURL .NextPage}}">Older →</a>{{end}}
+</div>
+{{end}}
+
+{{else if eq .Tab "new"}}
+<h1>New offer</h1>
+{{if .Planets}}
+<div class="panel" style="max-width:560px">
+  <form method="post" action="/trade/new">
+    <div class="field"><label>From planet</label>
+      <select name="planet" required style="width:100%">
+        {{range .Planets}}<option value="{{.ID}}">{{.Name}} · {{coords .Galaxy .System .Position}}</option>{{end}}
+      </select>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:1"><label>You give</label>
+        <select name="give">
+          {{range .OfferedOptions}}<option value="{{.Key}}">{{.Name}}</option>{{end}}
+        </select>
+      </div>
+      <div class="field" style="flex:1"><label>Amount</label><input type="number" name="give_amount" min="1" step="1" required></div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:1"><label>You want</label>
+        <select name="want">
+          {{range .OfferedOptions}}<option value="{{.Key}}">{{.Name}}</option>{{end}}
+        </select>
+      </div>
+      <div class="field" style="flex:1"><label>Amount</label><input type="number" name="want_amount" min="1" step="1" required></div>
+    </div>
+    <div class="field"><label>Trading partner <span class="muted">(optional — a directed, private offer)</span></label>
+      <input name="target" value="{{.Target}}" placeholder="username">
+    </div>
+    <button type="submit">Post offer</button>
+    <a class="btn ghost" href="/trade">Cancel</a>
+  </form>
+  <small class="muted">Requires a Trading Post. The given goods are escrowed, plus a 2% offer fee. Public offers last 7 days, private ones 6 hours.</small>
+</div>
+{{else}}
+<div class="panel muted">You have no planets yet.</div>
+{{end}}
+
+{{else if eq .Tab "own"}}
+<h1>My offers</h1>
+<div class="panel">
+<table>
+  <tr>
+    <th>Offer</th>
+    <th>Wants</th>
+    <th style="width:110px">Planet</th>
+    <th style="width:130px">Type</th>
+    <th style="width:150px">Expires</th>
+    <th style="width:90px"></th>
+  </tr>
+  {{range .MyOffers}}
+  <tr>
+    <td><b>{{.GiveStr}}</b></td>
+    <td>{{.WantStr}}</td>
+    <td class="muted">{{.Planet}}</td>
+    <td>{{if .Private}}<span class="tag">to {{.TargetName}}</span>{{else}}<span class="tag ok">public</span>{{end}}</td>
+    <td class="muted">{{.Expires}}</td>
+    <td>
+      <form method="post" action="/trade/offer/{{.ID}}/revoke" onsubmit="return confirm('Revoke this offer? The offer fee is not refunded.')">
+        <button class="bad" type="submit">Revoke</button>
+      </form>
+    </td>
+  </tr>
+  {{else}}
+  <tr><td colspan="6" class="muted">No open offers. <a href="/trade/new">Post one</a>.</td></tr>
+  {{end}}
+</table>
+</div>
+<p><a class="btn ghost" href="/trade/history">View trade history →</a></p>
+
+{{else if eq .Tab "history"}}
+<h1>Trade history</h1>
+<div class="panel">
+<table>
+  <tr>
+    <th style="width:150px">When</th>
+    <th style="width:90px">Action</th>
+    <th style="width:150px">Trader</th>
+    <th>You gave</th>
+    <th>You got</th>
+  </tr>
+  {{range .History}}
+  <tr>
+    <td class="muted">{{.When}}</td>
+    <td>{{.Action}}</td>
+    <td>
+      {{if .CounterpartyID}}<a href="/player/{{.CounterpartyID}}">{{.Counterparty}}</a>{{else}}{{if .Actor}}{{.Actor}}{{else}}—{{end}}{{end}}
+    </td>
+    <td>{{.GiveStr}}</td>
+    <td>{{.WantStr}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="5" class="muted">No trade history yet.</td></tr>
+  {{end}}
+</table>
+</div>
+
+{{else if eq .Tab "storage"}}
+<h1>Trade storage</h1>
+{{range .Storage}}
+<div class="panel">
+  <div class="row">
+    <b>{{.Name}}</b> <span class="muted">{{.Coords}}</span>
+    <span class="spacer"></span>
+    <span class="muted">Total {{.Total}}</span>
+    {{if .Entries}}
+    <form method="post" action="/trade/storage/credit">
+      <input type="hidden" name="planet" value="{{.PlanetID}}">
+      <button type="submit">Credit all</button>
+    </form>
+    {{end}}
+  </div>
+  {{if .Entries}}
+  <table>
+    <tr><th>Resource</th><th style="width:180px">Expires</th></tr>
+    {{range .Entries}}<tr><td>{{.GiveStr}}</td><td class="muted">{{.Expires}}</td></tr>{{end}}
+  </table>
+  {{else}}
+  <div class="muted">Nothing in storage.</div>
+  {{end}}
+</div>
+{{else}}
+<div class="panel muted">No planets.</div>
+{{end}}
+<small class="muted">Goods are held separately from planet stock and are forfeited if not collected before they expire.</small>
+
+{{else if eq .Tab "offer"}}
+{{with .Offer}}
+<h1>Offer #{{.ID}}</h1>
+<div class="panel">
+  <div class="row">
+    <span class="muted">Trader</span><b><a href="/player/{{.CreatorID}}">{{.CreatorName}}</a></b>
+    <span class="muted">From</span><span>{{.Planet}}</span>
+    <span class="muted">Expires</span><span>{{.Expires}}</span>
+    {{if .Private}}<span class="tag">private</span>{{end}}
+    <span class="tag {{if eq .Status "OPEN"}}ok{{end}}">{{.Status}}</span>
+  </div>
+  <p>They give <b>{{.GiveStr}}</b> and want <b>{{.WantStr}}</b>.</p>
+
+  {{if .IsMine}}
+    <p class="muted">This is your offer.</p>
+    <form method="post" action="/trade/offer/{{.ID}}/revoke" onsubmit="return confirm('Revoke this offer?')">
+      <button class="bad" type="submit">Revoke offer</button>
+    </form>
+  {{else if .CanAccept}}
+    <form method="post" action="/trade/offer/{{.ID}}/accept" class="row">
+      <label class="muted">Pay from</label>
+      <select name="planet">
+        {{range $.Planets}}<option value="{{.ID}}">{{.Name}} · {{coords .Galaxy .System .Position}}</option>{{end}}
+      </select>
+      <button type="submit">Accept trade</button>
+    </form>
+    <small class="muted">You pay {{.WantStr}} and receive {{.GiveStr}} (minus the completion fees) in your trade storage.</small>
+  {{else}}
+    <p class="muted">This offer cannot be accepted by you.</p>
+  {{end}}
+</div>
+{{end}}
+<p><a class="btn ghost" href="/trade">← Marketplace</a></p>
+
+{{else}}
+<div class="panel muted">Nothing here.</div>
+{{end}}
+
+{{template "foot" .}}
+{{end}}
+
+{{define "trade-nav"}}
+<div class="tabs">
+  <a href="/trade" class="{{if eq .Tab "market"}}active{{end}}">Marketplace</a>
+  <a href="/trade/new" class="{{if eq .Tab "new"}}active{{end}}">New offer</a>
+  <a href="/trade/own" class="{{if eq .Tab "own"}}active{{end}}">My offers</a>
+  <a href="/trade/history" class="{{if eq .Tab "history"}}active{{end}}">History</a>
+  <a href="/trade/storage" class="{{if eq .Tab "storage"}}active{{end}}">Storage</a>
+</div>
+{{end}}

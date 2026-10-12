@@ -59,10 +59,16 @@ Read first; one item per session. Keep this file short.
   `alliance_members` + `alliance_applications` + `alliance_posts` (migration
   `0003`). `ScoreStore.Alliances` powers the Highscore Alliances tab; `[TAG]`
   now shows next to usernames in galaxy/highscore/search/player.
+- **I7 trade** — `/trade` marketplace (public + directed/private offers, offered/
+  wanted filters), `/trade/new` (barter offer, escrowed goods + 2% up-front fee),
+  accept with atomic settlement into a separate per-planet trade storage,
+  revoke/expiry with escrow refund, `/trade/history` audit and `/trade/storage`
+  with *credit all*. New **Trading Post** building gates offer creation and sets
+  the per-planet offer slots (= level). `trade_offers` + `trade_history` +
+  `trade_storage` (migration `0004`); `game.Settle` fee math (`07-trade.md`).
 
 ## Todo (ordered)
 - [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
-- [ ] **Player trading** — Trade Ship + resource trade offers between players.
 - [ ] **Alliance diplomacy** — NAP/war declarations between alliances (follow-up
       to I6; membership, ranks, applications and the shared board already land).
 - [ ] **Debris + Recycler** — battle debris field at `debris_rate`, recycle mission.
@@ -198,8 +204,8 @@ build task in `info/sessions/`:
    Explosive Projectiles, Energy Focusing) can gate them.
 
 **Bigger but still self-contained** (own tables, no external dependency):
-Alliances (`I6`, *done* — diplomacy still open), Trade/market (`I7`), Events feed
-(`I3`, *done* — derived, no table), Vacation mode (`I9`).
+Alliances (`I6`, *done* — diplomacy still open), Trade/market (`I7`, *done*),
+Events feed (`I3`, *done* — derived, no table), Vacation mode (`I9`).
 
 **Not standalone** (need a new mechanic first): debris + Recycling Technology,
 Advanced Ship Armor hull bonus, extra cargo tech, Space Curvature Drive

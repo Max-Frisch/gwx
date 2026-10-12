@@ -620,3 +620,96 @@ func costString(c game.Resources) string {
 	}
 	return strings.Join(parts, " · ")
 }
+
+// ---- trading ----
+
+// resourceOption is one entry of a resource <select>.
+type resourceOption struct {
+	Key  string
+	Name string
+}
+
+// tradeOfferRow is the display shape of one marketplace/own offer.
+type tradeOfferRow struct {
+	ID          int64
+	CreatorID   int64
+	CreatorName string
+	Planet      string
+	Private     bool
+	TargetName  string
+	GiveStr     string
+	WantStr     string
+	Status      string
+	Expires     string
+	Created     string
+	IsMine      bool
+	CanAccept   bool
+}
+
+// tradeHistoryRow is one audit line in the trade history.
+type tradeHistoryRow struct {
+	When           string
+	Action         string
+	Actor          string
+	ActorID        int64
+	Counterparty   string
+	CounterpartyID int64
+	GiveStr        string
+	WantStr        string
+}
+
+// tradeStorageEntryRow is one pending delivery shown under a planet.
+type tradeStorageEntryRow struct {
+	GiveStr string
+	Expires string
+}
+
+// tradeStoragePlanet groups one planet's pending deliveries.
+type tradeStoragePlanet struct {
+	PlanetID int64
+	Name     string
+	Coords   string
+	Total    string
+	Entries  []tradeStorageEntryRow
+}
+
+// tradeData backs every trade tab.
+type tradeData struct {
+	baseData
+	Tab string
+
+	// marketplace
+	Offered   string
+	Requested string
+	Offers    []tradeOfferRow
+	Page      int
+	Pages     int
+	PrevPage  int
+	NextPage  int
+	Total     int
+
+	// create form / offer detail
+	Planets  []store.OwnedPlanet
+	Target   string
+	TargetID int64
+	Offer    *tradeOfferRow
+
+	// own / history / storage
+	MyOffers []tradeOfferRow
+	History  []tradeHistoryRow
+	Storage  []tradeStoragePlanet
+
+	OfferedOptions []resourceOption
+}
+
+// PageURL links to another marketplace page while keeping the filters.
+func (d tradeData) PageURL(n int) string {
+	u := "/trade?page=" + strconv.Itoa(n)
+	if d.Offered != "" {
+		u += "&offered=" + url.QueryEscape(d.Offered)
+	}
+	if d.Requested != "" {
+		u += "&requested=" + url.QueryEscape(d.Requested)
+	}
+	return u
+}

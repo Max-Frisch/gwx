@@ -46,6 +46,7 @@ type Handler struct {
 	scores       *store.ScoreStore
 	stats        *store.StatsStore
 	alliances    *store.AllianceStore
+	trade        *store.TradeStore
 	tmpl         *template.Template
 }
 
@@ -69,6 +70,7 @@ func New(db *sql.DB, universeCode string) *Handler {
 		scores:       store.NewScoreStore(db),
 		stats:        store.NewStatsStore(db),
 		alliances:    store.NewAllianceStore(db),
+		trade:        store.NewTradeStore(db),
 		tmpl:         tmpl,
 	}
 }
@@ -133,6 +135,17 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("POST /alliance/{id}/join", h.requireUser(h.AllianceJoinSubmit))
 	mux.HandleFunc("POST /alliance/{id}/apply", h.requireUser(h.AllianceApplySubmit))
 	mux.HandleFunc("GET /alliance/{id}", h.requireUser(h.AllianceProfilePage))
+
+	mux.HandleFunc("GET /trade", h.requireUser(h.TradePage))
+	mux.HandleFunc("GET /trade/new", h.requireUser(h.TradeNewPage))
+	mux.HandleFunc("POST /trade/new", h.requireUser(h.TradeCreateSubmit))
+	mux.HandleFunc("GET /trade/own", h.requireUser(h.TradeOwnPage))
+	mux.HandleFunc("GET /trade/history", h.requireUser(h.TradeHistoryPage))
+	mux.HandleFunc("GET /trade/storage", h.requireUser(h.TradeStoragePage))
+	mux.HandleFunc("POST /trade/storage/credit", h.requireUser(h.TradeStorageCreditSubmit))
+	mux.HandleFunc("GET /trade/offer/{id}", h.requireUser(h.TradeOfferPage))
+	mux.HandleFunc("POST /trade/offer/{id}/accept", h.requireUser(h.TradeAcceptSubmit))
+	mux.HandleFunc("POST /trade/offer/{id}/revoke", h.requireUser(h.TradeRevokeSubmit))
 }
 
 func mustSub(fsys embed.FS, dir string) fs.FS {
@@ -285,6 +298,16 @@ func msg(err error) string {
 		return "That alliance is closed — send an application instead."
 	case errors.Is(err, store.ErrForbidden):
 		return "You do not have the rights to do that."
+	case errors.Is(err, store.ErrNoTradingPost):
+		return "Build a Trading Post on that planet first."
+	case errors.Is(err, store.ErrTradeSlotsFull):
+		return "No free offer slots on that planet — upgrade its Trading Post."
+	case errors.Is(err, store.ErrTradeNotOpen):
+		return "That offer is no longer open."
+	case errors.Is(err, store.ErrTradeOwn):
+		return "You cannot accept your own offer."
+	case errors.Is(err, store.ErrTradePrivate):
+		return "That offer is directed at another player."
 	case errors.Is(err, store.ErrUserExists):
 		return "That username or email is already taken."
 	case errors.Is(err, store.ErrUnknownCode):
@@ -1944,4 +1967,295 @@ func clampInt(v, lo, hi int) int {
 		return hi
 	}
 	return v
+}
+
+// ---- trade handlers ----
+
+// tradePageSize is the marketplace page length.
+const tradePageSize = 30
+
+// tradeResourceOptions fixes the select order for the marketplace and offer form.
+var tradeResourceOptions = []resourceOption{
+	{Key: "iron", Name: "Iron"},
+	{Key: "lutinum", Name: "Lutinum"},
+	{Key: "water", Name: "Water"},
+	{Key: "hydrogen", Name: "Hydrogen"},
+}
+
+// tradeResFromForm turns one resource key + amount into a single-resource basket.
+func tradeResFromForm(key string, amount float64) game.Resources {
+	if amount <= 0 {
+		return game.Resources{}
+	}
+	switch key {
+	case "iron":
+		return game.Resources{Metal: amount}
+	case "lutinum":
+		return game.Resources{Lutinum: amount}
+	case "water":
+		return game.Resources{Water: amount}
+	case "hydrogen":
+		return game.Resources{Hydrogen: amount}
+	default:
+		return game.Resources{}
+	}
+}
+
+func parseFloat(s string) float64 {
+	v, _ := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	return v
+}
+
+func resAdd(a, b game.Resources) game.Resources {
+	return game.Resources{
+		Metal: a.Metal + b.Metal, Lutinum: a.Lutinum + b.Lutinum,
+		Water: a.Water + b.Water, Hydrogen: a.Hydrogen + b.Hydrogen,
+	}
+}
+
+// tradeResString renders a basket with full resource names, e.g. "10,000 Iron".
+func tradeResString(r game.Resources) string {
+	var parts []string
+	if r.Metal > 0 {
+		parts = append(parts, fmtFloat(r.Metal)+" Iron")
+	}
+	if r.Lutinum > 0 {
+		parts = append(parts, fmtFloat(r.Lutinum)+" Lutinum")
+	}
+	if r.Water > 0 {
+		parts = append(parts, fmtFloat(r.Water)+" Water")
+	}
+	if r.Hydrogen > 0 {
+		parts = append(parts, fmtFloat(r.Hydrogen)+" Hydrogen")
+	}
+	if len(parts) == 0 {
+		return "—"
+	}
+	return strings.Join(parts, " + ")
+}
+
+func (h *Handler) tradeOfferRowView(o store.TradeOffer, viewerID int64) tradeOfferRow {
+	return tradeOfferRow{
+		ID:          o.ID,
+		CreatorID:   o.CreatorID,
+		CreatorName: o.CreatorName,
+		Planet:      coords(o.Galaxy, o.System, o.Position),
+		Private:     o.IsPrivate(),
+		TargetName:  o.TargetName,
+		GiveStr:     tradeResString(o.Give),
+		WantStr:     tradeResString(o.Want),
+		Status:      o.Status,
+		Expires:     o.ExpiresAt.Format("2006-01-02 15:04"),
+		Created:     o.CreatedAt.Format("2006-01-02 15:04"),
+		IsMine:      o.CreatorID == viewerID,
+		CanAccept:   o.Status == "OPEN" && o.CreatorID != viewerID && (!o.TargetID.Valid || o.TargetID.Int64 == viewerID),
+	}
+}
+
+// TradePage is the public marketplace listing.
+func (h *Handler) TradePage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	_ = h.trade.ExpireOverdue(ctx, 100)
+
+	q := r.URL.Query()
+	offered, requested := q.Get("offered"), q.Get("requested")
+	page := atoiDefault(q.Get("page"), 1)
+	if page < 1 {
+		page = 1
+	}
+
+	d := tradeData{
+		baseData:       h.base(ctx, r, userID, "Trade", h.homeID(ctx, userID)),
+		Tab:            "market",
+		Offered:        offered,
+		Requested:      requested,
+		OfferedOptions: tradeResourceOptions,
+	}
+	offers, total, _ := h.trade.ListMarket(ctx, h.universeCode, userID, offered, requested, page, tradePageSize)
+	d.Total = total
+	d.Pages = (total + tradePageSize - 1) / tradePageSize
+	if d.Pages < 1 {
+		d.Pages = 1
+	}
+	if page > d.Pages {
+		page = d.Pages
+	}
+	d.Page, d.PrevPage, d.NextPage = page, page-1, page+1
+	for _, o := range offers {
+		d.Offers = append(d.Offers, h.tradeOfferRowView(o, userID))
+	}
+	h.render(w, "trade", http.StatusOK, d)
+}
+
+// TradeNewPage renders the create-offer form.
+func (h *Handler) TradeNewPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	planets, _ := h.planets.ListOwned(ctx, userID)
+	d := tradeData{
+		baseData:       h.base(ctx, r, userID, "Trade", h.homeID(ctx, userID)),
+		Tab:            "new",
+		Planets:        planets,
+		OfferedOptions: tradeResourceOptions,
+	}
+	if target := strings.TrimSpace(r.URL.Query().Get("target")); target != "" {
+		if id, err := strconv.ParseInt(target, 10, 64); err == nil {
+			if id != userID {
+				d.TargetID = id
+				d.Target, _ = h.auth.Username(ctx, id)
+			}
+		} else if id, err := h.auth.UserIDByUsername(ctx, h.universeCode, target); err == nil && id != userID {
+			d.TargetID, d.Target = id, target
+		}
+	}
+	h.render(w, "trade", http.StatusOK, d)
+}
+
+func (h *Handler) TradeCreateSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	back := "/trade/new"
+
+	planetID, _ := strconv.ParseInt(r.FormValue("planet"), 10, 64)
+	give := tradeResFromForm(r.FormValue("give"), parseFloat(r.FormValue("give_amount")))
+	want := tradeResFromForm(r.FormValue("want"), parseFloat(r.FormValue("want_amount")))
+	if give.IsZero() || want.IsZero() {
+		flashRedirect(w, r, back, "", "Enter a positive amount for both sides.")
+		return
+	}
+
+	var targetID int64
+	if name := strings.TrimSpace(r.FormValue("target")); name != "" {
+		id, err := h.auth.UserIDByUsername(ctx, h.universeCode, name)
+		if err != nil {
+			flashRedirect(w, r, back, "", "No such trading partner.")
+			return
+		}
+		if id == userID {
+			flashRedirect(w, r, back, "", "You cannot trade with yourself.")
+			return
+		}
+		targetID = id
+	}
+
+	if _, err := h.trade.CreateOffer(ctx, h.universeCode, userID, planetID, targetID, give, want); err != nil {
+		flashRedirect(w, r, back, "", msg(err))
+		return
+	}
+	flashRedirect(w, r, "/trade/own", "Offer posted.", "")
+}
+
+// TradeOwnPage lists the caller's open offers.
+func (h *Handler) TradeOwnPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	_ = h.trade.ExpireOverdue(ctx, 100)
+
+	d := tradeData{baseData: h.base(ctx, r, userID, "Trade", h.homeID(ctx, userID)), Tab: "own"}
+	offers, _ := h.trade.MyOffers(ctx, userID)
+	for _, o := range offers {
+		d.MyOffers = append(d.MyOffers, h.tradeOfferRowView(o, userID))
+	}
+	h.render(w, "trade", http.StatusOK, d)
+}
+
+// TradeHistoryPage lists completed/closed trades the caller took part in.
+func (h *Handler) TradeHistoryPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	d := tradeData{baseData: h.base(ctx, r, userID, "Trade", h.homeID(ctx, userID)), Tab: "history"}
+	entries, _ := h.trade.History(ctx, userID, 100)
+	for _, e := range entries {
+		d.History = append(d.History, tradeHistoryRow{
+			When:           e.At.Format("2006-01-02 15:04"),
+			Action:         e.Action,
+			Actor:          e.ActorName,
+			ActorID:        e.ActorID,
+			Counterparty:   e.CounterpartyName,
+			CounterpartyID: e.CounterpartyID,
+			GiveStr:        tradeResString(e.Give),
+			WantStr:        tradeResString(e.Want),
+		})
+	}
+	h.render(w, "trade", http.StatusOK, d)
+}
+
+// TradeStoragePage shows each owned planet's pending trade deliveries.
+func (h *Handler) TradeStoragePage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	d := tradeData{baseData: h.base(ctx, r, userID, "Trade", h.homeID(ctx, userID)), Tab: "storage"}
+
+	owned, _ := h.planets.ListOwned(ctx, userID)
+	for _, p := range owned {
+		entries, _ := h.trade.Storage(ctx, p.ID)
+		sp := tradeStoragePlanet{
+			PlanetID: p.ID, Name: p.Name,
+			Coords: coords(p.Galaxy, p.System, p.Position),
+		}
+		var total game.Resources
+		for _, e := range entries {
+			sp.Entries = append(sp.Entries, tradeStorageEntryRow{
+				GiveStr: tradeResString(e.Resources),
+				Expires: e.ExpiresAt.Format("2006-01-02 15:04"),
+			})
+			total = resAdd(total, e.Resources)
+		}
+		sp.Total = tradeResString(total)
+		d.Storage = append(d.Storage, sp)
+	}
+	h.render(w, "trade", http.StatusOK, d)
+}
+
+func (h *Handler) TradeStorageCreditSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	planetID, _ := strconv.ParseInt(r.FormValue("planet"), 10, 64)
+	sum, err := h.trade.CreditStorage(ctx, userID, planetID)
+	if err != nil {
+		flashRedirect(w, r, "/trade/storage", "", msg(err))
+		return
+	}
+	flashRedirect(w, r, "/trade/storage", "Credited "+tradeResString(sum)+" to the planet.", "")
+}
+
+// TradeOfferPage shows one offer with an accept (or revoke) form.
+func (h *Handler) TradeOfferPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	o, err := h.trade.GetOffer(ctx, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	row := h.tradeOfferRowView(*o, userID)
+	planets, _ := h.planets.ListOwned(ctx, userID)
+	d := tradeData{
+		baseData: h.base(ctx, r, userID, "Trade", h.homeID(ctx, userID)),
+		Tab:      "offer",
+		Offer:    &row,
+		Planets:  planets,
+	}
+	h.render(w, "trade", http.StatusOK, d)
+}
+
+func (h *Handler) TradeAcceptSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	planetID, _ := strconv.ParseInt(r.FormValue("planet"), 10, 64)
+	if planetID == 0 {
+		planetID = h.homeID(ctx, userID)
+	}
+	err := h.trade.Accept(ctx, id, userID, planetID)
+	flashRedirect(w, r, "/trade/storage", "Trade complete — collect it from storage.", msg(err))
+}
+
+func (h *Handler) TradeRevokeSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	err := h.trade.Revoke(r.Context(), id, userID)
+	flashRedirect(w, r, "/trade/own", "Offer revoked.", msg(err))
 }

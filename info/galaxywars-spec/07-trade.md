@@ -216,3 +216,32 @@ gwx has **no Trading Post and no trade subsystem at all**. A faithful port adds:
 6. **Marketplace list:** filters (visibility/offered/requested) + sorts
    (`rate`, `created`) over live public offers; the `OfferOverview` LiveComponent
    maps to a normal GET page (gwx is server-rendered, no LiveComponent).
+
+## gwx MVP as implemented (I7)
+
+gwx ships a deliberately smaller, server-rendered version of the above:
+
+- **Offer shape:** a direct **barter** — one offered resource amount ↔ one wanted
+  resource amount — rather than a give/want resource pair with a rate slider and
+  partial accepts. `course`/rate maths, the ±50% deviation band and the marked
+  extreme-rate log are **not** modelled.
+- **Visibility:** public (7-day life) or **private/directed** at one player
+  (6-hour life). No marketplace sort UI (newest first); offered/wanted filters.
+- **Fees (constants in `internal/game/trade.go`):** a 2% offer fee charged
+  up-front on create, plus 1.5% completion fees withheld from each delivered
+  basket. Fees are floored per resource.
+- **Escrow + settlement:** the given basket is escrowed from the creator's planet
+  while the offer is open. Accepting debits the wanted basket from the accepter's
+  chosen planet and delivers both sides (net of fees) **atomically** — no trading
+  fleet, no travel time, no 200-fleet cap.
+- **Storage & protected floor:** deliveries land in a **separate
+  `trade_storage`** and are credited to the planet on *Credit all* (still bounded
+  by the planet's storage caps). This is the explicit decision: trade **does not**
+  interact with the protected ("concealed") floor, because the goods are held
+  outside the planet's stock until collected. Uncollected entries are forfeited
+  after 7 days.
+- **Slots:** offer creation requires a **Trading Post** on the planet, and the
+  planet may hold at most `level` open offers.
+- **Expiry:** lazy — overdue offers are refunded (less the retained offer fee) and
+  closed as `EXPIRED` whenever the marketplace/own pages are loaded.
+

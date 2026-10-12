@@ -76,6 +76,7 @@ var Catalog = func() map[string]Def {
 
 		// ---- Buildings: military ----
 		{Code: "shipyard", Name: "Shipyard", Kind: KindBuilding, Cost: Resources{Metal: 400, Lutinum: 200, Water: 100}, CostFactor: 1.6, TimeSecs: 120, TimeFactor: 1.3, Prereqs: map[string]int{"command_center": 1}},
+		{Code: "trading_post", Name: "Trading Post", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 2000}, CostFactor: 1.6, TimeSecs: 120, TimeFactor: 1.3, Prereqs: map[string]int{"shipyard": 1}},
 		{Code: "orbital_defense", Name: "Orbital Defense Station", Kind: KindBuilding, Cost: Resources{Metal: 300, Lutinum: 200}, CostFactor: 1.6, TimeSecs: 90, TimeFactor: 1.3, Prereqs: map[string]int{"shipyard": 1}},
 		{Code: "planetary_shield", Name: "Planetary Shield", Kind: KindBuilding, Cost: Resources{Metal: 500, Lutinum: 300, Water: 200}, CostFactor: 1.6, TimeSecs: 120, TimeFactor: 1.3, Prereqs: map[string]int{"orbital_defense": 1}},
 
