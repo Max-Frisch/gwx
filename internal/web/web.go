@@ -77,7 +77,7 @@ func New(db *sql.DB, universeCode string) *Handler {
 
 // Mount registers all UI routes.
 func (h *Handler) Mount(mux *http.ServeMux) {
-	mux.Handle("GET /static/", http.FileServer(http.FS(mustSub(staticFS, "static"))))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(mustSub(staticFS, "static")))))
 
 	mux.HandleFunc("GET /{$}", h.Home)
 	mux.HandleFunc("GET /login", h.LoginPage)
