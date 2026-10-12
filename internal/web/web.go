@@ -734,9 +734,7 @@ func (h *Handler) unitRows(ctx context.Context, p *store.Planet, structs, techs 
 		if row.Icon == "" {
 			row.Icon = "i-ship"
 		}
-		if kind == game.KindDefense {
-			row.Stats = "Atk " + fmtInt(def.Attack) + " · Def " + fmtInt(def.Shield) + " · Hull " + fmtInt(def.Hull)
-		}
+		row.Stats = "Atk " + fmtInt(def.Attack) + weaponLabel(def.Weapon) + " · Def " + fmtInt(def.Shield) + " · Hull " + fmtInt(def.Hull)
 		if !row.Unlocked {
 			row.Missing = game.MissingPrereqs(def, structs, techs)
 		} else {
@@ -745,6 +743,19 @@ func (h *Handler) unitRows(ctx context.Context, p *store.Planet, structs, techs 
 		rows = append(rows, row)
 	}
 	return rows
+}
+
+// weaponLabel renders a unit's weapon class for the stat line, e.g. " (Energy)".
+// Civilian/weaponless hulls get no label.
+func weaponLabel(w game.WeaponClass) string {
+	switch w {
+	case game.WeaponEnergy:
+		return " (Energy)"
+	case game.WeaponExplosive:
+		return " (Explosive)"
+	default:
+		return ""
+	}
 }
 
 func (h *Handler) FleetPage(w http.ResponseWriter, r *http.Request) {

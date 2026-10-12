@@ -714,7 +714,7 @@ func (e *EventEngine) resolveAttackTx(ctx context.Context, tx *sql.Tx, fleetID, 
 		defender[k] += v
 	}
 
-	result := game.Simulate(units, defender, techs["ionization"], defTechs["advanced_ship_armor"], 6)
+	result := game.Simulate(units, defender, game.CombatTechsFromLevels(techs), game.CombatTechsFromLevels(defTechs), 6)
 
 	// Persist defender losses (ships + defense) and attacker survivors.
 	if err := persistSideLossesTx(ctx, tx, targetID.Int64, defShips, result.DefenderSurvivors); err != nil {

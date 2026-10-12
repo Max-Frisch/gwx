@@ -21,6 +21,7 @@
     <div class="bcard-meta">
       {{range .Costs}}<span class="cost"><span class="{{.Class}}">{{.Label}}</span> <span class="{{if .OK}}v-ok{{else}}v-bad{{end}}">{{.Amount}}</span></span>{{end}}
       <span class="dur">Duration {{.PerTimeStr}}</span>
+      <span class="dur">{{.Stats}}</span>
     </div>
     {{else}}
     <div class="bcard-meta"><span class="req">Requires: {{range $i, $m := .Missing}}{{if $i}}, {{end}}{{$m}}{{end}}</span></div>

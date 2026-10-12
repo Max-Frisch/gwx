@@ -118,7 +118,7 @@ func TestCargoCapacityScalesWithResearch(t *testing.T) {
 func TestSimulateOverwhelmingForceWins(t *testing.T) {
 	attacker := map[string]int64{"longeagle_x": 50}
 	defender := map[string]int64{"light_laser": 5}
-	res := Simulate(attacker, defender, 0, 0, 6)
+	res := Simulate(attacker, defender, CombatTechs{}, CombatTechs{}, 6)
 	if res.DefenderLost != 5 {
 		t.Errorf("expected all 5 turrets destroyed, got %d", res.DefenderLost)
 	}
@@ -210,7 +210,7 @@ func TestDefenseRoster(t *testing.T) {
 
 	// With the captured stats a rocket launcher out-guns the cougar's shields;
 	// three emplacements break the Cougar's hull in a single round.
-	res := Simulate(map[string]int64{"cougar": 1}, map[string]int64{"rocket_launcher": 3}, 0, 0, 6)
+	res := Simulate(map[string]int64{"cougar": 1}, map[string]int64{"rocket_launcher": 3}, CombatTechs{}, CombatTechs{}, 6)
 	if res.AttackerLost != 1 {
 		t.Errorf("rocket_launchers should destroy the cougar, attackerLost = %d", res.AttackerLost)
 	}

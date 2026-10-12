@@ -39,7 +39,7 @@ func TestCombatReportValues(t *testing.T) {
 }
 
 func TestSimulateRecordsPerUnitLosses(t *testing.T) {
-	res := Simulate(map[string]int64{"longeagle_x": 50}, map[string]int64{"light_laser": 5}, 0, 0, 6)
+	res := Simulate(map[string]int64{"longeagle_x": 50}, map[string]int64{"light_laser": 5}, CombatTechs{}, CombatTechs{}, 6)
 	if got := res.DefenderLosses["light_laser"]; got != 5 {
 		t.Errorf("defenderLosses[light_laser] = %d, want 5", got)
 	}

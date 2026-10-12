@@ -121,29 +121,34 @@ Read first; one item per session. Keep this file short.
 - **U1 UI refresh** — responsive + fast layout landed: design-token layer, vendored
   htmx for partial updates (queue/resource/build), mobile off-canvas nav, live
   resource ticker and self-polling queue countdown; no per-item blur.
+- **Debris + Recycler** — no debris field and no recycle mission: recovery happens
+  during attack resolution. The winner's Recyclers salvage
+  `20% + 1% × Recycling Technology` of the resource value of **both sides'**
+  destroyed ships/defense in the wreckage's own resource proportions, capped by
+  Recycler cargo (overflow lost). The attacker collects into its fleet hold when
+  it clears the field; otherwise the defending planet's surviving Recyclers
+  credit the planet. No Recyclers → nothing recovered. Combat-report payload
+  gained `recovered`/`recoveredBy`; `/statistics` Battle balance now renders the
+  **Recycled resources** table (`game.RecoverDebris`/`RecyclerCargo`,
+  `resolveAttackTx`).
+- **Attack techs** — real weapon classes and per-class attack bonuses: every
+  combat unit carries `Def.Weapon` (energy/explosive/none) and **Energy
+  Focusing** / **Explosive Projectiles** grant `10·√L %` attack to their class
+  (replacing the single flat `+10%/level` weapon tech); **Advanced Ship Armor**
+  now scales shields by the captured `10·√L %` too, and each side applies its
+  own techs. `game.CombatTechs`/`CombatTechsFromLevels`/`weaponMultiplier`,
+  `Simulate` signature, unit cards show the weapon class
+  (`internal/game/combat.go`, `catalog.go`; `03-combat.md`).
 
 ## Todo (ordered)
 
-**Next up — start here:** build **Debris + Recycler**. No debris field and no
-recycle mission: recovery happens during combat resolution. Recyclers must be in
-the attacking fleet (or on the planet when the **defender** wins) and recover
-`20% + 1% × Recycling Technology level` of the resource value of **both sides'**
-destroyed ships/defense, capped by Recycler cargo; overflow is lost. Pick up at:
-`internal/game/combat.go` (already returns per-unit losses), `internal/engine/event_engine.go`
-(apply recovery where attack loot is settled), Recycler `Cargo` in `catalog.go`
-(+`game.CargoCapacity`), and the combat-report payload. Then **Attack techs**
-(per-unit energy/explosive weapon type, `10·√L %`), then **Combat win chance**.
+**Next up — start here:** build **Combat win chance**. Keep the deterministic
+aggregate engine but compute and show a **win probability** in the simulator
+(the reference exposes only a % win/lose chance; even 99.98% can lose). Rapid
+Fire is not in the reference — dropped, so there is no per-unit rapid-fire table.
+Pick up at: `internal/game/combat.go` (`Simulate`), and once a fleet simulator
+page exists, its view model.
 
-- [ ] **Attack techs** — Energy Focusing and Explosive Projectiles are real
-      **attack techs**, each granting `10·√L %` attack to its weapon class (the
-      captured `Bonus` column). Give units a weapon type (energy vs explosive),
-      wire both, and replace today's single flat `+10%/level` weapon tech.
-- [ ] **Debris + Recycler** — no debris **field** and no recycle **mission** (as
-      in GW): recovery happens during/after combat. The winner recovers
-      `20% + 1% × Recycling Technology level` of the resource value of **both
-      sides'** destroyed ships/defense, capped by the **Recycler cargo** in the
-      attacking fleet; if the **defender wins**, the planet's own Recyclers
-      collect. Overflow is lost; with no Recyclers nothing is recovered.
 - [ ] **Combat win chance** — keep the deterministic aggregate engine but compute
       and show a **win probability** in the simulator (the reference exposes only
       a % win/lose chance; even 99.98% can lose). Rapid Fire is not in the
@@ -270,7 +275,7 @@ build task in `info/sessions/`:
    (`10-messages-events-search.md`).
 4. **Statistics from `reports` (`I4`)** — *done.* `/statistics` aggregates per-unit
    destroyed/lost resource value, looted/lost resources and farming totals from
-   the player's own combat reports. ("Recycled" needs debris first.)
+   the player's own combat reports. ("Recycled" now backed by Debris + Recycler.)
 5. **Defense roster (`I8`)** — *done.* The five reference units are catalog rows
    with real costs/stats + prereqs and immediately build/fight from `/defense`;
    the placeholder emplacements are gone.
@@ -292,7 +297,7 @@ Alliances (`I6`, *done* — diplomacy still open), Trade/market (`I7`, *done*),
 Events feed (`I3`, *done* — derived, no table), Vacation mode + sanctions
 (`I9`, *done* — scheduler-supported).
 
-**Designed, not yet built:** debris/recycler recovery (see Todo — no field, no
-mission; recyclers must be in the attacking fleet or on the attacked planet).
+**Built:** debris/recycler recovery (see Done — no field, no mission; the winner's
+recyclers salvage during combat resolution).
 **Not standalone** (need a new mechanic first): Advanced Ship Armor hull bonus,
 Space Curvature Drive movement effect, Premium (out of scope — no monetisation).
