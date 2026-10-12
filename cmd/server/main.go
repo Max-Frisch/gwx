@@ -44,8 +44,8 @@ func main() {
 	if err := upsertUniverse(ctx, db, cfg); err != nil {
 		log.Fatalf("[FATAL] universe config: %v", err)
 	}
-	log.Printf("[INIT] universe %q ready (game x%.2f, resource x%.2f, fleet x%.2f)",
-		cfg.UniverseCode, cfg.GameSpeed, cfg.ResourceSpeed, cfg.FleetSpeed)
+	log.Printf("[INIT] universe %q ready (game x%.2f, fleet x%.2f)",
+		cfg.UniverseCode, cfg.GameSpeed, cfg.FleetSpeed)
 
 	eventEngine := engine.NewEventEngine(db)
 	go eventEngine.StartScheduler(ctx)
@@ -98,7 +98,7 @@ func upsertUniverse(ctx context.Context, db *sql.DB, cfg *config.Config) error {
 			max_systems = EXCLUDED.max_systems,
 			ends_at = EXCLUDED.ends_at,
 			is_active = TRUE
-	`, cfg.UniverseCode, cfg.UniverseName, cfg.GameSpeed, cfg.ResourceSpeed, cfg.FleetSpeed,
+	`, cfg.UniverseCode, cfg.UniverseName, cfg.GameSpeed, cfg.GameSpeed, cfg.FleetSpeed,
 		cfg.MaxGalaxies, cfg.MaxSystems, endsAt)
 	return err
 }

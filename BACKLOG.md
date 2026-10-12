@@ -8,7 +8,8 @@ Read first; one item per session. Keep this file short.
 - Durable scheduler: generic `queues` (building/research/ship/defense) + fleets,
   `FOR UPDATE SKIP LOCKED`, idempotent.
 - Catalog: 13 buildings, 8 research, 6 ships, 8 defenses (original GW names).
-- Economy: production, energy gate with base supply, storages, protected floor.
+- Economy: ground-truth per-level production tables (no energy gate), storages,
+  protected floor.
 - Fleet missions: Transport, Deploy, Attack, Espionage, Colonize; combat + loot
   (no rapid-fire) + return leg; combat/espionage reports.
 - Auth (PBKDF2 + opaque sessions), registration → homeworld.
@@ -97,11 +98,11 @@ Headline facts worth folding into gwx:
 - **Hydrogen:** Chemical Factory water→H₂ **5:1**; Advanced Chemical Factory
   **2:1**.
 - **Points:** constant per item/level, economy-only (matches our model).
-- **Speed of the source data:** Uni5 ran at **2× game speed / 1× fleet speed**, so
-  every duration/production figure in the spec is a **2×-speed** value. gwx runs
-  **1× / 1×** (`GAME_SPEED` / `RESOURCE_SPEED` / `FLEET_SPEED` in
-  `internal/config`), so multiply reference times by 2 to get 1× figures; the
-  multiplier stays a clean runtime knob rather than being baked in.
+- **Speed of the source data:** Uni5 ran at **2× game speed / 1× fleet speed**.
+  The captured production tables are treated as the **x1 base** (Uni5's 2× is
+  context only). gwx has exactly **two** runtime modifiers — `GAME_SPEED`
+  (build/research time **and** production) and `FLEET_SPEED` (`internal/config`),
+  so the multiplier stays a clean knob rather than being baked in.
 - **Defense (now captured — `03-combat.md`):** all five units have costs/stats.
   `lightLaserTower` 600 Iron (Atk 350/Def 150, ckk 0.06); `laserTower` 2.000
   Iron + 200 Lutinum (1.000/700, 0.22); `empLauncher` 200 Iron + 5.000 Lutinum

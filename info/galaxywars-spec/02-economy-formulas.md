@@ -1,6 +1,6 @@
 # GWX ↔ GalaxyWars spec — 02 Economy formulas
 
-All values fitted/observed from the Uni5 capture. Costs are exact per-level (see `01-catalog.md`); production and the research bonuses below are the derived closed forms.
+All values fitted/observed from the Uni5 capture. Costs are exact per-level (see `01-catalog.md`); production is recorded as the exact per-level table and quoted here at the **x1 base** — the Uni5 capture ran at 2× game speed, which is context only. gwx applies `GAME_SPEED` to production at runtime. There is **no energy/electricity system**. The research bonuses below are the derived closed forms.
 
 ## Storage & protected floor (exact)
 
@@ -21,7 +21,7 @@ Mines/refinery/tower columns from the technology-tree calculator:
 
 ## Water → Hydrogen conversion
 
-- **Chemical Factory** converts water into hydrogen at **5:1** (H2 = ⌊water/5⌋). Its *water consumption* equals exactly the drilling tower water production at the same level (1:1).
+- **Chemical Factory** converts water into hydrogen at **5:1** (H2 = ⌊water/5⌋); its *water consumption* is exactly **5 × the H₂ produced**. Output stops when water is exhausted.
 - **Advanced Chemical Factory** is the same shape at **2:1** (H2 = ⌊water/2⌋) with a much larger water draw. Hydrogen output stops when water is exhausted.
 
 ## Research bonuses (exact)

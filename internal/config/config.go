@@ -17,14 +17,13 @@ type Config struct {
 	HTTPAddr    string
 	DatabaseURL string
 
-	UniverseCode  string
-	UniverseName  string
-	GameSpeed     float64
-	ResourceSpeed float64
-	FleetSpeed    float64
-	MaxGalaxies   int
-	MaxSystems    int
-	EndsAt        *time.Time
+	UniverseCode string
+	UniverseName string
+	GameSpeed    float64
+	FleetSpeed   float64
+	MaxGalaxies  int
+	MaxSystems   int
+	EndsAt       *time.Time
 }
 
 // Load reads and validates configuration. DATABASE_URL is the only required
@@ -35,17 +34,10 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
 
-	// Defaults are 1x/1x/1x. The classic GalaxyWars reference captures ran at
-	// 2x game speed / 1x fleet speed; the catalog values fitted from them are
-	// therefore 2x-speed figures. Keeping gwx at 1x lets a round re-scale them
-	// cleanly through these knobs instead of baking the capture's speed in.
+	// Defaults are 1x/1x. GalaxyWars has exactly two speed modifiers: a game
+	// speed (construction, research and resource production together) and a
+	// fleet speed. Resource production is therefore not split out separately.
 	gameSpeed, err := floatEnv("GAME_SPEED", 1)
-	if err != nil {
-		return nil, err
-	}
-	// RESOURCE_SPEED defaults to GAME_SPEED: one knob speeds build, research and
-	// production together, while RESOURCE_SPEED can still split production out.
-	resSpeed, err := floatEnv("RESOURCE_SPEED", gameSpeed)
 	if err != nil {
 		return nil, err
 	}
@@ -68,17 +60,16 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Env:           getenv("APP_ENV", "development"),
-		HTTPAddr:      getenv("HTTP_ADDR", ":8090"),
-		DatabaseURL:   dbURL,
-		UniverseCode:  getenv("UNIVERSE_CODE", "universe_gwx_1"),
-		UniverseName:  getenv("UNIVERSE_NAME", "Classic Universe"),
-		GameSpeed:     gameSpeed,
-		ResourceSpeed: resSpeed,
-		FleetSpeed:    fleetSpeed,
-		MaxGalaxies:   maxGal,
-		MaxSystems:    maxSys,
-		EndsAt:        endsAt,
+		Env:          getenv("APP_ENV", "development"),
+		HTTPAddr:     getenv("HTTP_ADDR", ":8090"),
+		DatabaseURL:  dbURL,
+		UniverseCode: getenv("UNIVERSE_CODE", "universe_gwx_1"),
+		UniverseName: getenv("UNIVERSE_NAME", "Classic Universe"),
+		GameSpeed:    gameSpeed,
+		FleetSpeed:   fleetSpeed,
+		MaxGalaxies:  maxGal,
+		MaxSystems:   maxSys,
+		EndsAt:       endsAt,
 	}, nil
 }
 

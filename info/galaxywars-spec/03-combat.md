@@ -71,7 +71,7 @@ The client idents differ from gwx's codes; the roster (`internal/game/catalog.go
 | plasmaTower | Plasma Turret | `plasma_turret` (retune) |
 | rocketDefenseCannons | Rocket Launchers | `rocket_launcher` (new) |
 
-Planetary Shield + Fusion Reactor are the two defense-relevant *buildings* (shield energy comes from the fusion reactor).
+Planetary Shield + Fusion Reactor are the two defense-relevant *buildings*: the Fusion Reactor is the Planetary Shield's building prerequisite (and adds a base attack value), while the shield adds a base defense value; there is no energy coupling.
 
 ## Battle simulator
 

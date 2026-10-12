@@ -161,8 +161,11 @@ W["01-catalog.md"] = "\n".join(lines) + "\n"
 lines = []
 lines.append("# GWX ↔ GalaxyWars spec — 02 Economy formulas\n")
 lines.append("All values fitted/observed from the Uni5 capture. Costs are exact "
-             "per-level (see `01-catalog.md`); production and the research bonuses "
-             "below are the derived closed forms.\n")
+             "per-level (see `01-catalog.md`); production is recorded as the exact "
+             "per-level table and quoted here at the **x1 base** — the Uni5 capture "
+             "ran at 2× game speed, which is context only. gwx applies `GAME_SPEED` "
+             "to production at runtime. There is **no energy/electricity system**. "
+             "The research bonuses below are the derived closed forms.\n")
 
 lines.append("## Storage & protected floor (exact)\n")
 lines.append("For every storage building (Iron/Lutinum/Water/Hydrogen Storage):\n")
@@ -186,8 +189,8 @@ for ident, label in [("ironMine", "Iron Mine → Iron @ mph"),
 lines.append("")
 lines.append("## Water → Hydrogen conversion\n")
 lines.append("- **Chemical Factory** converts water into hydrogen at **5:1** "
-             "(H2 = ⌊water/5⌋). Its *water consumption* equals exactly the "
-             "drilling tower water production at the same level (1:1).")
+             "(H2 = ⌊water/5⌋); its *water consumption* is exactly **5 × the H₂ "
+             "produced**. Output stops when water is exhausted.")
 lines.append("- **Advanced Chemical Factory** is the same shape at **2:1** "
              "(H2 = ⌊water/2⌋) with a much larger water draw. Hydrogen output stops "
              "when water is exhausted.\n")
@@ -291,7 +294,9 @@ lines.append(table(["GW ident", "Label", "gwx code"],
                     ["plasmaTower", "Plasma Turret", "`plasma_turret` (retune)"],
                     ["rocketDefenseCannons", "Rocket Launchers", "`rocket_launcher` (new)"]]))
 lines.append("Planetary Shield + Fusion Reactor are the two defense-relevant "
-             "*buildings* (shield energy comes from the fusion reactor).\n")
+             "*buildings*: the Fusion Reactor is the Planetary Shield's building "
+             "prerequisite (and adds a base attack value), while the shield adds a "
+             "base defense value; there is no energy coupling.\n")
 
 lines.append("## Battle simulator\n")
 lines.append("`GET/POST /app/<coord>/fleet/battle-simulator` — attacker vs defender "

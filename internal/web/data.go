@@ -28,7 +28,6 @@ type resView struct {
 	Metal, Lutinum, Water, Hydrogen                 float64
 	MetalCap, LutinumCap, WaterCap, HydrogenCap     int64
 	MetalProd, LutinumProd, WaterProd, HydrogenProd float64
-	EnergyProd, EnergyUsed                          int64
 }
 
 func newResView(p *store.Planet) *resView {
@@ -36,7 +35,6 @@ func newResView(p *store.Planet) *resView {
 		Metal: p.Metal, Lutinum: p.Lutinum, Water: p.Water, Hydrogen: p.Hydrogen,
 		MetalCap: p.MetalCap, LutinumCap: p.LutinumCap, WaterCap: p.WaterCap, HydrogenCap: p.HydrogenCap,
 		MetalProd: p.MetalProd, LutinumProd: p.LutinumProd, WaterProd: p.WaterProd, HydrogenProd: p.HydrogenProd,
-		EnergyProd: p.EnergyProd, EnergyUsed: p.EnergyUsed,
 	}
 }
 

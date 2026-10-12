@@ -44,11 +44,11 @@ type Def struct {
 	Speed  int
 	Fuel   int64
 
-	// Production (buildings).
-	Produces   string // "metal","lutinum","water","hydrogen","energy"
-	ProdBase   float64
-	EnergyUse  float64 // mine/reactor draw
-	EnergyProd float64 // fusion reactor output base
+	// Production (buildings). Extraction output comes from the captured
+	// per-level tables in production_tables.go; ProdBase is only the storage
+	// capacity base for storage buildings.
+	Produces string // "metal","lutinum","water","hydrogen"
+	ProdBase float64
 
 	// Prerequisites: code -> minimum level (building level or tech level).
 	Prereqs map[string]int
@@ -62,11 +62,11 @@ var Catalog = func() map[string]Def {
 		{Code: "research_center", Name: "Research Center", Kind: KindBuilding, Cost: Resources{Metal: 200, Lutinum: 200, Water: 100}, CostFactor: 1.8, TimeSecs: 90, TimeFactor: 1.3, Prereqs: map[string]int{"command_center": 1}},
 
 		// ---- Buildings: resource production ----
-		{Code: "iron_mine", Name: "Iron Mine", Kind: KindBuilding, Cost: Resources{Metal: 60, Lutinum: 15}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "metal", ProdBase: 30, EnergyUse: 10},
-		{Code: "lutinum_mine", Name: "Lutinum Mine", Kind: KindBuilding, Cost: Resources{Metal: 48, Lutinum: 24}, CostFactor: 1.6, TimeSecs: 40, TimeFactor: 1.25, Produces: "lutinum", ProdBase: 20, EnergyUse: 10},
-		{Code: "water_extractor", Name: "Drilling Tower", Kind: KindBuilding, Cost: Resources{Metal: 60, Lutinum: 40}, CostFactor: 1.5, TimeSecs: 45, TimeFactor: 1.25, Produces: "water", ProdBase: 20, EnergyUse: 10},
-		{Code: "chemical_factory", Name: "Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 200, Lutinum: 100, Water: 100}, CostFactor: 1.6, TimeSecs: 60, TimeFactor: 1.25, Produces: "hydrogen", ProdBase: 15, EnergyUse: 20, Prereqs: map[string]int{"water_extractor": 1}},
-		{Code: "fusion_reactor", Name: "Fusion Reactor", Kind: KindBuilding, Cost: Resources{Metal: 400, Lutinum: 200, Water: 300}, CostFactor: 1.6, TimeSecs: 90, TimeFactor: 1.3, Produces: "energy", EnergyProd: 50, Prereqs: map[string]int{"research_center": 1}},
+		{Code: "iron_mine", Name: "Iron Mine", Kind: KindBuilding, Cost: Resources{Metal: 60, Lutinum: 15}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "metal"},
+		{Code: "lutinum_mine", Name: "Lutinum Mine", Kind: KindBuilding, Cost: Resources{Metal: 48, Lutinum: 24}, CostFactor: 1.6, TimeSecs: 40, TimeFactor: 1.25, Produces: "lutinum"},
+		{Code: "water_extractor", Name: "Drilling Tower", Kind: KindBuilding, Cost: Resources{Metal: 60, Lutinum: 40}, CostFactor: 1.5, TimeSecs: 45, TimeFactor: 1.25, Produces: "water"},
+		{Code: "chemical_factory", Name: "Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 200, Lutinum: 100, Water: 100}, CostFactor: 1.6, TimeSecs: 60, TimeFactor: 1.25, Produces: "hydrogen", Prereqs: map[string]int{"water_extractor": 1}},
+		{Code: "fusion_reactor", Name: "Fusion Reactor", Kind: KindBuilding, Cost: Resources{Metal: 400, Lutinum: 200, Water: 300}, CostFactor: 1.6, TimeSecs: 90, TimeFactor: 1.3, Prereqs: map[string]int{"research_center": 1}},
 
 		// ---- Buildings: storages ----
 		{Code: "iron_storage", Name: "Iron Storage", Kind: KindBuilding, Cost: Resources{Metal: 100}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "storage_metal", ProdBase: 20000},

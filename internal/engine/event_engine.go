@@ -240,12 +240,10 @@ func recomputePlanetTx(ctx context.Context, tx *sql.Tx, planetID int64, universe
 		UPDATE planets SET
 			metal_cap = $2, lutinum_cap = $3, water_cap = $4, hydrogen_cap = $5,
 			metal_prod = $6, lutinum_prod = $7, water_prod = $8, hydrogen_prod = $9,
-			energy_used = $10, energy_prod = $11,
-			protected_metal = $12, protected_lutinum = $13, protected_water = $14, protected_hydrogen = $15
+			protected_metal = $10, protected_lutinum = $11, protected_water = $12, protected_hydrogen = $13
 		WHERE id = $1
 	`, planetID, e.MetalCap, e.LutinumCap, e.WaterCap, e.HydrogenCap,
 		e.MetalProd, e.LutinumProd, e.WaterProd, e.HydrogenProd,
-		e.EnergyUsed, e.EnergyProd,
 		e.ProtectedMetal, e.ProtectedLutinum, e.ProtectedWater, e.ProtectedHydrogen)
 	return err
 }

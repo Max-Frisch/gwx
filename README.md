@@ -40,23 +40,24 @@ just editing `.env` and restarting:
 | Variable | Meaning |
 |---|---|
 | `UNIVERSE_CODE` | stable key, e.g. `universe_gwx_1` |
-| `GAME_SPEED` | build + research speed multiplier (higher = faster) |
-| `RESOURCE_SPEED` | mine / refinery / hydrogen production multiplier |
+| `GAME_SPEED` | build + research time **and** resource production multiplier (higher = faster) |
 | `FLEET_SPEED` | fleet travel speed multiplier |
 | `MAX_GALAXIES`, `MAX_SYSTEMS` | universe bounds |
 | `ENDS_AT` | optional RFC3339 seasonal end (empty = long-term universe) |
 
+GalaxyWars has exactly **two** speed modifiers — game speed and fleet speed.
 Two flavours of round therefore come from the same binary: a slow long-term
 universe, or a fast seasonal one.
 
 ## The game
 
 - **Resources:** Iron, Lutinum, Water, Hydrogen. Water is pumped by the Drilling
-  Tower and converted **1:1 into hydrogen** by the Chemical Factory — if water
-  runs dry, hydrogen stops.
+  Tower and converted **5:1 into hydrogen** (five water per H₂) by the Chemical
+  Factory — if water runs dry, hydrogen stops.
 - **Buildings:** Command Center (faster builds), Research Center, the three
-  extraction buildings, Chemical Factory, Fusion Reactor (energy), four storages,
-  Shipyard, Orbital Defense Station, Planetary Shield.
+  extraction buildings, Chemical Factory, Fusion Reactor (gates the Planetary
+  Shield), four storages, Shipyard, Orbital Defense Station, Planetary Shield.
+- **No energy.** There is no electricity system: mines always produce at 100%.
 - **Research (account-wide):** Energy, Combustion/Ion/Space-Folding drives,
   Weapons, Defense, Cargo, Espionage. Drives gate the bigger hulls.
 - **Ships:** Spy Probe, Trade Ship, Cougar, Longeagle X, Colony Ship, Recycler.
