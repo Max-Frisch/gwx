@@ -36,12 +36,36 @@ Read first; one item per session. Keep this file short.
 - [ ] **JSON API** — thin `/api/v1` surface for tooling/bots.
 - [ ] **Full-loop integration test** — register → … → abandon.
 - [ ] **Anti-farm / noob protection** — optional points-ratio guard.
+- [ ] **Follow-up HAR walk** — capture the pages missing from Uni5: `/defense`
+      (unit costs/stats), trade, events, messages, search, alliance, highscore,
+      statistics, premium, settings. Dump with `tools/har/harscan.py`.
+
+## Reference spec (derived from Uni5 HARs — `info/galaxywars-spec/`)
+
+Real GalaxyWars v3.16.19-beta data extracted from the private Uni5 captures
+(`tools/har/harscan.py` → `extract_catalog.py` → `gen_spec.py`). Full details in
+`info/galaxywars-spec/01..06`. Headline facts worth folding into gwx:
+
+- **Cost scaling:** `cost(L) = base × M(L)`, `M(1)=M(2)=1`, then
+  `1,2,4,7,11.5,18,26.5,37,51,67.5,87,…` ≈ `(L³+15)/20` (near-cubic growth).
+- **Storage:** `60_000·L² + 300_000`; **protected ("concealed") floor = 2%** of
+  storage (`1_200·L² + 6_000`). NOTE: our README/backlog say 20% — GW is 2%.
+- **Research effects:** drive techs = speed bonus + `−0.5%/level` fuel;
+  utility techs (ionization/armor/cargo/spy/explosives/focusing) = **`10·√L %`**;
+  recycling = **`1%/level`**.
+- **Hydrogen:** Chemical Factory water→H₂ **5:1**; Advanced Chemical Factory
+  **2:1**.
+- **Points:** constant per item/level, economy-only (matches our model).
+- **Defense page gap:** only idents captured (`lightLaserTower`, `laserTower`,
+  `empLauncher`, `plasmaTower`, `rocketDefenseCannons`) — no costs/stats.
+- **Not captured at all:** trade, events, messages, search, alliance,
+  highscore, statistics, premium, settings, `/defense`.
 
 ## Content for later (from GalaxyWars reference screenshots in `info/`)
 
 Not implemented; captured here so we can cherry-pick. Reference is `GalaxyWars
 v3.16.19-beta`, a modern-dark skin (not the old grey bevel) despite the retro
-feel.
+feel. (Values below now backed by `info/galaxywars-spec/`.)
 
 **Nav sections seen** — PLANET: Overview, Construction, Research, Ships/Defense,
 **Trade**, **Technology**. UNIVERSE: Fleets, Galaxy, **Events**. COMMUNITY:
@@ -74,20 +98,23 @@ Settings**, Logout. (Bold = we don't have it.)
   that misread; keep it only if we deliberately add the feature).
 - **Footer**: Help / Game rules / Support / Status / Legal notice / version.
 
-**Roster gaps** (nice-to-have content)
+**Roster gaps** (nice-to-have content) — real stats in `info/galaxywars-spec/01,03`
 - Techs: Space Curvature Drive, Ionization, Energy Focusing, Explosive
   Projectiles, Spy Technology, Advanced Ship Armor, Increased Cargo Capacity,
-  Recycling Technology. (Each has a real function; details to be specced later
-  from live data. E.g. Recycling Technology has *two* jobs: (1) unlock the
-  Recycler ship as a tech prerequisite, (2) raise the % of debris collected.
-  Debris never appears on the planet — it is hauled directly during/after
-  battle.)
-- Ships: Jackal, Renegade, Raider, Falcon, Tjuger, Longeagle V, Noah (ark),
-  Small Trader, Large Trader. (Our "Trade Ship"/"Colony Ship" map to their
-  Trader / Colonization Ship.)
-- Defense: EMP Launcher, Rocket Launchers.
-- Buildings: Trading Post, Advanced Chemical Factory; alt names Lutinum
-  Refinery / Ship Factory / Water Tanks / Hydrogen Tanks.
+  Recycling Technology. Effects now known: drives = speed + `−0.5%/lvl` fuel;
+  utility techs = `10·√L %`; recycling = `1%/lvl` debris.
+  Recycling Technology has *two* jobs: (1) unlock the Recycler ship
+  (req: Ship Factory 1 + Combustion Drive 2), (2) raise the % of debris
+  collected. Debris never appears on the planet — it is hauled directly
+  during/after battle.
+- Ships (costs/stats in `03-combat.md`): Jackal, Renegade, Raider, Falcon,
+  Tjuger, Longeagle V, Noah (ark), Small Trader, Large Trader. Colonization
+  Ship + Recycler + Spy Probe already covered. Our "Trade Ship"/"Colony Ship"
+  map to their Trader / Colonization Ship.
+- Defense: EMP Launcher, Rocket Launchers (+ Light/Laser Turret, Plasma Turret);
+  costs/stats NOT captured (no `/defense` page in the HAR).
+- Buildings: Trading Post, Advanced Chemical Factory (water→H₂ 2:1 vs 5:1);
+  alt names Lutinum Refinery / Ship Factory / Water Tanks / Hydrogen Tanks.
 
 ### Ready to build now (existing data / mechanics only — no live data)
 

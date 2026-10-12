@@ -7,3 +7,7 @@ cookies.txt
 # Raw capture artifacts stay private (HARs embed session cookies/tokens).
 *.har
 info/captures/
+
+# Python tooling
+__pycache__/
+*.pyc

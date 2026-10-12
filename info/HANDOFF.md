@@ -2,6 +2,27 @@
 
 Continuation notes for feeding HAR captures in a fresh session.
 
+## Update — Uni5 HARs processed (spec produced)
+
+The two Uni5 captures in `info/recordings/Uni5/` have been mined and the spec is
+committed under `info/galaxywars-spec/` (`01-catalog`, `02-economy-formulas`,
+`03-combat`, `04-fleet`, `05-ui-flows`, `06-queue-management`). Tooling:
+
+- `tools/har/harscan.py` — stdlib streaming HAR inspector
+  (`index`/`dump`/`dump-all`/`assets`/`grep`/`slim`), base64-aware.
+- `tools/har/extract_catalog.py` — techtree pages + LiveComponent `calculate`
+  tables → `info/captures/derived/catalog.json` (+ `catalog.tsv`).
+- `tools/har/extract_pages.py` — merge building/research/ship page
+  categories, descriptions, current levels into the catalog.
+- `tools/har/fit_formulas.py` — closed-form fits (storage exact, production,
+  research bonuses).
+- `tools/har/gen_spec.py` — emits the `info/galaxywars-spec/*.md` files.
+
+Still missing (needs a fresh capture): `/defense` unit page, trade, events,
+messages, search, alliance, highscore, statistics, premium, settings.
+
+## Prior state
+
 ## Repo state
 
 - Prior commit: `5b30fbe feat: initial gwx — a small GalaxyWars-style browser game`.
@@ -47,7 +68,25 @@ Continuation notes for feeding HAR captures in a fresh session.
 - Disable cache when capturing so the **JS bundles** land in the HAR; they
   usually hold the whole config + formula names.
 
-## Next session — first steps (once HARs arrive)
+## Next session — remaining HARs to capture
+
+The Uni5 spec is done. The next session is about the **pages this capture
+missed**; grab them, then extend `info/galaxywars-spec/` (and fold values into
+`BACKLOG.md`):
+
+1. `/defense` unit page — Light Laser Turret, Laser Turret, EMP Launcher,
+   Plasma Turret, Rocket Launchers (costs/stats; the only current gap in
+   `03-combat.md`).
+2. Trade/marketplace (`/trading` tabs), Events (`/event`), Messages
+   (`/message`), Search (`/search`), Alliance (`/alliance/*`), Highscore
+   (`/highscore/*` tabs), Statistics (`/statistic/*`), Premium (`/premium/*`),
+   Settings (`/settings/*` tabs) → fill out `05-ui-flows.md`.
+3. Help / game-rules pages (external) for the combat/loot/debris formulas.
+
+Pipeline is ready; just drop new HARs in `info/recordings/` and run
+`tools/har/harscan.py` → `extract_*.py` → `gen_spec.py`.
+
+## Prior plan (completed) — first steps once HARs arrive
 
 1. Build `tools/har/harscan.py` (Python stdlib; **no jq** available) against the
    real HAR structure:
