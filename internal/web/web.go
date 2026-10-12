@@ -42,6 +42,7 @@ type Handler struct {
 	fleets       *store.FleetStore
 	reports      *store.ReportStore
 	auth         *store.AuthStore
+	scores       *store.ScoreStore
 	tmpl         *template.Template
 }
 
@@ -61,6 +62,7 @@ func New(db *sql.DB, universeCode string) *Handler {
 		fleets:       store.NewFleetStore(db),
 		reports:      store.NewReportStore(db),
 		auth:         store.NewAuthStore(db),
+		scores:       store.NewScoreStore(db),
 		tmpl:         tmpl,
 	}
 }
@@ -89,6 +91,7 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /galaxy", h.requireUser(h.GalaxyRedirect))
 	mux.HandleFunc("GET /galaxy/{galaxy}/{system}", h.requireUser(h.GalaxyPage))
 	mux.HandleFunc("GET /reports", h.requireUser(h.ReportsPage))
+	mux.HandleFunc("GET /highscore", h.requireUser(h.HighscorePage))
 	mux.HandleFunc("POST /queue/{qid}/cancel", h.requireUser(h.QueueCancelSubmit))
 }
 
@@ -589,6 +592,67 @@ func (h *Handler) ReportsPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	h.render(w, "reports", http.StatusOK, d)
+}
+
+func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	tab := r.URL.Query().Get("tab")
+	if tab != "planets" {
+		tab = "players"
+	}
+	sortKey := r.URL.Query().Get("sort")
+
+	d := highscoreData{baseData: h.base(ctx, r, userID, "Highscore", h.homeID(ctx, userID)), Tab: tab, Sort: sortKey}
+
+	if tab == "planets" {
+		rows, _ := h.scores.Planets(ctx, h.universeCode)
+		sort.SliceStable(rows, func(i, j int) bool {
+			switch sortKey {
+			case "name":
+				return rows[i].Name < rows[j].Name
+			case "owner":
+				return rows[i].OwnerName < rows[j].OwnerName
+			default:
+				return rows[i].Points > rows[j].Points
+			}
+		})
+		for i, p := range rows {
+			d.PlanetRows = append(d.PlanetRows, planetScoreRow{
+				Rank:      i + 1,
+				Name:      p.Name,
+				Coords:    coords(p.Galaxy, p.System, p.Position),
+				OwnerName: p.OwnerName,
+				Points:    int64(p.Points + 0.5),
+			})
+		}
+	} else {
+		rows, _ := h.scores.Players(ctx, h.universeCode)
+		sort.SliceStable(rows, func(i, j int) bool {
+			switch sortKey {
+			case "planet":
+				return rows[i].PlanetPoints > rows[j].PlanetPoints
+			case "research":
+				return rows[i].ResearchPoints > rows[j].ResearchPoints
+			case "name":
+				return rows[i].Username < rows[j].Username
+			default:
+				return rows[i].Total() > rows[j].Total()
+			}
+		})
+		for i, p := range rows {
+			d.Players = append(d.Players, playerScoreRow{
+				Rank:           i + 1,
+				Username:       p.Username,
+				PlanetPoints:   int64(p.PlanetPoints + 0.5),
+				ResearchPoints: int64(p.ResearchPoints + 0.5),
+				Total:          int64(p.Total() + 0.5),
+				Planets:        p.Planets,
+				IsMe:           p.UserID == userID,
+			})
+		}
+	}
+	h.render(w, "highscore", http.StatusOK, d)
 }
 
 // ---- submit handlers ----

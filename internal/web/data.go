@@ -109,6 +109,32 @@ type reportRow struct {
 	Body  string
 }
 
+type playerScoreRow struct {
+	Rank           int
+	Username       string
+	PlanetPoints   int64
+	ResearchPoints int64
+	Total          int64
+	Planets        int
+	IsMe           bool
+}
+
+type planetScoreRow struct {
+	Rank      int
+	Name      string
+	Coords    string
+	OwnerName string
+	Points    int64
+}
+
+type highscoreData struct {
+	baseData
+	Tab        string
+	Sort       string
+	Players    []playerScoreRow
+	PlanetRows []planetScoreRow
+}
+
 type authData struct {
 	baseData
 	Login string

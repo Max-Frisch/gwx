@@ -8,47 +8,94 @@
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-<header class="top">
-  <div class="wrap row" style="padding-top:8px;padding-bottom:8px">
-    <a class="brand" href="/">gwx</a>
+<svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8.5a1.5 1.5 0 0 1-1.5 1.5H15v-6H9v6H5.5A1.5 1.5 0 0 1 4 19.5z"/></symbol>
+  <symbol id="i-build" viewBox="0 0 24 24"><path d="M5 21V5a1 1 0 0 1 1-1h6v17M12 21V9h6a1 1 0 0 1 1 1v11M3 21h18M8 8h1M8 12h1M15 13h1M15 17h1"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5.2 8.3A1.8 1.8 0 0 0 6.3 20h11.4a1.8 1.8 0 0 0 1.5-2.7L14 9V3"/><path d="M8.5 14h7"/></symbol>
+  <symbol id="i-ship" viewBox="0 0 24 24"><path d="M12 2.5c2.8 2 4.2 5.4 4.2 8.6l2.9 3.6-3.9-.9-3.2 3.7-3.2-3.7-3.9.9 2.9-3.6C7.8 7.9 9.2 4.5 12 2.5z"/><circle cx="12" cy="9" r="1.4"/></symbol>
+  <symbol id="i-fleet" viewBox="0 0 24 24"><path d="M3 12l16-7-4 16-3.2-6.2z"/><path d="M11.8 14.8L19 5"/></symbol>
+  <symbol id="i-galaxy" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><ellipse cx="12" cy="12" rx="9.5" ry="3.6" transform="rotate(-24 12 12)"/></symbol>
+  <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 3h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4M8.5 12.5h7M8.5 16h7"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v4.5a4 4 0 0 1-8 0z"/><path d="M8 5.5H5V7a3 3 0 0 0 3 3M16 5.5h3V7a3 3 0 0 1-3 3M12 12.5V16M9 20h6M10 16h4"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 12h10M16 8l4 4-4 4"/></symbol>
+</svg>
+<div class="app">
+  <aside class="sidebar">
+    <a class="logo" href="/">gwx</a>
     {{if .ActivePlanetID}}
-    <nav class="nav row">
-      <a href="/overview/{{.ActivePlanetID}}">Overview</a>
-      <a href="/buildings/{{.ActivePlanetID}}">Buildings</a>
-      <a href="/shipyard/{{.ActivePlanetID}}">Shipyard</a>
-      <a href="/research/{{.ActivePlanetID}}">Research</a>
-      <a href="/fleet/{{.ActivePlanetID}}">Fleet</a>
-      <a href="/galaxy">Galaxy</a>
-      <a href="/reports">Reports</a>
+    <div class="planet-box">
+      <select onchange="if(this.value)location.href=this.value">
+        {{range .Planets}}<option value="/overview/{{.ID}}" {{if eq .ID $.ActivePlanetID}}selected{{end}}>{{.Name}} · {{coords .Galaxy .System .Position}}</option>{{end}}
+      </select>
+      <span class="planet-coords">{{range .Planets}}{{if eq .ID $.ActivePlanetID}}{{coords .Galaxy .System .Position}}{{end}}{{end}}</span>
+    </div>
+    <nav class="side-nav">
+      <div class="side-group">
+        <div class="label">Planet</div>
+        <a href="/overview/{{.ActivePlanetID}}" class="{{if eq .Title "Overview"}}active{{end}}"><svg class="ic"><use href="#i-home"/></svg>Overview</a>
+        <a href="/buildings/{{.ActivePlanetID}}" class="{{if eq .Title "Buildings"}}active{{end}}"><svg class="ic"><use href="#i-build"/></svg>Construction</a>
+        <a href="/research/{{.ActivePlanetID}}" class="{{if eq .Title "Research"}}active{{end}}"><svg class="ic"><use href="#i-flask"/></svg>Research</a>
+        <a href="/shipyard/{{.ActivePlanetID}}" class="{{if eq .Title "Shipyard"}}active{{end}}"><svg class="ic"><use href="#i-ship"/></svg>Ships/Defense</a>
+      </div>
+      <div class="side-group">
+        <div class="label">Universe</div>
+        <a href="/fleet/{{.ActivePlanetID}}" class="{{if eq .Title "Fleet"}}active{{end}}"><svg class="ic"><use href="#i-fleet"/></svg>Fleets</a>
+        <a href="/galaxy" class="{{if eq .Title "Galaxy"}}active{{end}}"><svg class="ic"><use href="#i-galaxy"/></svg>Galaxy</a>
+      </div>
+      <div class="side-group">
+        <div class="label">Community</div>
+        <a href="/highscore" class="{{if eq .Title "Highscore"}}active{{end}}"><svg class="ic"><use href="#i-trophy"/></svg>Highscore</a>
+      </div>
+      <div class="side-group">
+        <div class="label">Account</div>
+        <a href="/reports" class="{{if eq .Title "Reports"}}active{{end}}"><svg class="ic"><use href="#i-report"/></svg>Reports</a>
+      </div>
+    </nav>
+    <div class="side-foot">
+      <span class="who">{{.Username}}</span>
+      <form method="post" action="/logout"><button class="ghost" type="submit"><svg class="ic"><use href="#i-logout"/></svg></button></form>
+    </div>
+    {{else}}
+    <nav class="side-nav">
+      <div class="side-group">
+        <div class="label">Account</div>
+        <a href="/login"><svg class="ic"><use href="#i-home"/></svg>Log in</a>
+        <a href="/register"><svg class="ic"><use href="#i-build"/></svg>Register</a>
+      </div>
     </nav>
     {{end}}
-    <span class="spacer"></span>
-    <span class="muted">{{.Username}}</span>
-    <form method="post" action="/logout"><button class="ghost" type="submit">Logout</button></form>
-  </div>
-  {{if .Resources}}
-  <div class="resbar"><div class="wrap">
-    <span><span class="muted">Iron</span> <b class="m">{{nf .Resources.Metal}}</b> <span class="muted">/ {{n .Resources.MetalCap}}</span> <small>+{{nf .Resources.MetalProd}}/h</small></span>
-    <span><span class="muted">Lutinum</span> <b class="l">{{nf .Resources.Lutinum}}</b> <span class="muted">/ {{n .Resources.LutinumCap}}</span> <small>+{{nf .Resources.LutinumProd}}/h</small></span>
-    <span><span class="muted">Water</span> <b class="w">{{nf .Resources.Water}}</b> <span class="muted">/ {{n .Resources.WaterCap}}</span> <small>+{{nf .Resources.WaterProd}}/h</small></span>
-    <span><span class="muted">Hydrogen</span> <b class="h">{{nf .Resources.Hydrogen}}</b> <span class="muted">/ {{n .Resources.HydrogenCap}}</span> <small>+{{nf .Resources.HydrogenProd}}/h</small></span>
-    <span><span class="muted">Energy</span> <b>{{n .Resources.EnergyProd}}</b> <span class="muted">/ {{n .Resources.EnergyUsed}}</span></span>
-  </div></div>
-  {{end}}
-  {{if .Planets}}
-  <div class="wrap row" style="padding-bottom:6px;font-size:12px">
-    <span class="muted">Planets:</span>
-    {{range .Planets}}<a class="tag {{if eq .ID $.ActivePlanetID}}ok{{end}}" href="/overview/{{.ID}}">{{.Name}} {{coords .Galaxy .System .Position}}</a>{{end}}
-  </div>
-  {{end}}
-</header>
-<main><div class="wrap">
-{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
-{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+  </aside>
+  <div class="main">
+    {{if .Resources}}
+    <header class="topbar">
+      <div class="res">
+        <div class="cell"><span class="k">Iron</span><span class="v">{{nf .Resources.Metal}}</span><span class="s">{{n .Resources.MetalCap}} · +{{nf .Resources.MetalProd}}/h</span></div>
+        <div class="cell"><span class="k">Lutinum</span><span class="v">{{nf .Resources.Lutinum}}</span><span class="s">{{n .Resources.LutinumCap}} · +{{nf .Resources.LutinumProd}}/h</span></div>
+        <div class="cell"><span class="k">Water</span><span class="v">{{nf .Resources.Water}}</span><span class="s">{{n .Resources.WaterCap}} · +{{nf .Resources.WaterProd}}/h</span></div>
+        <div class="cell"><span class="k">Hydrogen</span><span class="v">{{nf .Resources.Hydrogen}}</span><span class="s">{{n .Resources.HydrogenCap}} · +{{nf .Resources.HydrogenProd}}/h</span></div>
+      </div>
+      <div class="energy"><span class="k">Energy</span><span class="v">{{n .Resources.EnergyProd}} / {{n .Resources.EnergyUsed}}</span></div>
+    </header>
+    {{end}}
+    <main class="content"><div class="inner">
+      {{if or (eq .Title "Buildings") (eq .Title "Research") (eq .Title "Shipyard")}}{{template "tabs" .}}{{end}}
+      {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+      {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+{{end}}
+
+{{define "tabs"}}
+<div class="tabs">
+  <a href="/buildings/{{.ActivePlanetID}}" class="{{if eq .Title "Buildings"}}active{{end}}">Buildings</a>
+  <a href="/research/{{.ActivePlanetID}}" class="{{if eq .Title "Research"}}active{{end}}">Research</a>
+  <a href="/shipyard/{{.ActivePlanetID}}" class="{{if eq .Title "Shipyard"}}active{{end}}">Ships/Defense</a>
+</div>
 {{end}}
 
 {{define "foot"}}
-</div></main>
+      <footer class="foot"><span>gwx</span><span>no points, no fleet readout — fog of war</span></footer>
+    </div></main>
+  </div>
+</div>
 </body>
 </html>
 {{end}}

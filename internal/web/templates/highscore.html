@@ -1,0 +1,60 @@
+{{define "highscore"}}
+{{template "head" .}}
+<div class="tabs">
+  <a href="/highscore?tab=players" class="{{if eq .Tab "players"}}active{{end}}">Players</a>
+  <a href="/highscore?tab=planets" class="{{if eq .Tab "planets"}}active{{end}}">Planets</a>
+</div>
+
+{{if eq .Tab "planets"}}
+<h1>Highscore <span class="muted">Planets</span></h1>
+<div class="panel">
+<table>
+  <tr>
+    <th>#</th>
+    <th><a href="/highscore?tab=planets&sort=name">Planet</a></th>
+    <th><a href="/highscore?tab=planets&sort=owner">Owner</a></th>
+    <th><a href="/highscore?tab=planets&sort=points">Points</a></th>
+  </tr>
+  {{range .PlanetRows}}
+  <tr>
+    <td class="muted">{{.Rank}}</td>
+    <td>{{.Name}} <span class="muted">{{.Coords}}</span></td>
+    <td>{{if .OwnerName}}{{.OwnerName}}{{else}}<span class="muted">Uncolonized</span>{{end}}</td>
+    <td>{{n .Points}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="4" class="muted">No planets yet.</td></tr>
+  {{end}}
+</table>
+</div>
+{{else}}
+<h1>Highscore <span class="muted">Players</span></h1>
+<div class="panel">
+<table>
+  <tr>
+    <th>#</th>
+    <th><a href="/highscore?tab=players&sort=name">Player</a></th>
+    <th><a href="/highscore?tab=players&sort=planet">Planet points</a></th>
+    <th><a href="/highscore?tab=players&sort=research">Research points</a></th>
+    <th><a href="/highscore?tab=players&sort=total">Total points</a></th>
+    <th>Planets</th>
+  </tr>
+  {{range .Players}}
+  <tr>
+    <td class="muted">{{.Rank}}</td>
+    <td>{{.Username}}{{if .IsMe}} <span class="tag ok">you</span>{{end}}</td>
+    <td>{{n .PlanetPoints}}</td>
+    <td>{{n .ResearchPoints}}</td>
+    <td><b>{{n .Total}}</b></td>
+    <td>{{.Planets}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="6" class="muted">No players yet.</td></tr>
+  {{end}}
+</table>
+</div>
+{{end}}
+
+<small class="muted">Economy points only — buildings + research. Fleet and defense strength is never shown: nobody can tell a 20-ship trader from a hidden monster fleet.</small>
+{{template "foot" .}}
+{{end}}
