@@ -47,9 +47,23 @@ func scanPlanet(row interface {
 	return &p, nil
 }
 
-// Get returns a planet by id.
+// Get returns a planet by id. It first settles production up to now so the
+// caller always observes current resources: the stack is never cron-updated,
+// every read path is the accrual point (on-demand accrual).
 func (s *PlanetStore) Get(ctx context.Context, planetID int64) (*Planet, error) {
+	if err := s.accrue(ctx, planetID); err != nil {
+		return nil, err
+	}
 	return scanPlanet(s.db.QueryRowContext(ctx, `SELECT `+planetCols+` FROM planets WHERE id = $1`, planetID))
+}
+
+// accrue banks a planet's production since its last calculation by invoking the
+// row-locked update_planet_resources() SQL function.
+func (s *PlanetStore) accrue(ctx context.Context, planetID int64) error {
+	var m, l, w, h float64
+	return s.db.QueryRowContext(ctx,
+		`SELECT out_metal, out_lutinum, out_water, out_hydrogen FROM update_planet_resources($1)`,
+		planetID).Scan(&m, &l, &w, &h)
 }
 
 // HomeworldID returns the user's homeworld id (0 if none).
