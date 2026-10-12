@@ -26,6 +26,7 @@ Append one line per completed session: `date | session | result | commit`.
 2026-10-12 | testing | full-loop integration test: ephemeral Postgres + migrations + real UI/scheduler at x10000/x100000; register→build→research→shipyard→raid→loot→return→colonize (+ transport); skips without a DB | (this commit)
 2026-10-12 | UI cards | Construction card layout (grouped: Main/Resource/Military; per-resource cost tint, SVG tiles, Upgrade-to-level buttons) + Resources sub-tab (per-building output incl. −water, totals, storage, plunder-protected); Construction tabs reduced to Buildings+Resources | (this commit)
 2026-10-12 | UI perf | fix scroll jank: remove per-card backdrop-filter (each card re-blurred the fixed starfield every frame). Queued U1 (info/sessions/U1-ui-refresh.md) for responsive+fast layout, design tokens, vendored htmx | (this commit)
+2026-10-12 | U1 | UI refresh: design-token layer + refactored app.css, vendored htmx 1.9.12 (progressive enhancement), htmx content swaps for build/research/ship/defense + live resource ticker + self-polling queue countdown, off-canvas responsive nav, stacked cards, scrollable tables, focus-visible/reduced-motion polish; no per-card blur | (this commit)
 ```
 
 ## Recon (2026-10-12)

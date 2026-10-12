@@ -1,13 +1,14 @@
 {{define "defense"}}
 {{template "head" .}}
+<div id="page-content">{{template "defense-content" .}}</div>
+{{template "foot" .}}
+{{end}}
+
+{{define "defense-content"}}
+{{template "banners" .}}
 <h1>Defense</h1>
 
-{{if .Queue}}
-<div class="panel row">
-  <span>Producing <b>{{.Queue.Name}}</b> — finishes in {{.Queue.Remaining}}</span>
-  <form method="post" action="/queue/{{.Queue.ID}}/cancel" class="spacer"><button class="bad" type="submit">Cancel (refund)</button></form>
-</div>
-{{end}}
+{{template "queue-panel" .}}
 
 <div class="panel">
 <table>
@@ -22,7 +23,8 @@
       <td class="muted">{{.PerTimeStr}}</td>
       <td>
         {{if gt .MaxAffordable 0}}
-        <form method="post" action="/defense/{{$.ActivePlanetID}}/build" class="row">
+        <form method="post" action="/defense/{{$.ActivePlanetID}}/build" class="row"
+              hx-post="/defense/{{$.ActivePlanetID}}/build" hx-target="#page-content" hx-swap="innerHTML" hx-disabled-elt="find button">
           <input type="hidden" name="code" value="{{.Code}}">
           <input type="number" name="qty" value="1" min="1" max="{{.MaxAffordable}}">
           <button type="submit">Build</button>
@@ -38,5 +40,5 @@
   {{end}}
 </table>
 </div>
-{{template "foot" .}}
+{{template "hx-extras" .}}
 {{end}}

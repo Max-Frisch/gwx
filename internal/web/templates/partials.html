@@ -1,0 +1,53 @@
+{{/* Reusable htmx/server-rendered partials. Everything here degrades to nothing
+   without JavaScript: the full page already contains the same markup, and the
+   partials only exist so htmx can swap regions instead of reloading. */}}
+
+{{/* banners renders flash/error feedback inside a swapped content region. It is
+     inert on full page loads (base.html already shows the banners there), so it
+     only fires when the response is an htmx fragment. */}}
+{{define "banners"}}
+{{if .HX}}
+  {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+  {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+{{end}}
+{{end}}
+
+{{/* resource-cells is the four topbar resource readouts. */}}
+{{define "resource-cells"}}
+<div class="cell"><span class="k">Iron</span><span class="v">{{nf .Resources.Metal}}</span><span class="s">{{n .Resources.MetalCap}} · +{{nf .Resources.MetalProd}}/h</span></div>
+<div class="cell"><span class="k">Lutinum</span><span class="v">{{nf .Resources.Lutinum}}</span><span class="s">{{n .Resources.LutinumCap}} · +{{nf .Resources.LutinumProd}}/h</span></div>
+<div class="cell"><span class="k">Water</span><span class="v">{{nf .Resources.Water}}</span><span class="s">{{n .Resources.WaterCap}} · +{{nf .Resources.WaterProd}}/h</span></div>
+<div class="cell"><span class="k">Hydrogen</span><span class="v">{{nf .Resources.Hydrogen}}</span><span class="s">{{n .Resources.HydrogenCap}} · +{{nf .Resources.HydrogenProd}}/h{{if gt .Resources.WaterUse 0.0}} (−{{nf .Resources.WaterUse}} Wa/h){{end}}</span></div>
+{{end}}
+
+{{/* res-strip wraps the cells and polls itself for a live ticker. */}}
+{{define "res-strip"}}
+<div class="res" id="res-strip" hx-get="/partials/resources/{{.ActivePlanetID}}" hx-trigger="every 5s" hx-swap="innerHTML">{{template "resource-cells" .}}</div>
+{{end}}
+
+{{/* res-strip-oob is the same strip marked for an out-of-band swap, so a build
+     action updates the ticker immediately (and re-arms its own polling). */}}
+{{define "res-strip-oob"}}
+<div class="res" id="res-strip" hx-swap-oob="true" hx-get="/partials/resources/{{.ActivePlanetID}}" hx-trigger="every 5s" hx-swap="innerHTML">{{template "resource-cells" .}}</div>
+{{end}}
+
+{{/* hx-extras is appended to every swapped content fragment: it carries the
+     out-of-band resource refresh and nothing else. Empty without JS. */}}
+{{define "hx-extras"}}{{if and .HX .Resources}}{{template "res-strip-oob" .}}{{end}}{{end}}
+
+{{/* queue-panel is the active-order banner. It self-polls every 5s (resyncing
+     the "finishes in …" text with the server) and lets the client-side ticker
+     count down smoothly in between. */}}
+{{define "queue-panel"}}
+<div id="queue-panel"{{if .Queue}} hx-get="/partials/queue/{{.ActivePlanetID}}?kind={{.Queue.Kind}}" hx-trigger="every 5s" hx-swap="outerHTML"{{end}}>
+  {{if .Queue}}
+  <div class="panel row">
+    <span>{{if eq .Queue.Kind "building"}}Building{{else if eq .Queue.Kind "research"}}Researching{{else}}Producing{{end}} <b>{{.Queue.Name}}</b> — finishes in <span data-countdown="{{.Queue.FinishUnix}}">{{.Queue.Remaining}}</span></span>
+    <form method="post" action="/queue/{{.Queue.ID}}/cancel" class="spacer"
+          hx-post="/queue/{{.Queue.ID}}/cancel" hx-target="#page-content" hx-swap="innerHTML">
+      <button class="bad" type="submit">Cancel (refund)</button>
+    </form>
+  </div>
+  {{end}}
+</div>
+{{end}}

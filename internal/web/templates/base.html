@@ -6,6 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}} · gwx</title>
 <link rel="stylesheet" href="/static/app.css">
+<script src="/static/htmx.min.js" defer></script>
+<script src="/static/app.js" defer></script>
 </head>
 <body>
 <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
@@ -31,6 +33,8 @@
   <symbol id="i-atom" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.2"/><ellipse cx="12" cy="12" rx="9" ry="3.6"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(120 12 12)"/></symbol>
   <symbol id="i-tank" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7" ry="2.8"/><path d="M5 5.5v13c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-13M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/></symbol>
 </svg>
+<input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Open navigation">
+<label for="nav-toggle" class="nav-burger" aria-hidden="true"></label>
 <div class="app{{if .NavRight}} nav-right{{end}}">
   <aside class="sidebar">
     <a class="logo" href="/">gwx</a>
@@ -88,11 +92,8 @@
   <div class="main">
     {{if .Resources}}
     <header class="topbar">
-      <div class="res">
-        <div class="cell"><span class="k">Iron</span><span class="v">{{nf .Resources.Metal}}</span><span class="s">{{n .Resources.MetalCap}} · +{{nf .Resources.MetalProd}}/h</span></div>
-        <div class="cell"><span class="k">Lutinum</span><span class="v">{{nf .Resources.Lutinum}}</span><span class="s">{{n .Resources.LutinumCap}} · +{{nf .Resources.LutinumProd}}/h</span></div>
-        <div class="cell"><span class="k">Water</span><span class="v">{{nf .Resources.Water}}</span><span class="s">{{n .Resources.WaterCap}} · +{{nf .Resources.WaterProd}}/h</span></div>
-        <div class="cell"><span class="k">Hydrogen</span><span class="v">{{nf .Resources.Hydrogen}}</span><span class="s">{{n .Resources.HydrogenCap}} · +{{nf .Resources.HydrogenProd}}/h{{if gt .Resources.WaterUse 0.0}} (−{{nf .Resources.WaterUse}} Wa/h){{end}}</span></div>
+      <div class="res" id="res-strip" hx-get="/partials/resources/{{.ActivePlanetID}}" hx-trigger="every 5s" hx-swap="innerHTML">
+        {{template "resource-cells" .}}
       </div>
     </header>
     {{end}}

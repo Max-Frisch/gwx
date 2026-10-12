@@ -1,19 +1,20 @@
 {{define "buildings"}}
 {{template "head" .}}
+<div id="page-content">{{template "buildings-content" .}}</div>
+{{template "foot" .}}
+{{end}}
+
+{{define "buildings-content"}}
+{{template "banners" .}}
 <h1>Buildings</h1>
 
-{{if .Queue}}
-<div class="panel row">
-  <span>Building <b>{{.Queue.Name}}</b> — finishes in {{.Queue.Remaining}}</span>
-  <form method="post" action="/queue/{{.Queue.ID}}/cancel" class="spacer"><button class="bad" type="submit">Cancel (refund)</button></form>
-</div>
-{{end}}
+{{template "queue-panel" .}}
 
 {{range .Sections}}
 <h2 class="section-head">{{.Name}}</h2>
 {{range .Rows}}
 <div class="bcard{{if not .Unlocked}} locked{{end}}">
-  <div class="bcard-img"><svg class="ic-lg"><use href="#{{.Icon}}"/></svg></div>
+  <div class="bcard-img">{{if .Art}}<img src="{{.Art}}" alt="{{.Name}}" loading="lazy">{{else}}<svg class="ic-lg"><use href="#{{.Icon}}"/></svg>{{end}}</div>
   <div class="bcard-body">
     <div class="bcard-title">{{.Name}} <span class="bcard-level">Level {{.Level}}</span>{{if .Queued}} <span class="tag busy">building</span>{{end}}</div>
     <p class="bcard-desc">{{.Desc}}</p>
@@ -32,7 +33,8 @@
     {{else if .Queued}}
       <span class="muted">queued</span>
     {{else}}
-      <form method="post" action="/buildings/{{$.ActivePlanetID}}/build">
+      <form method="post" action="/buildings/{{$.ActivePlanetID}}/build"
+            hx-post="/buildings/{{$.ActivePlanetID}}/build" hx-target="#page-content" hx-swap="innerHTML" hx-disabled-elt="find button">
         <input type="hidden" name="code" value="{{.Code}}">
         <button type="submit" {{if not .Affordable}}disabled{{end}}>Upgrade to level {{.NextLevel}}</button>
       </form>
@@ -41,5 +43,5 @@
 </div>
 {{end}}
 {{end}}
-{{template "foot" .}}
+{{template "hx-extras" .}}
 {{end}}

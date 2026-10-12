@@ -91,6 +91,8 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /buildings/{id}", h.requireUser(h.BuildingsPage))
 	mux.HandleFunc("POST /buildings/{id}/build", h.requireUser(h.BuildSubmit))
 	mux.HandleFunc("GET /resources/{id}", h.requireUser(h.ResourcesPage))
+	mux.HandleFunc("GET /partials/resources/{id}", h.requireUser(h.ResourceCellsPartial))
+	mux.HandleFunc("GET /partials/queue/{id}", h.requireUser(h.QueuePartial))
 	mux.HandleFunc("GET /research/{id}", h.requireUser(h.ResearchPage))
 	mux.HandleFunc("POST /research/{id}/start", h.requireUser(h.ResearchSubmit))
 	mux.HandleFunc("GET /shipyard/{id}", h.requireUser(h.ShipyardPage))
@@ -468,12 +470,21 @@ func (h *Handler) OverviewPage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) BuildingsPage(w http.ResponseWriter, r *http.Request) {
 	userID, _ := h.userID(r)
 	id := pathID(r)
-	p, ok := h.owned(r.Context(), userID, id)
+	d, ok := h.buildingsView(r.Context(), r, userID, id)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	ctx := r.Context()
+	h.render(w, "buildings", http.StatusOK, d)
+}
+
+// buildingsView assembles the Construction page data. It is shared by the full
+// GET render and the htmx fragment response after a build/cancel.
+func (h *Handler) buildingsView(ctx context.Context, r *http.Request, userID, id int64) (buildingsData, bool) {
+	p, ok := h.owned(ctx, userID, id)
+	if !ok {
+		return buildingsData{}, false
+	}
 	structs, _ := h.planets.Structures(ctx, id)
 	techs, _ := h.planets.Techs(ctx, userID)
 	gameSpeed, _ := h.gameSpeed(ctx)
@@ -516,7 +527,7 @@ func (h *Handler) BuildingsPage(w http.ResponseWriter, r *http.Request) {
 			d.Sections = append(d.Sections, buildingSection{Name: g, Rows: rows})
 		}
 	}
-	h.render(w, "buildings", http.StatusOK, d)
+	return d, true
 }
 
 // ResourcesPage is the production overview: the exact hourly output per
@@ -591,12 +602,19 @@ func (h *Handler) ResourcesPage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ResearchPage(w http.ResponseWriter, r *http.Request) {
 	userID, _ := h.userID(r)
 	id := pathID(r)
-	p, ok := h.owned(r.Context(), userID, id)
+	d, ok := h.researchView(r.Context(), r, userID, id)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	ctx := r.Context()
+	h.render(w, "research", http.StatusOK, d)
+}
+
+func (h *Handler) researchView(ctx context.Context, r *http.Request, userID, id int64) (researchData, bool) {
+	p, ok := h.owned(ctx, userID, id)
+	if !ok {
+		return researchData{}, false
+	}
 	structs, _ := h.planets.Structures(ctx, id)
 	techs, _ := h.planets.Techs(ctx, userID)
 	gameSpeed, _ := h.gameSpeed(ctx)
@@ -622,18 +640,25 @@ func (h *Handler) ResearchPage(w http.ResponseWriter, r *http.Request) {
 		}
 		d.Rows = append(d.Rows, row)
 	}
-	h.render(w, "research", http.StatusOK, d)
+	return d, true
 }
 
 func (h *Handler) ShipyardPage(w http.ResponseWriter, r *http.Request) {
 	userID, _ := h.userID(r)
 	id := pathID(r)
-	p, ok := h.owned(r.Context(), userID, id)
+	d, ok := h.shipyardView(r.Context(), r, userID, id)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	ctx := r.Context()
+	h.render(w, "shipyard", http.StatusOK, d)
+}
+
+func (h *Handler) shipyardView(ctx context.Context, r *http.Request, userID, id int64) (shipyardData, bool) {
+	p, ok := h.owned(ctx, userID, id)
+	if !ok {
+		return shipyardData{}, false
+	}
 	structs, _ := h.planets.Structures(ctx, id)
 	techs, _ := h.planets.Techs(ctx, userID)
 	gameSpeed, _ := h.gameSpeed(ctx)
@@ -644,18 +669,25 @@ func (h *Handler) ShipyardPage(w http.ResponseWriter, r *http.Request) {
 		d.Queue = &v
 	}
 	d.Ships = h.unitRows(ctx, p, structs, techs, game.KindShip, gameSpeed)
-	h.render(w, "shipyard", http.StatusOK, d)
+	return d, true
 }
 
 func (h *Handler) DefensePage(w http.ResponseWriter, r *http.Request) {
 	userID, _ := h.userID(r)
 	id := pathID(r)
-	p, ok := h.owned(r.Context(), userID, id)
+	d, ok := h.defenseView(r.Context(), r, userID, id)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	ctx := r.Context()
+	h.render(w, "defense", http.StatusOK, d)
+}
+
+func (h *Handler) defenseView(ctx context.Context, r *http.Request, userID, id int64) (defenseData, bool) {
+	p, ok := h.owned(ctx, userID, id)
+	if !ok {
+		return defenseData{}, false
+	}
 	structs, _ := h.planets.Structures(ctx, id)
 	techs, _ := h.planets.Techs(ctx, userID)
 	gameSpeed, _ := h.gameSpeed(ctx)
@@ -666,7 +698,7 @@ func (h *Handler) DefensePage(w http.ResponseWriter, r *http.Request) {
 		d.Queue = &v
 	}
 	d.Units = h.unitRows(ctx, p, structs, techs, game.KindDefense, gameSpeed)
-	h.render(w, "defense", http.StatusOK, d)
+	return d, true
 }
 
 func (h *Handler) unitRows(ctx context.Context, p *store.Planet, structs, techs map[string]int, kind game.Kind, gameSpeed float64) []unitRow {
@@ -1943,6 +1975,9 @@ func (h *Handler) BuildSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 	code := r.FormValue("code")
 	err := h.queues.StartBuilding(r.Context(), h.universeCode, userID, id, code)
+	if h.renderHXContent(w, r, userID, "buildings", id, "Construction started.", msg(err)) {
+		return
+	}
 	flashRedirect(w, r, "/buildings/"+strconv.FormatInt(id, 10), "Construction started.", msg(err))
 }
 
@@ -1955,12 +1990,16 @@ func (h *Handler) ResearchSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 	code := r.FormValue("code")
 	err := h.queues.StartResearch(r.Context(), h.universeCode, userID, id, code)
+	if h.renderHXContent(w, r, userID, "research", id, "Research started.", msg(err)) {
+		return
+	}
 	flashRedirect(w, r, "/research/"+strconv.FormatInt(id, 10), "Research started.", msg(err))
 }
 
 func (h *Handler) ShipyardSubmit(w http.ResponseWriter, r *http.Request) {
 	userID, _ := h.userID(r)
 	id := pathID(r)
+	back := "/shipyard/" + strconv.FormatInt(id, 10)
 	if _, ok := h.owned(r.Context(), userID, id); !ok {
 		http.NotFound(w, r)
 		return
@@ -1969,16 +2008,23 @@ func (h *Handler) ShipyardSubmit(w http.ResponseWriter, r *http.Request) {
 	qty, _ := strconv.ParseInt(r.FormValue("qty"), 10, 64)
 	def, ok := game.Get(code)
 	if !ok || def.Kind != game.KindShip {
-		flashRedirect(w, r, "/shipyard/"+strconv.FormatInt(id, 10), "", "Unknown item.")
+		if h.renderHXContent(w, r, userID, "shipyard", id, "", "Unknown item.") {
+			return
+		}
+		flashRedirect(w, r, back, "", "Unknown item.")
 		return
 	}
 	err := h.queues.StartUnits(r.Context(), h.universeCode, userID, id, string(def.Kind), code, qty)
-	flashRedirect(w, r, "/shipyard/"+strconv.FormatInt(id, 10), "Production queued.", msg(err))
+	if h.renderHXContent(w, r, userID, "shipyard", id, "Production queued.", msg(err)) {
+		return
+	}
+	flashRedirect(w, r, back, "Production queued.", msg(err))
 }
 
 func (h *Handler) DefenseSubmit(w http.ResponseWriter, r *http.Request) {
 	userID, _ := h.userID(r)
 	id := pathID(r)
+	back := "/defense/" + strconv.FormatInt(id, 10)
 	if _, ok := h.owned(r.Context(), userID, id); !ok {
 		http.NotFound(w, r)
 		return
@@ -1987,11 +2033,17 @@ func (h *Handler) DefenseSubmit(w http.ResponseWriter, r *http.Request) {
 	qty, _ := strconv.ParseInt(r.FormValue("qty"), 10, 64)
 	def, ok := game.Get(code)
 	if !ok || def.Kind != game.KindDefense {
-		flashRedirect(w, r, "/defense/"+strconv.FormatInt(id, 10), "", "Unknown item.")
+		if h.renderHXContent(w, r, userID, "defense", id, "", "Unknown item.") {
+			return
+		}
+		flashRedirect(w, r, back, "", "Unknown item.")
 		return
 	}
 	err := h.queues.StartUnits(r.Context(), h.universeCode, userID, id, string(def.Kind), code, qty)
-	flashRedirect(w, r, "/defense/"+strconv.FormatInt(id, 10), "Production queued.", msg(err))
+	if h.renderHXContent(w, r, userID, "defense", id, "Production queued.", msg(err)) {
+		return
+	}
+	flashRedirect(w, r, back, "Production queued.", msg(err))
 }
 
 func (h *Handler) FleetDispatchSubmit(w http.ResponseWriter, r *http.Request) {
@@ -2063,7 +2115,131 @@ func (h *Handler) QueueCancelSubmit(w http.ResponseWriter, r *http.Request) {
 	if to == "" {
 		to = "/overview/" + strconv.FormatInt(h.homeID(r.Context(), userID), 10)
 	}
+	if kind, id, ok := pageFromReferer(to); ok {
+		if h.renderHXContent(w, r, userID, kind, id, "Order cancelled.", msg(err)) {
+			return
+		}
+	}
+	if isHX(r) {
+		// Could not map the referer back to a content region: fall back to a
+		// real navigation rather than swapping a whole page into the fragment.
+		w.Header().Set("HX-Redirect", to)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	flashRedirect(w, r, to, "Order cancelled.", msg(err))
+}
+
+// ---- htmx helpers ----
+
+// isHX reports whether the request came from htmx (progressive enhancement).
+func isHX(r *http.Request) bool { return r.Header.Get("HX-Request") == "true" }
+
+// renderHXContent answers an htmx action by re-rendering just the page's content
+// region (the same markup the full page embeds in #page-content). It returns
+// false when the request is not htmx, so callers can fall back to the plain
+// POST -> redirect path that keeps the app working without JavaScript.
+func (h *Handler) renderHXContent(w http.ResponseWriter, r *http.Request, userID int64, kind string, id int64, okMsg, errMsg string) bool {
+	if !isHX(r) {
+		return false
+	}
+	if errMsg != "" {
+		okMsg = ""
+	}
+	ctx := r.Context()
+	var name string
+	var data any
+	switch kind {
+	case "buildings":
+		d, ok := h.buildingsView(ctx, r, userID, id)
+		if !ok {
+			http.NotFound(w, r)
+			return true
+		}
+		d.HX, d.Flash, d.Error = true, okMsg, errMsg
+		name, data = "buildings-content", d
+	case "research":
+		d, ok := h.researchView(ctx, r, userID, id)
+		if !ok {
+			http.NotFound(w, r)
+			return true
+		}
+		d.HX, d.Flash, d.Error = true, okMsg, errMsg
+		name, data = "research-content", d
+	case "shipyard":
+		d, ok := h.shipyardView(ctx, r, userID, id)
+		if !ok {
+			http.NotFound(w, r)
+			return true
+		}
+		d.HX, d.Flash, d.Error = true, okMsg, errMsg
+		name, data = "shipyard-content", d
+	case "defense":
+		d, ok := h.defenseView(ctx, r, userID, id)
+		if !ok {
+			http.NotFound(w, r)
+			return true
+		}
+		d.HX, d.Flash, d.Error = true, okMsg, errMsg
+		name, data = "defense-content", d
+	default:
+		return false
+	}
+	h.render(w, name, http.StatusOK, data)
+	return true
+}
+
+// pageFromReferer maps a referer like "/shipyard/5?x=y" back to the page kind
+// and planet id, so the cancel action can re-render the right content region.
+func pageFromReferer(ref string) (string, int64, bool) {
+	u, err := url.Parse(ref)
+	if err != nil {
+		return "", 0, false
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) != 2 {
+		return "", 0, false
+	}
+	id, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return "", 0, false
+	}
+	switch parts[0] {
+	case "buildings", "research", "shipyard", "defense":
+		return parts[0], id, true
+	default:
+		return "", 0, false
+	}
+}
+
+// ResourceCellsPartial is the live topbar ticker: htmx polls it and swaps the
+// four resource cells without a page reload.
+func (h *Handler) ResourceCellsPartial(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id := pathID(r)
+	p, ok := h.owned(r.Context(), userID, id)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	h.render(w, "resource-cells", http.StatusOK, baseData{ActivePlanetID: id, Resources: newResView(p)})
+}
+
+// QueuePartial re-renders the queue banner for a planet+kind so its countdown
+// resyncs with the server while the client ticker runs in between.
+func (h *Handler) QueuePartial(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id := pathID(r)
+	if _, ok := h.owned(r.Context(), userID, id); !ok {
+		http.NotFound(w, r)
+		return
+	}
+	d := queuePartialData{ActivePlanetID: id}
+	if q, ok := h.activeQueue(r.Context(), id, userID, r.URL.Query().Get("kind")); ok {
+		v := newQueueView(q)
+		d.Queue = &v
+	}
+	h.render(w, "queue-panel", http.StatusOK, d)
 }
 
 // ---- small helpers ----

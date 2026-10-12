@@ -1,13 +1,14 @@
 {{define "research"}}
 {{template "head" .}}
+<div id="page-content">{{template "research-content" .}}</div>
+{{template "foot" .}}
+{{end}}
+
+{{define "research-content"}}
+{{template "banners" .}}
 <h1>Research <span class="muted">(account-wide)</span></h1>
 
-{{if .Queue}}
-<div class="panel row">
-  <span>Researching <b>{{.Queue.Name}}</b> — finishes in {{.Queue.Remaining}}</span>
-  <form method="post" action="/queue/{{.Queue.ID}}/cancel" class="spacer"><button class="bad" type="submit">Cancel (refund)</button></form>
-</div>
-{{end}}
+{{template "queue-panel" .}}
 
 <div class="panel">
 <table>
@@ -21,7 +22,8 @@
       <td class="muted">{{.TimeStr}}</td>
       <td>
         {{if and .Affordable (not .Queued)}}
-        <form method="post" action="/research/{{$.ActivePlanetID}}/start">
+        <form method="post" action="/research/{{$.ActivePlanetID}}/start"
+              hx-post="/research/{{$.ActivePlanetID}}/start" hx-target="#page-content" hx-swap="innerHTML" hx-disabled-elt="find button">
           <input type="hidden" name="code" value="{{.Code}}">
           <button type="submit">Research</button>
         </form>
@@ -35,5 +37,5 @@
   {{end}}
 </table>
 </div>
-{{template "foot" .}}
+{{template "hx-extras" .}}
 {{end}}

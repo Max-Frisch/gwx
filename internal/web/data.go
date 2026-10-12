@@ -24,6 +24,11 @@ type baseData struct {
 	Flash          string
 	Error          string
 
+	// HX marks a response as an htmx fragment (not a full page): content
+	// templates use it to render their own flash/error banner inside the
+	// swapped region and to emit out-of-band updates.
+	HX bool
+
 	// Account-lifecycle notices shown as a banner on every page.
 	OnVacation   bool
 	Sanctioned   bool
@@ -51,6 +56,9 @@ type queueView struct {
 	Kind      string
 	Name      string
 	Remaining string
+	// FinishUnix is the completion time in unix seconds, used by the
+	// client-side countdown ticker (the server text is the fallback).
+	FinishUnix int64
 }
 
 func newQueueView(q store.Queue) queueView {
@@ -61,7 +69,13 @@ func newQueueView(q store.Queue) queueView {
 			name = fmt.Sprintf("%s → %d", d.Name, q.TargetLevel.Int64)
 		}
 	}
-	return queueView{ID: q.ID, Kind: q.Kind, Name: name, Remaining: until(q.FinishAt)}
+	return queueView{ID: q.ID, Kind: q.Kind, Name: name, Remaining: until(q.FinishAt), FinishUnix: q.FinishAt.Unix()}
+}
+
+// queuePartialData backs the self-polling queue panel fragment.
+type queuePartialData struct {
+	ActivePlanetID int64
+	Queue          *queueView
 }
 
 type buildRow struct {
@@ -77,7 +91,10 @@ type buildRow struct {
 	TimeStr    string
 	Desc       string
 	Icon       string
-	Costs      []costPart
+	// Art is an optional image tile for the card. Empty today (the catalog
+	// carries SVG icons only), so the template falls back to the placeholder.
+	Art   string
+	Costs []costPart
 }
 
 // costPart is one resource of an item's price: its label, the CSS class that

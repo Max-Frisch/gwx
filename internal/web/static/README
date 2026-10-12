@@ -1,0 +1,20 @@
+Vendored front-end assets
+=========================
+
+No build step, no Node, no CDN. Everything here is served from the embedded
+`staticFS` via `/static/`.
+
+htmx.min.js
+-----------
+- Version: 1.9.12 (minified distribution build, unmodified bytes after the
+  banner comment).
+- Source:  https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js
+- License: BSD 2-Clause — https://github.com/bigskysoftware/htmx/blob/v1.9.12/LICENSE
+- Used for progressive enhancement only: every page and form still works with
+  JavaScript disabled (plain GET links and POST -> redirect forms).
+
+app.js
+------
+Hand-written vanilla helpers (no library):
+- Countdown ticker for `[data-countdown]` elements (unix seconds -> "in 3m 4s").
+- Mobile sidebar toggle wiring for the CSS checkbox hack.
