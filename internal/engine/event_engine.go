@@ -767,6 +767,41 @@ func (e *EventEngine) resolveAttackTx(ctx context.Context, tx *sql.Tx, fleetID, 
 		}
 	}
 
+	// Debris: the winner's Recyclers salvage a share of both sides' wreckage
+	// during the same pass (there is no separate debris field or recycle
+	// mission). The attacker salvages if it cleared the field; otherwise the
+	// defending planet's surviving Recyclers collect.
+	recovered := game.Resources{}
+	recoveredBy := ""
+	if game.TotalUnits(result.DefenderSurvivors) == 0 {
+		cargo := game.RecyclerCargo(result.AttackerSurvivors, techs["increased_cargo_capacity"])
+		recovered = game.RecoverDebris(result.AttackerLosses, result.DefenderLosses, techs["recycling_technology"], cargo).Rounded()
+		if recovered.Total() > 0 {
+			recoveredBy = "attacker"
+		}
+	} else {
+		cargo := game.RecyclerCargo(result.DefenderSurvivors, defTechs["increased_cargo_capacity"])
+		recovered = game.RecoverDebris(result.AttackerLosses, result.DefenderLosses, defTechs["recycling_technology"], cargo).Rounded()
+		if recovered.Total() > 0 {
+			recoveredBy = "defender"
+		}
+	}
+	if recoveredBy == "defender" {
+		if _, err := accrueTx(ctx, tx, targetID.Int64); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE planets SET
+				metal = LEAST(metal_cap, metal + $2),
+				lutinum = LEAST(lutinum_cap, lutinum + $3),
+				water = LEAST(water_cap, water + $4),
+				hydrogen = LEAST(hydrogen_cap, hydrogen + $5)
+			WHERE id = $1
+		`, targetID.Int64, recovered.Metal, recovered.Lutinum, recovered.Water, recovered.Hydrogen); err != nil {
+			return err
+		}
+	}
+
 	// Report. Each participant gets their own copy of the payload, tagged with
 	// their role so statistics can read destroyed/lost from the right side.
 	payload := map[string]any{
@@ -779,6 +814,11 @@ func (e *EventEngine) resolveAttackTx(ctx context.Context, tx *sql.Tx, fleetID, 
 			"metal": int64(loot.Metal), "lutinum": int64(loot.Lutinum),
 			"water": int64(loot.Water), "hydrogen": int64(loot.Hydrogen),
 		},
+		"recovered": map[string]int64{
+			"metal": int64(recovered.Metal), "lutinum": int64(recovered.Lutinum),
+			"water": int64(recovered.Water), "hydrogen": int64(recovered.Hydrogen),
+		},
+		"recoveredBy": recoveredBy,
 	}
 	payload["role"] = "attacker"
 	rawAttacker, _ := json.Marshal(payload)
@@ -818,7 +858,8 @@ func (e *EventEngine) resolveAttackTx(ctx context.Context, tx *sql.Tx, fleetID, 
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE fleets SET cargo_metal = $2, cargo_lutinum = $3, cargo_water = $4, cargo_hydrogen = $5 WHERE id = $1
-	`, fleetID, int64(loot.Metal), int64(loot.Lutinum), int64(loot.Water), int64(loot.Hydrogen)); err != nil {
+	`, fleetID, int64(loot.Metal)+int64(recovered.Metal), int64(loot.Lutinum)+int64(recovered.Lutinum),
+		int64(loot.Water)+int64(recovered.Water), int64(loot.Hydrogen)+int64(recovered.Hydrogen)); err != nil {
 		return err
 	}
 	return sendHomeTx(ctx, tx, fleetID, result.AttackerSurvivors, techs, og, os, op, tg, ts, tp, speedPct, fleetSpeed)

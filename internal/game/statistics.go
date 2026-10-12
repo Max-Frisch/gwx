@@ -23,6 +23,8 @@ type CombatReport struct {
 	DefenderLosses    map[string]int64 `json:"defenderLosses"`
 	AttackerSurvivors map[string]int64 `json:"attackerSurvivors"`
 	Loot              Loot             `json:"loot"`
+	Recovered         Loot             `json:"recovered"`
+	RecoveredBy       string           `json:"recoveredBy"`
 }
 
 // UnitValue is the total resource cost (metal + lutinum + water + hydrogen) of
@@ -96,6 +98,7 @@ type BattleBalance struct {
 	Ships     []UnitStat
 	Defense   []UnitStat
 	Resources []ResourceStat
+	Recycled  []ResourceStat
 }
 
 // Farming summarises a player's raids: attacks that returned with loot.
@@ -130,6 +133,8 @@ func AggregateBattle(reports []CombatReport) BattleBalance {
 	defense := map[string]*UnitStat{}
 	plundered := map[string]float64{}
 	lost := map[string]float64{}
+	recycled := map[string]float64{}
+	dispersed := map[string]float64{}
 
 	for _, r := range reports {
 		var own, enemy map[string]int64
@@ -166,6 +171,19 @@ func AggregateBattle(reports []CombatReport) BattleBalance {
 		dest["lutinum"] += float64(r.Loot.Lutinum)
 		dest["water"] += float64(r.Loot.Water)
 		dest["hydrogen"] += float64(r.Loot.Hydrogen)
+
+		// Debris the player's own side salvaged is Gained; debris the enemy
+		// salvaged was taken from the field and shows as Lost.
+		if r.RecoveredBy != "" {
+			rec := recycled
+			if r.RecoveredBy != r.Role {
+				rec = dispersed
+			}
+			rec["metal"] += float64(r.Recovered.Metal)
+			rec["lutinum"] += float64(r.Recovered.Lutinum)
+			rec["water"] += float64(r.Recovered.Water)
+			rec["hydrogen"] += float64(r.Recovered.Hydrogen)
+		}
 	}
 
 	bb.Ships = unitStats(ships, KindShip)
@@ -173,6 +191,9 @@ func AggregateBattle(reports []CombatReport) BattleBalance {
 	for _, res := range resourceOrder {
 		bb.Resources = append(bb.Resources, ResourceStat{
 			Name: res.name, Plundered: plundered[res.key], Lost: lost[res.key],
+		})
+		bb.Recycled = append(bb.Recycled, ResourceStat{
+			Name: res.name, Plundered: recycled[res.key], Lost: dispersed[res.key],
 		})
 	}
 	return bb

@@ -59,12 +59,23 @@
 </div>
 
 <h2>Recycled resources</h2>
-<div class="panel"><span class="muted">Nothing recovered yet — debris salvaging arrives with the Recycler update.</span></div>
-<small class="muted">All values are resource value (destroyed / plundered / lost). Your own figures only — fleet composition is never public.</small>
+<div class="panel">
+<table>
+  <tr><th>Resource</th><th>Gained</th><th>Lost</th></tr>
+  {{range .Battle.Recycled}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td class="{{if .Plundered}}m{{else}}muted{{end}}">{{nf .Plundered}}</td>
+    <td class="{{if .Lost}}bad{{else}}muted{{end}}">{{nf .Lost}}</td>
+  </tr>
+  {{end}}
+</table>
+</div>
+<small class="muted">All values are resource value (destroyed / plundered / lost / recycled). Your own figures only — fleet composition is never public.</small>
 
 {{else if eq .Tab "farming"}}
 <h1>Statistics <span class="muted">Farming balance</span></h1>
-<p class="muted">Beta — covers every raid in your recent combat reports. Recycled resources are not counted until debris exists.</p>
+<p class="muted">Beta — covers every raid in your recent combat reports.</p>
 <div class="panel row">
   <span class="tag">Raids {{.Farming.Raids}}</span>
   <span class="tag ok">Total plundered {{nf .Farming.Total}}</span>
@@ -99,7 +110,7 @@
   {{end}}
 </table>
 </div>
-<small class="muted">Recycled resources (debris gained / lost) will appear here once the debris mechanic exists.</small>
+<small class="muted">Debris recovered during battle (Recyclers) is tallied under Battle balance &rsaquo; Recycled resources.</small>
 {{end}}
 {{template "foot" .}}
 {{end}}
