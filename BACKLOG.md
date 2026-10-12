@@ -20,6 +20,14 @@ Read first; one item per session. Keep this file short.
 - Per-start universe config (speeds, bounds, optional `ENDS_AT`).
 - Verified end-to-end: build → research → shipyard → raid → loot → return,
   colonize, and all pages render.
+- **Full-loop integration test** (`internal/integration`) — spins up a
+  throwaway Postgres, runs `migrations/`, starts the real HTTP UI + durable
+  scheduler against a fast **x10000 game / x100000 fleet** test universe, and
+  drives the whole acceptance path through the actual forms/sessions:
+  register → build → research → shipyard → raid → loot → return → colonize,
+  then asserts reports/messages/feeds. Reuses the local compose Postgres
+  (`GWX_TEST_DATABASE_URL`/`DATABASE_URL`, else `:5433`) and **skips** when it is
+  unreachable, so `go test ./...` stays green without a database.
 - **UI reskin** — dark-navy shell with starfield, left sidebar (grouped nav),
   top resource strip, centered page tabs, steel-blue accents. Matches the
   GalaxyWars reference screenshots (see `info/`). Pure CSS + `html/template`.
@@ -95,7 +103,6 @@ Read first; one item per session. Keep this file short.
       (Legacy/misread: reference GW has no moons; `[M]` means *main planet*.)
 - [ ] **Seasonal lifecycle** — automatic archive/reset at `ENDS_AT`; round seeding.
 - [ ] **JSON API** — thin `/api/v1` surface for tooling/bots.
-- [ ] **Full-loop integration test** — register → … → abandon.
 - [ ] **Anti-farm / noob protection** — optional points-ratio guard.
 
 ## Reference spec (derived from Uni5 HARs — `info/galaxywars-spec/`)

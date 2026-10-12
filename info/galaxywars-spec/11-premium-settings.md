@@ -73,7 +73,12 @@ A drag-sortable planet list (`data-controller="ajax-sort"`, reorder POSTs to
 Footer: *"N free planets remaining"* (here `7`; the account owns 3 planets).
 The home planet row has no actions. **No rename form is present in this
 capture** — planet naming happens at colonisation time / elsewhere, not from
-Settings. [change-home/abandon: **build now**]
+Settings. [change-home: **build now**]
+
+> **Correction:** *abandon planet* is **scrapped**. GalaxyWars has no abandon
+> mechanic — the capture above was a misread and the concept was a dangling
+> relict from the sibling `neoxnova` project. Do not implement it or reference
+> it in the gwx loop.
 
 ## Settings → Vacation mode — `/settings/vacation/`
 

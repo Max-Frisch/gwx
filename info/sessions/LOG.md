@@ -23,6 +23,7 @@ Append one line per completed session: `date | session | result | commit`.
 2026-10-12 | economy2 | rip out OGame energy everywhere (drop energy_used/energy_prod, schema + insert); implement Advanced Chemical Factory (water→H₂ 2:1) alongside Chemical Factory (5:1), both drawing one shared water pool that adds up and throttles together at zero (new planets.water_use + 0006 function); docs | (this commit)
 2026-10-12 | I8 | defense roster: 5 real GW units retuned (Light/Laser/EMP/Plasma/Rocket), placeholders dropped (0007), Ionization + Explosive Projectiles techs, /defense page split from shipyard, ckk = (Atk+Def)/8000 documented | (this commit)
 2026-10-12 | I9 | vacation mode + sanctions: users.vacation_since/until + sanctioned/reason (0008); production freeze in update_planet_resources, scheduler queue-pause + auto-end (FinalizeExpiredVacations), attack/queue/dispatch gates, /settings/vacation + /settings/sanction + banner | (this commit)
+2026-10-12 | testing | full-loop integration test: ephemeral Postgres + migrations + real UI/scheduler at x10000/x100000; register→build→research→shipyard→raid→loot→return→colonize (+ transport); skips without a DB | (this commit)
 ```
 
 ## Recon (2026-10-12)

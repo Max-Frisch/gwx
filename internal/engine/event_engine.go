@@ -83,16 +83,23 @@ func (e *EventEngine) StartScheduler(ctx context.Context) {
 	log.Println("[ENGINE] durable scheduler online (1s poll)")
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
-	e.processDue(ctx)
+	e.Tick(ctx)
 	for {
 		select {
 		case <-ctx.Done():
 			log.Println("[ENGINE] scheduler stopped")
 			return
 		case <-ticker.C:
-			e.processDue(ctx)
+			e.Tick(ctx)
 		}
 	}
+}
+
+// Tick resolves every piece of due work exactly once. It is the same work the
+// background scheduler does on each poll, exposed so tests (and other callers)
+// can advance the game deterministically without waiting for the 1s ticker.
+func (e *EventEngine) Tick(ctx context.Context) {
+	e.processDue(ctx)
 }
 
 func (e *EventEngine) processDue(ctx context.Context) {
