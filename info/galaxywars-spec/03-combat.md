@@ -41,10 +41,17 @@ Ship stat block is taken from the technology-tree ship pages (`Base` = hull defa
 
 ## Build time
 
-The ship calculator's `Level` input is the **Ship Factory level**; it lists the per-unit build time at each factory level (higher factory → shorter time). Faster-than-linear: ≈ `K / (1+F)²`.
+The ship calculator's `Level` input is the **Ship Factory level**; it lists the per-unit build time at each factory level (higher factory → shorter time). Level 1 is the captured per-unit duration; every higher factory level divides it by a shared divisor `D(F)` (faster-than-linear):
+
+`D(F) = 1, 2, 3.5, 5.5, 8, 11.5, 15.5, 20, 25, 30.5, 37, 44, 51.5, 59.5, 68, 77.5, 87.5, 98, 109, 120.5, 133, 146, 159.5, 173.5, 188, 203.5, 219.5, 236, 253, …`
+
+The series is identical for **every ship and every defense unit** (confirmed across Jackal, Falcon, Longeagle X and all five defense units). Extrapolated past L29 with `1 + (F²+F−2)/4 + ½·Σ_{k=1}^{F−1} ⌊k/5⌋`, which reproduces all 29 captured values exactly.
+
 - **Jackal:** F1=00:20:00, F2=00:10:00, F3=00:05:42, F4=00:03:38, F5=00:02:30, F6=00:01:44, F7=00:01:17, F8=00:01:00, F9=00:00:48, F10=00:00:39, F11=00:00:32
 - **Falcon:** F1=10:00:00, F2=05:00:00, F3=02:51:25, F4=01:49:05, F5=01:15:00, F6=00:52:10, F7=00:38:42, F8=00:30:00, F9=00:24:00, F10=00:19:40, F11=00:16:12
 - **Longeagle X:** F1=13 Tage, 21:20:00, F2=6 Tage, 22:40:00, F3=3 Tage, 23:14:17, F4=2 Tage, 12:36:21, F5=1 Tag, 17:40:00, F6=1 Tag, 04:59:07, F7=21:30:19, F8=16:40:00, F9=13:20:00, F10=10:55:44, F11=09:00:32
+
+**gwx:** implemented in `internal/game/game_math.go` (`unitTimeDivisors` / `UnitTimeMultiplier`) as the exact captured divisor series; ship `TimeSecs` are the captured level-1 durations and `def.TimeSecs / D(level)` is the per-unit time.
 
 ## Defense
 
@@ -81,10 +88,11 @@ Stat-mapping decisions:
   derived coefficient (see the header). We set `Hull = Attack + Defense`
   (equivalently `ckk × 8000`) so durability scales with the captured combat
   weight; `ckk` itself is not stored.
-- **Build time.** The reference calculator scales unit time by the Orbital
-  Defense Station level, but gwx already keeps unit build time factory-independent
-  for ships; defence follows the same rule, so `TimeSecs` is the captured
-  per-unit duration (ODS L4 in the capture).
+- **Build time.** Defense uses the same captured per-unit divisor curve as ships
+  (factory = Orbital Defense Station): `TimeSecs` is the captured level-1 (ODS
+  L1) per-unit duration and `TimeSecs / D(ODS level)` gives the build time
+  (e.g. Laser Turret ODS L4 → `5000 / 5.5 = 909s`, matching the captured
+  `00:15:09`).
 - **Dropped placeholders:** the gwx-specific `defense_turret`, `ion_cannon`,
   `gauss_cannon`, `small_shield_dome` and `large_shield_dome` are removed
   (migration `0007`). They were invented stand-ins with no GalaxyWars counterpart.

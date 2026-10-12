@@ -81,14 +81,24 @@ func TestProductionMatchesReference(t *testing.T) {
 }
 
 func TestUnitTimeScalesWithFactoryLevel(t *testing.T) {
-	// Captured Jackal times: F1 00:20:00 (1200s), F2 00:10:00, F11 00:00:32.
+	// Captured Jackal times: F1 00:20:00 (1200s), F2 00:10:00, F3 00:05:42,
+	// F4 00:03:38, F11 00:00:32 — from the Uni5 ship calculator.
 	def := Catalog["jackal"]
 	at := func(level int) float64 { return def.TimeSecs * UnitTimeMultiplier(level) }
-	if at(1) != 1200 {
-		t.Errorf("jackal F1 = %v, want 1200", at(1))
+	want := map[int]float64{1: 1200, 2: 600, 3: 342.86, 4: 218.18, 11: 32.43}
+	for level, w := range want {
+		if got := at(level); math.Abs(got-w) > 0.05 {
+			t.Errorf("jackal F%d = %v, want %v", level, got, w)
+		}
 	}
-	if got := at(2); math.Abs(got-533.33) > 1 {
-		t.Errorf("jackal F2 = %v, want ~533", got)
+	// The same curve applies to Longeagle X and defense (ODS level curve).
+	lx := Catalog["longeagle_x"]
+	if got := lx.TimeSecs * UnitTimeMultiplier(3); math.Abs(got-342857.14) > 5 {
+		t.Errorf("longeagle_x F3 = %v, want ~342857 (3d23:14:17)", got)
+	}
+	laser := Catalog["heavy_laser"]
+	if got := laser.TimeSecs * UnitTimeMultiplier(4); math.Abs(got-909.09) > 0.5 {
+		t.Errorf("laser turret ODS4 = %v, want ~909 (00:15:09)", got)
 	}
 	if UnitFactoryCode(KindShip) != "shipyard" || UnitFactoryCode(KindDefense) != "orbital_defense" {
 		t.Error("unit factory code mapping wrong")

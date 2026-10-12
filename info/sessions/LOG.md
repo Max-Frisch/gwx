@@ -28,6 +28,7 @@ Append one line per completed session: `date | session | result | commit`.
 2026-10-12 | UI perf | fix scroll jank: remove per-card backdrop-filter (each card re-blurred the fixed starfield every frame). Queued U1 (info/sessions/U1-ui-refresh.md) for responsive+fast layout, design tokens, vendored htmx | (this commit)
 2026-10-12 | U1 | UI refresh: design-token layer + refactored app.css, vendored htmx 1.9.12 (progressive enhancement), htmx content swaps for build/research/ship/defense + live resource ticker + self-polling queue countdown, off-canvas responsive nav, stacked cards, scrollable tables, focus-visible/reduced-motion polish; no per-card blur | (this commit)
 2026-10-12 | catalog fidelity | catalog rebuilt from the Uni5 capture: exact building/research/ship/defense costs + prereqs, shared cost curve (1,1,2,4,7,11.5,…), full 14-ship roster, Drive/Weapons/Ship research categories replacing the OGame-style Energy/Weapons/Defense items, effect remap (ionization/advanced_ship_armor/increased_cargo_capacity/spy_technology), storage 60_000·L²+300_000 with 2% concealed floor; unit times captured at full length and scaled by factory level (4/(1+F)², Ship Factory / Orbital Defense Station); Research + Ships/Defense reused the Construction card layout; tests + integration updated | 373987d
+2026-10-12 | unit-time curve | replaced the fitted 4/(1+F)² unit scaling with the exact captured factory divisor series (1,2,3.5,5.5,8,11.5,… , shared by every ship + defense unit; ship = TimeSecs/D(Ship Factory), defense = TimeSecs/D(ODS)); game_math unitTimeDivisors + closed-form extrapolation, tests, spec 03, BACKLOG | (this commit)
 ```
 
 ## Open (next session)
@@ -38,9 +39,10 @@ Append one line per completed session: `date | session | result | commit`.
   anti-farm. Combat still uses a single attack tech (`ionization`) and a single
   defense tech (`advanced_ship_armor`) — the other weapons techs only gate units
   and score points.
-- Unit build times use the fitted `4/(1+F)²` factory scaling (level-1 times are
-  the captured ones); building/research times use captured level-1 bases with the
-  existing TimeFactor per-level growth (not re-fitted from the capture).
+- Unit build times now use the **exact captured factory divisor series**
+  (`1,2,3.5,5.5,8,11.5,…`, shared by every ship and defense unit) instead of the
+  fitted `4/(1+F)²`. Building/research times still use captured level-1 bases with
+  the existing TimeFactor per-level growth (not re-fitted from the capture).
 
 ## Recon (2026-10-12)
 

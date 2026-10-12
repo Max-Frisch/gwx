@@ -126,13 +126,44 @@ func UnitFactoryCode(kind Kind) string {
 	return "shipyard"
 }
 
-// UnitTimeMultiplier returns the per-unit build-time factor for a factory
-// level. Captain times are captured at factory level 1; the reference speeds up
-// faster than linearly, fitted as 4/(1+level)² (level 1 → 1.0, matching the
-// captured level-1 durations).
-func UnitTimeMultiplier(factoryLevel int) float64 {
+// unitTimeDivisors is the exact shared per-factory-level divisor captured from
+// the Uni5 ship and defense calculators: a unit's build time is
+// TimeSecs / unitTimeDivisors[factoryLevel], where the factory is the Ship
+// Factory (ships) or the Orbital Defense Station (defense). Level 1 leaves the
+// captured per-unit duration unchanged; higher factory levels speed production
+// up faster than linearly. All ships and all defense units share the identical
+// series (verified against Jackal, Falcon, Longeagle X and every defense unit).
+// Captured for factory levels 1..29; beyond the captured range it extrapolates
+// with the closed form that reproduces every captured value exactly.
+var unitTimeDivisors = []float64{
+	0, // index 0 unused
+	1, 2, 3.5, 5.5, 8, 11.5, 15.5, 20, 25, 30.5,
+	37, 44, 51.5, 59.5, 68, 77.5, 87.5, 98, 109, 120.5,
+	133, 146, 159.5, 173.5, 188, 203.5, 219.5, 236, 253,
+}
+
+// unitTimeDivisor returns the captured build-time divisor for a factory level.
+func unitTimeDivisor(factoryLevel int) float64 {
 	if factoryLevel < 1 {
 		factoryLevel = 1
 	}
-	return 4.0 / math.Pow(1.0+float64(factoryLevel), 2)
+	if factoryLevel < len(unitTimeDivisors) {
+		return unitTimeDivisors[factoryLevel]
+	}
+	// Extrapolate with 1 + (F²+F−2)/4 + ½·Σ_{k=1}^{F−1} ⌊k/5⌋, the closed form
+	// that matches the captured divisors exactly.
+	f := float64(factoryLevel)
+	var staircase float64
+	for k := 1; k < factoryLevel; k++ {
+		staircase += float64(k / 5)
+	}
+	return 1 + (f*f+f-2)/4 + staircase/2
+}
+
+// UnitTimeMultiplier returns the per-unit build-time factor for a factory
+// level: the reciprocal of the captured divisor curve, so level 1 yields 1.0
+// (the captured per-unit duration unchanged) and higher levels shorten it along
+// the reference's exact curve.
+func UnitTimeMultiplier(factoryLevel int) float64 {
+	return 1 / unitTimeDivisor(factoryLevel)
 }
