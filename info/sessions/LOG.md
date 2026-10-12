@@ -8,6 +8,7 @@ Append one line per completed session: `date | session | result | commit`.
 2026-10-12 | E2 | trade/marketplace spec (07-trade.md) | 717fe63
 2026-10-12 | E3 | alliance spec (08-alliance.md; rank rights not exercised in capture) | 747b229
 2026-10-12 | E4 | highscore + statistics spec (09-rankings-statistics.md) | 37178ed
+2026-10-12 | E5 | messages/events/search spec (10-messages-events-search.md) | (this commit)
 ```
 
 ## Recon (2026-10-12)
