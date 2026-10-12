@@ -1,0 +1,90 @@
+{{define "settings"}}
+{{template "head" .}}
+<h1>Settings</h1>
+
+<div class="tabs">
+  <a href="/settings/account" class="{{if eq .Tab "account"}}active{{end}}">Account</a>
+  <a href="/settings/game" class="{{if eq .Tab "game"}}active{{end}}">Game</a>
+</div>
+
+{{if eq .Tab "game"}}
+<h2>Interface</h2>
+<div class="panel" style="max-width:460px">
+  <form method="post" action="/settings/game">
+    <div class="field">
+      <label>Navigation position</label>
+      <select name="navigationPosition" style="width:100%">
+        <option value="left" {{if eq .NavigationPosition "left"}}selected{{end}}>Left</option>
+        <option value="right" {{if eq .NavigationPosition "right"}}selected{{end}}>Right</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Language</label>
+      <select name="locale" style="width:100%">
+        <option value="en" {{if eq .Locale "en"}}selected{{end}}>English</option>
+        <option value="de" {{if eq .Locale "de"}}selected{{end}}>Deutsch</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Messages per page</label>
+      <input type="number" name="messagesPerPage" value="{{.MessagesPerPage}}" min="1" max="100">
+    </div>
+    <button type="submit">Save</button>
+  </form>
+</div>
+
+<h2>Fleets</h2>
+<div class="panel" style="max-width:460px">
+  <form method="post" action="/settings/game">
+    <div class="field">
+      <label>Quick-dispatch probe count</label>
+      <input type="number" name="spyShortcutCount" value="{{.SpyShortcutCount}}" min="0" max="100">
+    </div>
+    <div class="field">
+      <label>Max reconnaissance probes</label>
+      <input type="number" name="spyLimitOnSpy" value="{{.SpyLimitOnSpy}}" min="0" max="100000">
+    </div>
+    <button type="submit">Save</button>
+  </form>
+</div>
+{{else}}
+<div class="panel" style="max-width:460px">
+  <div class="row"><span class="muted">Username</span><b>{{.Username}}</b></div>
+  <div class="row"><span class="muted">Email</span><b>{{.Email}}</b></div>
+</div>
+
+<h2>Change username</h2>
+<div class="panel" style="max-width:460px">
+  <form method="post" action="/settings/account">
+    <input type="hidden" name="action" value="username">
+    <div class="field"><label>New username</label><input name="name" value="{{.Username}}" required style="width:100%"></div>
+    <div class="field"><label>Current password</label><input type="password" name="currentPassword" required style="width:100%"></div>
+    <button type="submit">Rename</button>
+  </form>
+</div>
+
+<h2>Change email</h2>
+<div class="panel" style="max-width:460px">
+  <form method="post" action="/settings/account">
+    <input type="hidden" name="action" value="email">
+    <div class="field"><label>New email</label><input type="email" name="mail" value="{{.Email}}" required style="width:100%"></div>
+    <div class="field"><label>Current password</label><input type="password" name="currentPassword" required style="width:100%"></div>
+    <button type="submit">Change email</button>
+  </form>
+</div>
+
+<h2>Change password</h2>
+<div class="panel" style="max-width:460px">
+  <form method="post" action="/settings/account">
+    <input type="hidden" name="action" value="password">
+    <div class="field"><label>Current password</label><input type="password" name="currentPassword" required style="width:100%"></div>
+    <div class="field"><label>New password (min 10 chars)</label><input type="password" name="passwordFirst" required style="width:100%"></div>
+    <div class="field"><label>Repeat new password</label><input type="password" name="passwordSecond" required style="width:100%"></div>
+    <button type="submit">Change password</button>
+  </form>
+  <small class="muted">Changing your password signs out every other session.</small>
+</div>
+{{end}}
+
+{{template "foot" .}}
+{{end}}

@@ -12,6 +12,7 @@ Append one line per completed session: `date | session | result | commit`.
 2026-10-12 | E6 | premium + settings spec (11-premium-settings.md) | c31bfa2
 2026-10-12 | E7 | login + overview onboarding spec (12-onboarding.md) | 2f744c3
 2026-10-12 | E8 | consolidated 01-12 spec; rewrote 05 nav; gen_spec owns 01-04/06; refreshed BACKLOG/HANDOFF | (this commit)
+2026-10-12 | I1 | /search (planets+players) + /player/{id} profile + /settings (Account rename/email/password, Game prefs); users.settings JSONB | (this commit)
 ```
 
 ## Recon (2026-10-12)

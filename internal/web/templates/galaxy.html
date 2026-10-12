@@ -20,7 +20,7 @@
   <tr>
     <td>{{.Position}}</td>
     <td>{{if .PlanetID}}<a href="/galaxy/{{$.Galaxy}}/{{$.System}}">{{.Name}}</a>{{else}}<span class="muted">empty</span>{{end}}</td>
-    <td>{{if .OwnerName}}{{.OwnerName}}{{else}}<span class="muted">—</span>{{end}}{{if .IsHomeworld}} <span class="tag">homeworld</span>{{end}}</td>
+    <td>{{if .OwnerName}}<a href="/player/{{.OwnerID}}">{{.OwnerName}}</a>{{else}}<span class="muted">—</span>{{end}}{{if .IsHomeworld}} <span class="tag">homeworld</span>{{end}}</td>
     <td></td>
   </tr>
   {{end}}

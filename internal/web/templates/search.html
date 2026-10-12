@@ -1,0 +1,57 @@
+{{define "search"}}
+{{template "head" .}}
+<h1>Search</h1>
+
+<div class="panel">
+  <form method="get" action="/search" class="row">
+    <input type="text" name="q" value="{{.Query}}" placeholder="Player or planet name" autofocus style="width:280px">
+    <button type="submit">Search</button>
+  </form>
+</div>
+
+{{if .Query}}
+<h2>Players</h2>
+<div class="panel">
+<table>
+  <tr>
+    <th>Player</th>
+    <th>Planet points</th>
+    <th>Research points</th>
+    <th>Total points</th>
+  </tr>
+  {{range .Players}}
+  <tr>
+    <td><a href="/player/{{.UserID}}">{{.Username}}</a>{{if .IsMe}} <span class="tag ok">you</span>{{end}}</td>
+    <td>{{n .PlanetPoints}}</td>
+    <td>{{n .ResearchPoints}}</td>
+    <td><b>{{n .Total}}</b></td>
+  </tr>
+  {{else}}
+  <tr><td colspan="4" class="muted">No matching players.</td></tr>
+  {{end}}
+</table>
+</div>
+
+<h2>Planets</h2>
+<div class="panel">
+<table>
+  <tr>
+    <th>Planet</th>
+    <th>Coordinates</th>
+    <th>Owner</th>
+  </tr>
+  {{range .PlanetHits}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td>{{.Coords}}</td>
+    <td>{{if .OwnerName}}<a href="/player/{{.OwnerID}}">{{.OwnerName}}</a>{{else}}<span class="muted">Uncolonized</span>{{end}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="3" class="muted">No matching planets.</td></tr>
+  {{end}}
+</table>
+</div>
+{{end}}
+
+{{template "foot" .}}
+{{end}}

@@ -92,6 +92,13 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /galaxy/{galaxy}/{system}", h.requireUser(h.GalaxyPage))
 	mux.HandleFunc("GET /reports", h.requireUser(h.ReportsPage))
 	mux.HandleFunc("GET /highscore", h.requireUser(h.HighscorePage))
+	mux.HandleFunc("GET /search", h.requireUser(h.SearchPage))
+	mux.HandleFunc("GET /player/{id}", h.requireUser(h.PlayerPage))
+	mux.HandleFunc("GET /settings", h.requireUser(h.SettingsRedirect))
+	mux.HandleFunc("GET /settings/account", h.requireUser(h.SettingsAccountPage))
+	mux.HandleFunc("POST /settings/account", h.requireUser(h.SettingsAccountSubmit))
+	mux.HandleFunc("GET /settings/game", h.requireUser(h.SettingsGamePage))
+	mux.HandleFunc("POST /settings/game", h.requireUser(h.SettingsGameSubmit))
 	mux.HandleFunc("POST /queue/{qid}/cancel", h.requireUser(h.QueueCancelSubmit))
 }
 
@@ -163,6 +170,9 @@ func (h *Handler) base(ctx context.Context, r *http.Request, userID int64, title
 	}
 	b.Flash = r.URL.Query().Get("ok")
 	b.Error = r.URL.Query().Get("err")
+	if st, err := h.auth.Settings(ctx, userID); err == nil {
+		b.NavRight = st.NavigationPosition == "right"
+	}
 	return b
 }
 
@@ -225,6 +235,8 @@ func msg(err error) string {
 		return "Target planet does not exist."
 	case errors.Is(err, store.ErrNotOwner):
 		return "You do not own that planet."
+	case errors.Is(err, store.ErrUserExists):
+		return "That username or email is already taken."
 	case errors.Is(err, store.ErrUnknownCode):
 		return "Unknown item."
 	default:
@@ -277,16 +289,16 @@ func (h *Handler) RegisterSubmit(w http.ResponseWriter, r *http.Request) {
 		h.render(w, "register", http.StatusBadRequest,
 			authData{baseData: baseData{Title: "Register", Error: m}, Login: username, Email: email})
 	}
-	if len(username) < 3 || len(username) > 32 {
-		fail("Username must be 3-32 characters")
+	if m := validateUsername(username); m != "" {
+		fail(m)
 		return
 	}
-	if !strings.Contains(email, "@") {
-		fail("Enter a valid email")
+	if m := validateEmail(email); m != "" {
+		fail(m)
 		return
 	}
-	if len(password) < 10 {
-		fail("Password must be at least 10 characters")
+	if m := validatePassword(password); m != "" {
+		fail(m)
 		return
 	}
 	hash, err := auth.HashPassword(password)
@@ -568,6 +580,9 @@ func (h *Handler) GalaxyPage(w http.ResponseWriter, r *http.Request) {
 			if row.PlanetID.Valid {
 				gr.PlanetID = row.PlanetID.Int64
 			}
+			if row.OwnerID.Valid {
+				gr.OwnerID = row.OwnerID.Int64
+			}
 			gr.Name = row.Name.String
 			gr.OwnerName = row.OwnerName.String
 			gr.IsHomeworld = row.IsHomeworld
@@ -643,6 +658,7 @@ func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
 		for i, p := range rows {
 			d.Players = append(d.Players, playerScoreRow{
 				Rank:           i + 1,
+				UserID:         p.UserID,
 				Username:       p.Username,
 				PlanetPoints:   int64(p.PlanetPoints + 0.5),
 				ResearchPoints: int64(p.ResearchPoints + 0.5),
@@ -653,6 +669,205 @@ func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.render(w, "highscore", http.StatusOK, d)
+}
+
+func (h *Handler) SearchPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+
+	d := searchData{baseData: h.base(ctx, r, userID, "Search", h.homeID(ctx, userID)), Query: q}
+	if q == "" {
+		h.render(w, "search", http.StatusOK, d)
+		return
+	}
+
+	if planets, err := h.planets.SearchPlanets(ctx, h.universeCode, q); err == nil {
+		for _, p := range planets {
+			d.PlanetHits = append(d.PlanetHits, planetSearchRow{
+				Name:      p.Name,
+				Coords:    coords(p.Galaxy, p.System, p.Position),
+				OwnerID:   p.OwnerID,
+				OwnerName: p.OwnerName,
+			})
+		}
+	}
+
+	needle := strings.ToLower(q)
+	if players, err := h.scores.Players(ctx, h.universeCode); err == nil {
+		var matches []store.PlayerScore
+		for _, p := range players {
+			if strings.Contains(strings.ToLower(p.Username), needle) {
+				matches = append(matches, p)
+			}
+		}
+		sort.SliceStable(matches, func(i, j int) bool { return matches[i].Total() > matches[j].Total() })
+		for _, p := range matches {
+			d.Players = append(d.Players, playerScoreRow{
+				UserID:         p.UserID,
+				Username:       p.Username,
+				PlanetPoints:   int64(p.PlanetPoints + 0.5),
+				ResearchPoints: int64(p.ResearchPoints + 0.5),
+				Total:          int64(p.Total() + 0.5),
+				Planets:        p.Planets,
+				IsMe:           p.UserID == userID,
+			})
+		}
+	}
+	h.render(w, "search", http.StatusOK, d)
+}
+
+func (h *Handler) PlayerPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	playerID, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	name, err := h.auth.Username(ctx, playerID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	d := playerData{
+		baseData: h.base(ctx, r, userID, "Player", h.homeID(ctx, userID)),
+		PlayerID: playerID,
+		Username: name,
+		IsMe:     playerID == userID,
+	}
+
+	if players, err := h.scores.Players(ctx, h.universeCode); err == nil {
+		sort.SliceStable(players, func(i, j int) bool { return players[i].Total() > players[j].Total() })
+		for i, p := range players {
+			if p.UserID == playerID {
+				d.Rank = i + 1
+				d.PlanetPoints = int64(p.PlanetPoints + 0.5)
+				d.ResearchPoints = int64(p.ResearchPoints + 0.5)
+				d.TotalPoints = int64(p.Total() + 0.5)
+				break
+			}
+		}
+	}
+
+	planetPoints := map[int64]int64{}
+	if scores, err := h.scores.Planets(ctx, h.universeCode); err == nil {
+		for _, p := range scores {
+			if p.OwnerID == playerID {
+				planetPoints[p.PlanetID] = int64(p.Points + 0.5)
+			}
+		}
+	}
+	planets, _ := h.planets.ListOwned(ctx, playerID)
+	for _, p := range planets {
+		d.PlanetRows = append(d.PlanetRows, playerPlanetRow{
+			Name:   p.Name,
+			Coords: coords(p.Galaxy, p.System, p.Position),
+			Points: planetPoints[p.ID],
+			IsHome: p.IsHomeworld,
+		})
+	}
+	h.render(w, "player", http.StatusOK, d)
+}
+
+func (h *Handler) SettingsRedirect(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+}
+
+func (h *Handler) SettingsAccountPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	d := settingsData{baseData: h.base(ctx, r, userID, "Settings", h.homeID(ctx, userID)), Tab: "account"}
+	d.Username, _ = h.auth.Username(ctx, userID)
+	d.Email, _ = h.auth.Email(ctx, userID)
+	h.render(w, "settings", http.StatusOK, d)
+}
+
+func (h *Handler) SettingsGamePage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	st, _ := h.auth.Settings(ctx, userID)
+	d := settingsData{
+		baseData:           h.base(ctx, r, userID, "Settings", h.homeID(ctx, userID)),
+		Tab:                "game",
+		NavigationPosition: st.NavigationPosition,
+		Locale:             st.Locale,
+		MessagesPerPage:    st.MessagesPerPage,
+		SpyShortcutCount:   st.SpyShortcutCount,
+		SpyLimitOnSpy:      st.SpyLimitOnSpy,
+	}
+	h.render(w, "settings", http.StatusOK, d)
+}
+
+func (h *Handler) SettingsAccountSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	back := "/settings/account"
+
+	hash, err := h.auth.PasswordHash(ctx, userID)
+	if err != nil || !auth.VerifyPassword(r.FormValue("currentPassword"), hash) {
+		flashRedirect(w, r, back, "", "Current password is incorrect.")
+		return
+	}
+
+	switch r.FormValue("action") {
+	case "username":
+		name := strings.TrimSpace(r.FormValue("name"))
+		if m := validateUsername(name); m != "" {
+			flashRedirect(w, r, back, "", m)
+			return
+		}
+		flashRedirect(w, r, back, "Username updated.", msg(h.auth.UpdateUsername(ctx, userID, name)))
+	case "email":
+		email := strings.ToLower(strings.TrimSpace(r.FormValue("mail")))
+		if m := validateEmail(email); m != "" {
+			flashRedirect(w, r, back, "", m)
+			return
+		}
+		flashRedirect(w, r, back, "Email updated.", msg(h.auth.UpdateEmail(ctx, userID, email)))
+	case "password":
+		first := r.FormValue("passwordFirst")
+		if m := validatePassword(first); m != "" {
+			flashRedirect(w, r, back, "", m)
+			return
+		}
+		if first != r.FormValue("passwordSecond") {
+			flashRedirect(w, r, back, "", "Passwords do not match.")
+			return
+		}
+		newHash, err := auth.HashPassword(first)
+		if err != nil {
+			flashRedirect(w, r, back, "", "Could not secure password.")
+			return
+		}
+		if err := h.auth.UpdatePassword(ctx, userID, newHash); err != nil {
+			flashRedirect(w, r, back, "", msg(err))
+			return
+		}
+		h.issueSession(w, r, userID)
+		flashRedirect(w, r, back, "Password updated.", "")
+	default:
+		flashRedirect(w, r, back, "", "Unknown action.")
+	}
+}
+
+func (h *Handler) SettingsGameSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+
+	st := store.DefaultUserSettings()
+	if r.FormValue("navigationPosition") == "right" {
+		st.NavigationPosition = "right"
+	}
+	if r.FormValue("locale") == "de" {
+		st.Locale = "de"
+	}
+	st.MessagesPerPage = clampInt(atoiDefault(r.FormValue("messagesPerPage"), st.MessagesPerPage), 1, 100)
+	st.SpyShortcutCount = clampInt(atoiDefault(r.FormValue("spyShortcutCount"), st.SpyShortcutCount), 0, 100)
+	st.SpyLimitOnSpy = clampInt(atoiDefault(r.FormValue("spyLimitOnSpy"), st.SpyLimitOnSpy), 0, 100000)
+
+	if err := h.auth.UpdateSettings(ctx, userID, st); err != nil {
+		flashRedirect(w, r, "/settings/game", "", "Could not save settings.")
+		return
+	}
+	flashRedirect(w, r, "/settings/game", "Settings saved.", "")
 }
 
 // ---- submit handlers ----
@@ -850,4 +1065,21 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func atoiDefault(s string, def int) int {
+	if n, err := strconv.Atoi(strings.TrimSpace(s)); err == nil {
+		return n
+	}
+	return def
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }

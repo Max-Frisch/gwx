@@ -55,6 +55,17 @@ type OwnedPlanet struct {
 	IsHomeworld bool
 }
 
+// SearchPlanet is a planet search hit with its owner (if colonized).
+type SearchPlanet struct {
+	ID        int64
+	Name      string
+	Galaxy    int
+	System    int
+	Position  int
+	OwnerID   int64
+	OwnerName string
+}
+
 // ScanRow is one slot in a galaxy/system scan.
 type ScanRow struct {
 	Position    int

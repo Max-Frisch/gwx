@@ -56,6 +56,8 @@ a:hover { color: var(--link-hi); text-decoration: underline; }
 
 /* ---- shell ---- */
 .app { display: flex; min-height: 100vh; }
+.app.nav-right { flex-direction: row-reverse; }
+.app.nav-right .sidebar { border-right: 0; border-left: 1px solid #0a0e15; }
 
 .sidebar {
   width: 244px; flex: 0 0 244px;

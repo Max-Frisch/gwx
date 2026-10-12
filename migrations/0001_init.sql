@@ -39,6 +39,10 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT uq_universe_email UNIQUE (universe_id, email)
 );
 
+-- Per-account UI/game preferences (interface settings etc.). Idempotent so it
+-- also lands on databases created before the column existed.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}'::jsonb;
+
 CREATE TABLE IF NOT EXISTS sessions (
     id           BIGSERIAL PRIMARY KEY,
     user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -17,6 +17,7 @@ type baseData struct {
 	ActivePlanetID int64
 	Planets        []store.OwnedPlanet
 	Resources      *resView
+	NavRight       bool
 	Flash          string
 	Error          string
 }
@@ -98,6 +99,7 @@ type galaxyRow struct {
 	Position    int
 	PlanetID    int64
 	Name        string
+	OwnerID     int64
 	OwnerName   string
 	IsHomeworld bool
 }
@@ -111,6 +113,7 @@ type reportRow struct {
 
 type playerScoreRow struct {
 	Rank           int
+	UserID         int64
 	Username       string
 	PlanetPoints   int64
 	ResearchPoints int64
@@ -133,6 +136,51 @@ type highscoreData struct {
 	Sort       string
 	Players    []playerScoreRow
 	PlanetRows []planetScoreRow
+}
+
+type planetSearchRow struct {
+	Name      string
+	Coords    string
+	OwnerID   int64
+	OwnerName string
+}
+
+type searchData struct {
+	baseData
+	Query      string
+	Players    []playerScoreRow
+	PlanetHits []planetSearchRow
+}
+
+type playerPlanetRow struct {
+	Name   string
+	Coords string
+	Points int64
+	IsHome bool
+}
+
+type playerData struct {
+	baseData
+	PlayerID       int64
+	Username       string
+	Rank           int
+	PlanetPoints   int64
+	ResearchPoints int64
+	TotalPoints    int64
+	IsMe           bool
+	PlanetRows     []playerPlanetRow
+}
+
+type settingsData struct {
+	baseData
+	Tab                string
+	Username           string
+	Email              string
+	NavigationPosition string
+	Locale             string
+	MessagesPerPage    int
+	SpyShortcutCount   int
+	SpyLimitOnSpy      int
 }
 
 type authData struct {

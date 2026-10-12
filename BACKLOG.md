@@ -25,6 +25,11 @@ Read first; one item per session. Keep this file short.
   (defense, trade, alliance, highscore/statistics, messages/events/search,
   premium/settings, login/overview). Spec now `info/galaxywars-spec/01`–`12`;
   implementation split into `I1`–`I9` in `info/sessions/`.
+- **I1 search + settings** — `/search` (planets by name, players by username),
+  `/player/{id}` profile (economy points + planets, no fleet info — fog of war),
+  and `/settings` with Account (rename / email / password, current-password
+  gated) and Game (nav position, locale, messages-per-page, spy knobs) tabs.
+  New `users.settings` JSONB; password change revokes other sessions.
 
 ## Todo (ordered)
 - [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
@@ -139,11 +144,12 @@ build task in `info/sessions/`:
 1. **Highscore / Hall of Fame** — *done* (Players + Planets). Compute economy
    points from `planet_items` (building levels) + `user_techs` (research
    levels). Economy/research only, no military points.
-2. **Account settings (`I1`)** — change username / email / password, plus
-   interface prefs (`navigationPosition`, `messagesPerPage`, `locale`); the auth
-   store already does hashing + sessions (`11-premium-settings.md`).
-3. **Search + player profile (`I1`)** — find planets by name and players by
-   username (`planets`, `users`); `/player/<uuid>` hub with trajectory + planets
+2. **Account settings (`I1`)** — *done.* Change username / email / password
+   (current password required; other sessions revoked), plus interface prefs
+   (`navigationPosition`, `messagesPerPage`, `locale`, spy knobs) in
+   `users.settings` (`11-premium-settings.md`).
+3. **Search + player profile (`I1`)** — *done.* Find planets by name and players
+   by username; `/player/{id}` hub with economy points + owned planets
    (`10-messages-events-search.md`).
 4. **Statistics from `reports` (`I4`)** — aggregate the combat JSONB payloads for
    destroyed / plundered. ("Recycled" needs debris first.)

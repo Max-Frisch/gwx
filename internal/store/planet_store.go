@@ -213,6 +213,34 @@ func (s *PlanetStore) Scan(ctx context.Context, universeCode string, galaxy, sys
 	return out, rows.Err()
 }
 
+// SearchPlanets finds planets whose name matches term (case-insensitive),
+// across the whole universe, with their owner when colonized.
+func (s *PlanetStore) SearchPlanets(ctx context.Context, universeCode, term string) ([]SearchPlanet, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT p.id, p.name, p.galaxy, p.system, p.position,
+		       COALESCE(p.user_id, 0), COALESCE(u.username, '')
+		FROM planets p
+		LEFT JOIN users u ON u.id = p.user_id
+		WHERE p.universe_id = (SELECT id FROM universes WHERE code_name = $1)
+		  AND p.name ILIKE '%' || $2 || '%'
+		ORDER BY p.name
+		LIMIT 100
+	`, universeCode, term)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SearchPlanet
+	for rows.Next() {
+		var p SearchPlanet
+		if err := rows.Scan(&p.ID, &p.Name, &p.Galaxy, &p.System, &p.Position, &p.OwnerID, &p.OwnerName); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 // FindAt returns the planet id at exact coordinates within a universe, or 0.
 func (s *PlanetStore) FindAt(ctx context.Context, universeCode string, g, sys, pos int) (int64, error) {
 	var id int64

@@ -1,0 +1,38 @@
+{{define "player"}}
+{{template "head" .}}
+<h1>{{.Username}}{{if .IsMe}} <span class="tag ok">you</span>{{end}}</h1>
+
+<div class="panel">
+  <div class="row">
+    <span class="muted">Rank</span>
+    <b>#{{.Rank}}</b>
+    <span class="spacer"></span>
+    <span class="muted">Total points</span>
+    <b>{{n .TotalPoints}}</b>
+    <span class="muted">Planet / Research</span>
+    <span>{{n .PlanetPoints}} / {{n .ResearchPoints}}</span>
+  </div>
+</div>
+
+<h2>Planets</h2>
+<div class="panel">
+<table>
+  <tr>
+    <th>Coordinates</th>
+    <th>Name</th>
+    <th>Points</th>
+  </tr>
+  {{range .PlanetRows}}
+  <tr>
+    <td>{{.Coords}}</td>
+    <td>{{.Name}}{{if .IsHome}} <span class="tag">main planet</span>{{end}}</td>
+    <td>{{n .Points}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="3" class="muted">No planets.</td></tr>
+  {{end}}
+</table>
+<small class="muted">Economy points only. Fleet and defense strength is never shown — fog of war stays intact.</small>
+</div>
+{{template "foot" .}}
+{{end}}

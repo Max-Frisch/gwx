@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"math/rand"
 	"time"
@@ -180,5 +181,111 @@ func (s *AuthStore) SessionUser(ctx context.Context, tokenHash string) (int64, e
 // DeleteSession revokes one session.
 func (s *AuthStore) DeleteSession(ctx context.Context, tokenHash string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = $1`, tokenHash)
+	return err
+}
+
+// Email returns a user's email address.
+func (s *AuthStore) Email(ctx context.Context, userID int64) (string, error) {
+	var email string
+	err := s.db.QueryRowContext(ctx, `SELECT email FROM users WHERE id = $1`, userID).Scan(&email)
+	if err == sql.ErrNoRows {
+		return "", ErrNotFound
+	}
+	return email, err
+}
+
+// PasswordHash returns the stored password hash for verification.
+func (s *AuthStore) PasswordHash(ctx context.Context, userID int64) (string, error) {
+	var hash string
+	err := s.db.QueryRowContext(ctx, `SELECT password_hash FROM users WHERE id = $1`, userID).Scan(&hash)
+	if err == sql.ErrNoRows {
+		return "", ErrNotFound
+	}
+	return hash, err
+}
+
+// UpdateUsername renames a player. Uniqueness violations map to ErrUserExists.
+func (s *AuthStore) UpdateUsername(ctx context.Context, userID int64, username string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET username = $2 WHERE id = $1`, userID, username)
+	return mapUniqueViolation(err)
+}
+
+// UpdateEmail changes a player's email. Uniqueness maps to ErrUserExists.
+func (s *AuthStore) UpdateEmail(ctx context.Context, userID int64, email string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET email = $2 WHERE id = $1`, userID, email)
+	return mapUniqueViolation(err)
+}
+
+// UpdatePassword sets a new password hash and revokes every existing session
+// (logout-everywhere). The caller re-issues a session for the current browser.
+func (s *AuthStore) UpdatePassword(ctx context.Context, userID int64, passwordHash string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET password_hash = $2 WHERE id = $1`, userID, passwordHash); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func mapUniqueViolation(err error) error {
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+		return ErrUserExists
+	}
+	return err
+}
+
+// UserSettings holds per-account UI and game preferences.
+type UserSettings struct {
+	NavigationPosition string `json:"navigationPosition"`
+	Locale             string `json:"locale"`
+	MessagesPerPage    int    `json:"messagesPerPage"`
+	SpyShortcutCount   int    `json:"spyShortcutCount"`
+	SpyLimitOnSpy      int    `json:"spyLimitOnSpy"`
+}
+
+// DefaultUserSettings returns the values used when nothing is stored yet.
+// gwx's own default nav is left (the reference's is right); the layout is
+// mirrored when a player picks "right".
+func DefaultUserSettings() UserSettings {
+	return UserSettings{
+		NavigationPosition: "left",
+		Locale:             "en",
+		MessagesPerPage:    10,
+		SpyShortcutCount:   1,
+		SpyLimitOnSpy:      200,
+	}
+}
+
+// Settings loads a user's preferences, falling back to defaults per field.
+func (s *AuthStore) Settings(ctx context.Context, userID int64) (UserSettings, error) {
+	settings := DefaultUserSettings()
+	var raw []byte
+	err := s.db.QueryRowContext(ctx, `SELECT settings FROM users WHERE id = $1`, userID).Scan(&raw)
+	if err == sql.ErrNoRows {
+		return settings, ErrNotFound
+	}
+	if err != nil {
+		return settings, err
+	}
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &settings)
+	}
+	return settings, nil
+}
+
+// UpdateSettings persists a user's preferences as a JSONB object.
+func (s *AuthStore) UpdateSettings(ctx context.Context, userID int64, settings UserSettings) error {
+	raw, err := json.Marshal(settings)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE users SET settings = $2 WHERE id = $1`, userID, raw)
 	return err
 }
