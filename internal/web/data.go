@@ -128,16 +128,75 @@ type planetScoreRow struct {
 	Rank      int
 	Name      string
 	Coords    string
+	OwnerID   int64
 	OwnerName string
 	Points    int64
 }
+
+type battleRow struct {
+	Rank      int
+	When      string
+	Attacker  string
+	Defender  string
+	Coords    string
+	Rounds    int
+	Destroyed int64
+	Plundered int64
+}
+
+// highscorePageSize is the reference leaderboard page length (100 rows).
+const highscorePageSize = 100
 
 type highscoreData struct {
 	baseData
 	Tab        string
 	Sort       string
+	Direction  string
 	Players    []playerScoreRow
 	PlanetRows []planetScoreRow
+	Battles    []battleRow
+	Page       int
+	Pages      int
+	PrevPage   int
+	NextPage   int
+}
+
+// SortURL is the header link for a sort key: clicking the active key flips the
+// direction, any other key picks a sensible default (names ascending,
+// scores descending).
+func (d highscoreData) SortURL(key string) string {
+	dir := "desc"
+	if key == "name" || key == "owner" {
+		dir = "asc"
+	}
+	if d.Sort == key {
+		if d.Direction == "asc" {
+			dir = "desc"
+		} else {
+			dir = "asc"
+		}
+	}
+	return "/highscore?tab=" + d.Tab + "&sort=" + key + "&direction=" + dir
+}
+
+// SortMark marks the active sort key with an arrow.
+func (d highscoreData) SortMark(key string) string {
+	if d.Sort != key {
+		return ""
+	}
+	if d.Direction == "asc" {
+		return " ▲"
+	}
+	return " ▼"
+}
+
+// PageURL links to another page while preserving the tab and sort order.
+func (d highscoreData) PageURL(n int) string {
+	u := "/highscore?tab=" + d.Tab
+	if d.Sort != "" {
+		u += "&sort=" + d.Sort + "&direction=" + d.Direction
+	}
+	return u + "&page=" + strconv.Itoa(n)
 }
 
 type statisticsData struct {

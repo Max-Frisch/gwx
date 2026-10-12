@@ -3,9 +3,14 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"time"
 
 	"gwx/internal/game"
 )
+
+// battlesReportLimit caps how many recent combat reports feed the Battles tab.
+const battlesReportLimit = 2000
 
 // ScoreStore computes economy leaderboards. Points are buildings + research
 // only; the game has no military points, so fleet/defense strength never shows.
@@ -218,6 +223,81 @@ func (s *ScoreStore) Planets(ctx context.Context, universeCode string) ([]Planet
 	out := make([]PlanetScore, 0, len(scores))
 	for _, ps := range scores {
 		out = append(out, *ps)
+	}
+	return out, nil
+}
+
+// BattleRow is one public battle headline. It never carries fleet or defense
+// composition — only the total resource value destroyed/plundered, the two
+// player names and the target coordinates. Fog of war holds.
+type BattleRow struct {
+	ID        int64
+	When      time.Time
+	Attacker  string
+	Defender  string
+	Coords    string
+	Rounds    int
+	Destroyed float64
+	Plundered float64
+}
+
+// Battles returns recent combat headlines for the universe. Each battle is
+// written as two combat reports (attacker + defender) inside one transaction,
+// so they share created_at; the attacker copy defines the row and the defender
+// copy supplies the defender's name (empty for attacks on unowned planets).
+func (s *ScoreStore) Battles(ctx context.Context, universeCode string) ([]BattleRow, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT r.id, u.username, r.created_at, r.payload
+		FROM reports r
+		JOIN users u ON u.id = r.user_id
+		WHERE r.kind = 'combat'
+		  AND r.universe_id = (SELECT id FROM universes WHERE code_name = $1)
+		ORDER BY r.created_at DESC, r.id DESC
+		LIMIT $2`, universeCode, battlesReportLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	defenders := map[string]string{}
+	order := make([]string, 0)
+	battles := map[string]BattleRow{}
+	for rows.Next() {
+		var id int64
+		var username string
+		var when time.Time
+		var raw []byte
+		if err := rows.Scan(&id, &username, &when, &raw); err != nil {
+			return nil, err
+		}
+		var rep game.CombatReport
+		if err := json.Unmarshal(raw, &rep); err != nil {
+			continue
+		}
+		key := rep.Target + "|" + when.UTC().Format(time.RFC3339Nano)
+		switch rep.Role {
+		case "defender":
+			defenders[key] = username
+		case "attacker":
+			if _, seen := battles[key]; seen {
+				continue
+			}
+			battles[key] = BattleRow{
+				ID: id, When: when, Attacker: username, Coords: rep.Target,
+				Rounds: rep.Rounds, Destroyed: rep.DestroyedValue(), Plundered: rep.LootValue(),
+			}
+			order = append(order, key)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]BattleRow, 0, len(order))
+	for _, key := range order {
+		b := battles[key]
+		b.Defender = defenders[key]
+		out = append(out, b)
 	}
 	return out, nil
 }

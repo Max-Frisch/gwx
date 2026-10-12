@@ -129,6 +129,10 @@ a:hover { color: var(--link-hi); text-decoration: underline; }
 .tabs a { padding: 8px 18px; color: #c2cad8; font-size: 13.5px; border-radius: 2px; }
 .tabs a:hover { background: rgba(255, 255, 255, .05); color: #fff; text-decoration: none; }
 .tabs a.active { background: var(--accent); color: #fff; }
+.tabs .disabled { padding: 8px 18px; color: var(--muted-2); font-size: 13.5px; cursor: not-allowed; }
+
+/* ---- pagination ---- */
+.pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 4px 0 16px; font-size: 12px; }
 
 /* ---- headings ---- */
 h1 { font-size: 19px; font-weight: 600; margin: 0 0 16px; color: #f0f3f8; }

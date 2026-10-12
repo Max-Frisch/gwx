@@ -801,50 +801,77 @@ func (h *Handler) messageAction(w http.ResponseWriter, r *http.Request, fn func(
 func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
 	userID, _ := h.userID(r)
 	ctx := r.Context()
-	tab := r.URL.Query().Get("tab")
-	if tab != "planets" {
+	q := r.URL.Query()
+
+	tab := q.Get("tab")
+	switch tab {
+	case "planets", "battles":
+	default:
 		tab = "players"
 	}
-	sortKey := r.URL.Query().Get("sort")
 
-	d := highscoreData{baseData: h.base(ctx, r, userID, "Highscore", h.homeID(ctx, userID)), Tab: tab, Sort: sortKey}
+	page, _ := strconv.Atoi(q.Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	direction := q.Get("direction")
+	if direction != "asc" {
+		direction = "desc"
+	}
 
-	if tab == "planets" {
+	d := highscoreData{baseData: h.base(ctx, r, userID, "Highscore", h.homeID(ctx, userID)), Tab: tab, Direction: direction}
+
+	switch tab {
+	case "planets":
+		d.Sort = planetSort(q.Get("sort"))
 		rows, _ := h.scores.Planets(ctx, h.universeCode)
 		sort.SliceStable(rows, func(i, j int) bool {
-			switch sortKey {
-			case "name":
-				return rows[i].Name < rows[j].Name
-			case "owner":
-				return rows[i].OwnerName < rows[j].OwnerName
-			default:
-				return rows[i].Points > rows[j].Points
-			}
+			return ordered(comparePlanets(rows[i], rows[j], d.Sort), direction)
 		})
-		for i, p := range rows {
+		start, end, pages, page := pageWindow(len(rows), page, highscorePageSize)
+		d.Page, d.Pages, d.PrevPage, d.NextPage = page, pages, page-1, page+1
+		for i := start; i < end; i++ {
+			p := rows[i]
 			d.PlanetRows = append(d.PlanetRows, planetScoreRow{
 				Rank:      i + 1,
 				Name:      p.Name,
 				Coords:    coords(p.Galaxy, p.System, p.Position),
+				OwnerID:   p.OwnerID,
 				OwnerName: p.OwnerName,
 				Points:    int64(p.Points + 0.5),
 			})
 		}
-	} else {
+	case "battles":
+		d.Sort = battleSort(q.Get("sort"))
+		rows, _ := h.scores.Battles(ctx, h.universeCode)
+		sort.SliceStable(rows, func(i, j int) bool {
+			return ordered(compareBattles(rows[i], rows[j], d.Sort), direction)
+		})
+		start, end, pages, page := pageWindow(len(rows), page, highscorePageSize)
+		d.Page, d.Pages, d.PrevPage, d.NextPage = page, pages, page-1, page+1
+		for i := start; i < end; i++ {
+			b := rows[i]
+			d.Battles = append(d.Battles, battleRow{
+				Rank:      i + 1,
+				When:      b.When.Format("2006-01-02 15:04"),
+				Attacker:  b.Attacker,
+				Defender:  b.Defender,
+				Coords:    b.Coords,
+				Rounds:    b.Rounds,
+				Destroyed: int64(b.Destroyed + 0.5),
+				Plundered: int64(b.Plundered + 0.5),
+			})
+		}
+	default:
+		d.Sort = playerSort(q.Get("sort"))
 		rows, _ := h.scores.Players(ctx, h.universeCode)
 		sort.SliceStable(rows, func(i, j int) bool {
-			switch sortKey {
-			case "planet":
-				return rows[i].PlanetPoints > rows[j].PlanetPoints
-			case "research":
-				return rows[i].ResearchPoints > rows[j].ResearchPoints
-			case "name":
-				return rows[i].Username < rows[j].Username
-			default:
-				return rows[i].Total() > rows[j].Total()
-			}
+			return ordered(comparePlayers(rows[i], rows[j], d.Sort), direction)
 		})
-		for i, p := range rows {
+		start, end, pages, page := pageWindow(len(rows), page, highscorePageSize)
+		d.Page, d.Pages, d.PrevPage, d.NextPage = page, pages, page-1, page+1
+		for i := start; i < end; i++ {
+			p := rows[i]
 			d.Players = append(d.Players, playerScoreRow{
 				Rank:           i + 1,
 				UserID:         p.UserID,
@@ -858,6 +885,147 @@ func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.render(w, "highscore", http.StatusOK, d)
+}
+
+// playerSort normalises a Players-tab sort key, accepting the legacy short
+// names so old bookmarks keep working.
+func playerSort(key string) string {
+	switch key {
+	case "name", "planetCount":
+		return key
+	case "planet", "planetPoints":
+		return "planetPoints"
+	case "research", "researchPoints":
+		return "researchPoints"
+	case "planets", "allPoints", "total", "":
+		return "allPoints"
+	default:
+		return "allPoints"
+	}
+}
+
+// planetSort normalises a Planets-tab sort key.
+func planetSort(key string) string {
+	switch key {
+	case "name", "owner":
+		return key
+	default:
+		return "points"
+	}
+}
+
+// battleSort normalises a Battles-tab sort key.
+func battleSort(key string) string {
+	switch key {
+	case "date", "loot":
+		return key
+	default:
+		return "destroyed"
+	}
+}
+
+func comparePlayers(a, b store.PlayerScore, key string) int {
+	switch key {
+	case "name":
+		return strings.Compare(a.Username, b.Username)
+	case "planetPoints":
+		return cmpFloat(a.PlanetPoints, b.PlanetPoints)
+	case "researchPoints":
+		return cmpFloat(a.ResearchPoints, b.ResearchPoints)
+	case "planetCount":
+		return cmpInt(int64(a.Planets), int64(b.Planets))
+	default:
+		return cmpFloat(a.Total(), b.Total())
+	}
+}
+
+func comparePlanets(a, b store.PlanetScore, key string) int {
+	switch key {
+	case "name":
+		return strings.Compare(a.Name, b.Name)
+	case "owner":
+		return strings.Compare(a.OwnerName, b.OwnerName)
+	default:
+		return cmpFloat(a.Points, b.Points)
+	}
+}
+
+func compareBattles(a, b store.BattleRow, key string) int {
+	switch key {
+	case "date":
+		return cmpTime(a.When, b.When)
+	case "loot":
+		return cmpFloat(a.Plundered, b.Plundered)
+	default:
+		return cmpFloat(a.Destroyed, b.Destroyed)
+	}
+}
+
+// ordered turns a compare result into a "before" predicate for the given
+// direction (ascending when "asc", otherwise descending).
+func ordered(comp int, direction string) bool {
+	if direction == "asc" {
+		return comp < 0
+	}
+	return comp > 0
+}
+
+func cmpFloat(a, b float64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func cmpInt(a, b int64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func cmpTime(a, b time.Time) int {
+	switch {
+	case a.Before(b):
+		return -1
+	case a.After(b):
+		return 1
+	default:
+		return 0
+	}
+}
+
+// pageWindow clamps page against the row count and returns the slice bounds,
+// total page count and the clamped page number.
+func pageWindow(total, page, perPage int) (start, end, pages, clamped int) {
+	pages = (total + perPage - 1) / perPage
+	if pages < 1 {
+		pages = 1
+	}
+	clamped = page
+	if clamped < 1 {
+		clamped = 1
+	}
+	if clamped > pages {
+		clamped = pages
+	}
+	start = (clamped - 1) * perPage
+	end = start + perPage
+	if end > total {
+		end = total
+	}
+	if start > total {
+		start = total
+	}
+	return start, end, pages, clamped
 }
 
 func (h *Handler) StatisticsPage(w http.ResponseWriter, r *http.Request) {

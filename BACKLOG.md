@@ -45,6 +45,12 @@ Read first; one item per session. Keep this file short.
   win/loss/tie), Farming balance (raids, loot totals, average haul) and Resources
   (plundered vs lost). Combat reports now record per-unit losses and the viewer's
   role; `StatsStore` aggregates the player's own JSONB payloads (`I4-statistics.md`).
+- **I5 highscore expansion** — Highscore now has Players / Alliances (disabled
+  placeholder, pending I6) / Planets / Battles tabs with server-side
+  `?sort=&direction=&page=` (100/page, reference query shape). Battles is a
+  gwx-native headline view built from `reports` (`ScoreStore.Battles`): date,
+  attacker/defender, coordinates, total destroyed + plundered resource value.
+  No fleet/defense composition is ever exposed (`I5-highscore-expansion.md`).
 
 ## Todo (ordered)
 - [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
@@ -54,9 +60,6 @@ Read first; one item per session. Keep this file short.
 - [ ] **Moon** — optional moon chance on large attacks; jump gate later.
       (Legacy/misread: reference GW has no moons; `[M]` means *main planet*.)
 - [ ] **Seasonal lifecycle** — automatic archive/reset at `ENDS_AT`; round seeding.
-- [ ] **Highscore expansion** — remaining Highscore tabs (Alliances, Battles).
-      Economy/research points only, never fleet composition. (Statistics pages
-      done — see I4.)
 - [ ] **JSON API** — thin `/api/v1` surface for tooling/bots.
 - [ ] **Full-loop integration test** — register → … → abandon.
 - [ ] **Anti-farm / noob protection** — optional points-ratio guard.
@@ -111,7 +114,8 @@ Settings**, Logout. (Bold = we don't have it.)
   trading fleets, quick-add amount buttons, flagged/marked trades.
 - **Alliance**: tags (e.g. `[ThF-]`), membership, diplomacy, shared board.
 - **Highscore**: tabs for Players / Alliances / Planets / Battles; columns
-  Planet points / Research points / Total points / Planets.
+  Planet points / Research points / Total points / Planets. *(Players + Planets +
+  Battles done in I5; Alliances placeholder until I6.)*
   NOTE: this does **not** conflict with fog-of-war. The game HAS points, but
   only **economy points (buildings + research)** — there are **no military
   points** (no fleet/defense score). That is the whole point: a 10k-point player
@@ -174,8 +178,10 @@ build task in `info/sessions/`:
 6. **Messages from `reports` + system feed (`I2`)** — *done.* `/messages` lists
    combat/espionage reports by kind plus system notifications with read/archive/
    delete and an unread badge (`10-messages-events-search.md`).
-7. **Highscore expansion (`I5`)** — Alliances tab (`ScoreStore.Alliances`
-   aggregation) and sortable Players headers; *Battles* is external-only.
+7. **Highscore expansion (`I5`)** — *done.* Alliances tab is a disabled
+   placeholder until I6 lands; Players headers are sortable with the reference
+   `?sort=&direction=&page=` shape; *Battles* is a gwx-native headline view over
+   `reports` (`ScoreStore.Battles`), no composition leaked.
 8. **Static Help / Game rules pages + footer links** — pure templates.
 9. **Roster additions that work with today's combat model** — new ships
    (Jackal, Renegade, Raider, Falcon, Tjuger, Longeagle V, Noah, Small/Large

@@ -23,6 +23,21 @@ func TestLossValue(t *testing.T) {
 	}
 }
 
+func TestCombatReportValues(t *testing.T) {
+	rep := CombatReport{
+		AttackerLosses: map[string]int64{"cougar": 1},
+		DefenderLosses: map[string]int64{"defense_turret": 2},
+		Loot:           Loot{Metal: 1000, Hydrogen: 500},
+	}
+	// Cougar 4100 + 2 × Defense Turret 2500 = 9100.
+	if got := rep.DestroyedValue(); got != 9100 {
+		t.Errorf("DestroyedValue = %v, want 9100", got)
+	}
+	if got := rep.LootValue(); got != 1500 {
+		t.Errorf("LootValue = %v, want 1500", got)
+	}
+}
+
 func TestSimulateRecordsPerUnitLosses(t *testing.T) {
 	res := Simulate(map[string]int64{"longeagle_x": 50}, map[string]int64{"defense_turret": 5}, 0, 0, 6)
 	if got := res.DefenderLosses["defense_turret"]; got != 5 {

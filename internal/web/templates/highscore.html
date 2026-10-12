@@ -2,7 +2,9 @@
 {{template "head" .}}
 <div class="tabs">
   <a href="/highscore?tab=players" class="{{if eq .Tab "players"}}active{{end}}">Players</a>
+  <span class="disabled" title="Alliances arrive with the alliance update">Alliances</span>
   <a href="/highscore?tab=planets" class="{{if eq .Tab "planets"}}active{{end}}">Planets</a>
+  <a href="/highscore?tab=battles" class="{{if eq .Tab "battles"}}active{{end}}">Battles</a>
 </div>
 
 {{if eq .Tab "planets"}}
@@ -11,15 +13,15 @@
 <table>
   <tr>
     <th>#</th>
-    <th><a href="/highscore?tab=planets&sort=name">Planet</a></th>
-    <th><a href="/highscore?tab=planets&sort=owner">Owner</a></th>
-    <th><a href="/highscore?tab=planets&sort=points">Points</a></th>
+    <th><a href="{{.SortURL "name"}}">Planet{{.SortMark "name"}}</a></th>
+    <th><a href="{{.SortURL "owner"}}">Owner{{.SortMark "owner"}}</a></th>
+    <th><a href="{{.SortURL "points"}}">Points{{.SortMark "points"}}</a></th>
   </tr>
   {{range .PlanetRows}}
   <tr>
     <td class="muted">{{.Rank}}</td>
     <td>{{.Name}} <span class="muted">{{.Coords}}</span></td>
-    <td>{{if .OwnerName}}{{.OwnerName}}{{else}}<span class="muted">Uncolonized</span>{{end}}</td>
+    <td>{{if .OwnerName}}<a href="/player/{{.OwnerID}}">{{.OwnerName}}</a>{{else}}<span class="muted">Uncolonized</span>{{end}}</td>
     <td>{{n .Points}}</td>
   </tr>
   {{else}}
@@ -27,17 +29,50 @@
   {{end}}
 </table>
 </div>
+{{template "highscore-pager" .}}
+
+{{else if eq .Tab "battles"}}
+<h1>Highscore <span class="muted">Battles</span></h1>
+<div class="panel">
+<table>
+  <tr>
+    <th>#</th>
+    <th><a href="{{.SortURL "date"}}">Date{{.SortMark "date"}}</a></th>
+    <th>Attacker</th>
+    <th>Defender</th>
+    <th>Coordinates</th>
+    <th><a href="{{.SortURL "destroyed"}}">Destroyed{{.SortMark "destroyed"}}</a></th>
+    <th><a href="{{.SortURL "loot"}}">Plundered{{.SortMark "loot"}}</a></th>
+  </tr>
+  {{range .Battles}}
+  <tr>
+    <td class="muted">{{.Rank}}</td>
+    <td class="muted">{{.When}}</td>
+    <td>{{.Attacker}}</td>
+    <td>{{if .Defender}}{{.Defender}}{{else}}<span class="muted">Uncolonized</span>{{end}}</td>
+    <td class="muted">{{.Coords}}</td>
+    <td class="bad">{{n .Destroyed}}</td>
+    <td class="m">{{n .Plundered}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="7" class="muted">No battles yet.</td></tr>
+  {{end}}
+</table>
+</div>
+{{template "highscore-pager" .}}
+<small class="muted">Headlines only — total resource value destroyed and plundered. No fleet or defense composition is ever shown.</small>
+
 {{else}}
 <h1>Highscore <span class="muted">Players</span></h1>
 <div class="panel">
 <table>
   <tr>
     <th>#</th>
-    <th><a href="/highscore?tab=players&sort=name">Player</a></th>
-    <th><a href="/highscore?tab=players&sort=planet">Planet points</a></th>
-    <th><a href="/highscore?tab=players&sort=research">Research points</a></th>
-    <th><a href="/highscore?tab=players&sort=total">Total points</a></th>
-    <th>Planets</th>
+    <th><a href="{{.SortURL "name"}}">Player{{.SortMark "name"}}</a></th>
+    <th><a href="{{.SortURL "planetPoints"}}">Planet points{{.SortMark "planetPoints"}}</a></th>
+    <th><a href="{{.SortURL "researchPoints"}}">Research points{{.SortMark "researchPoints"}}</a></th>
+    <th><a href="{{.SortURL "allPoints"}}">Total points{{.SortMark "allPoints"}}</a></th>
+    <th><a href="{{.SortURL "planetCount"}}">Planets{{.SortMark "planetCount"}}</a></th>
   </tr>
   {{range .Players}}
   <tr>
@@ -53,8 +88,21 @@
   {{end}}
 </table>
 </div>
+{{template "highscore-pager" .}}
 {{end}}
 
+{{if ne .Tab "battles"}}
 <small class="muted">Economy points only — buildings + research. Fleet and defense strength is never shown: nobody can tell a 20-ship trader from a hidden monster fleet.</small>
+{{end}}
 {{template "foot" .}}
+{{end}}
+
+{{define "highscore-pager"}}
+{{if gt .Pages 1}}
+<div class="pager">
+  {{if gt .Page 1}}<a class="btn ghost" href="{{.PageURL .PrevPage}}">← Newer</a>{{end}}
+  <span class="muted">Page {{.Page}} / {{.Pages}}</span>
+  {{if lt .Page .Pages}}<a class="btn ghost" href="{{.PageURL .NextPage}}">Older →</a>{{end}}
+</div>
+{{end}}
 {{end}}

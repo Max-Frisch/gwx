@@ -49,6 +49,17 @@ func LossValue(units map[string]int64) float64 {
 	return total
 }
 
+// DestroyedValue is the total resource value destroyed on both sides of the
+// battle, using the catalog cost of every lost unit.
+func (r CombatReport) DestroyedValue() float64 {
+	return LossValue(r.AttackerLosses) + LossValue(r.DefenderLosses)
+}
+
+// LootValue is the total resource value the attacker plundered.
+func (r CombatReport) LootValue() float64 {
+	return float64(r.Loot.Metal + r.Loot.Lutinum + r.Loot.Water + r.Loot.Hydrogen)
+}
+
 // UnitStat is one row of the battle-balance tables: how many units of a type
 // the player destroyed and how many they lost.
 type UnitStat struct {
