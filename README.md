@@ -83,8 +83,8 @@ universe, or a fast seasonal one.
    (`Storage(L) = 60_000·L² + 300_000` in the capture). A cushion always
    survives a raid.
 
-Combat is a simple aggregate, simultaneous-fire model with **rapid-fire off**
-(see the backlog). Shields fully regenerate each round.
+Combat is a simple aggregate, simultaneous-fire model with **no rapid-fire**
+(the reference has none); shields fully regenerate each round.
 
 ## Architecture
 

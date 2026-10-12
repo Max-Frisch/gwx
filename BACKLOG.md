@@ -118,20 +118,40 @@ Read first; one item per session. Keep this file short.
   capacity, plunder-protected share). Catalog gained `Group`/`Desc`/`Icon`.
   Perf: **no `backdrop-filter` on per-card/list items** — it re-blurred the fixed
   starfield every scroll frame and janked long lists.
+- **U1 UI refresh** — responsive + fast layout landed: design-token layer, vendored
+  htmx for partial updates (queue/resource/build), mobile off-canvas nav, live
+  resource ticker and self-polling queue countdown; no per-item blur.
 
 ## Todo (ordered)
-- [ ] **U1 UI refresh** (`info/sessions/U1-ui-refresh.md`) — responsive + fast
-      layout: design-token layer in `app.css`, **vendored htmx** (no build step)
-      for partial updates (queue/resource/build), mobile breakpoints, visual
-      polish pass, and performance guardrails (no per-item blur;
-      `content-visibility` for long lists). Chosen stack: stdlib
-      `html/template` + hand-written CSS + htmx (no Tailwind/Templ/Node).
-- [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
+
+**Next up — start here:** build **Debris + Recycler**. No debris field and no
+recycle mission: recovery happens during combat resolution. Recyclers must be in
+the attacking fleet (or on the planet when the **defender** wins) and recover
+`20% + 1% × Recycling Technology level` of the resource value of **both sides'**
+destroyed ships/defense, capped by Recycler cargo; overflow is lost. Pick up at:
+`internal/game/combat.go` (already returns per-unit losses), `internal/engine/event_engine.go`
+(apply recovery where attack loot is settled), Recycler `Cargo` in `catalog.go`
+(+`game.CargoCapacity`), and the combat-report payload. Then **Attack techs**
+(per-unit energy/explosive weapon type, `10·√L %`), then **Combat win chance**.
+
+- [ ] **Attack techs** — Energy Focusing and Explosive Projectiles are real
+      **attack techs**, each granting `10·√L %` attack to its weapon class (the
+      captured `Bonus` column). Give units a weapon type (energy vs explosive),
+      wire both, and replace today's single flat `+10%/level` weapon tech.
+- [ ] **Debris + Recycler** — no debris **field** and no recycle **mission** (as
+      in GW): recovery happens during/after combat. The winner recovers
+      `20% + 1% × Recycling Technology level` of the resource value of **both
+      sides'** destroyed ships/defense, capped by the **Recycler cargo** in the
+      attacking fleet; if the **defender wins**, the planet's own Recyclers
+      collect. Overflow is lost; with no Recyclers nothing is recovered.
+- [ ] **Combat win chance** — keep the deterministic aggregate engine but compute
+      and show a **win probability** in the simulator (the reference exposes only
+      a % win/lose chance; even 99.98% can lose). Rapid Fire is not in the
+      reference — dropped, so there is no per-unit rapid-fire table.
+- [ ] **Espionage quick dispatch** — wire the stored `settings.spyShortcutCount`
+      into the galaxy view's "send spy probe(s)" action (probe count).
 - [ ] **Alliance diplomacy** — NAP/war declarations between alliances (follow-up
       to I6; membership, ranks, applications and the shared board already land).
-- [ ] **Debris + Recycler** — battle debris field at `debris_rate`, recycle mission.
-- [ ] **Moon** — optional moon chance on large attacks; jump gate later.
-      (Legacy/misread: reference GW has no moons; `[M]` means *main planet*.)
 - [ ] **Seasonal lifecycle** — automatic archive/reset at `ENDS_AT`; round seeding.
 - [ ] **JSON API** — thin `/api/v1` surface for tooling/bots.
 - [ ] **Anti-farm / noob protection** — optional points-ratio guard.
@@ -194,13 +214,16 @@ Settings**, Logout. (Bold = we don't have it.)
   can field 10× the ships of a 50k-point player who sank everything into
   infrastructure/research. So a leaderboard is fully consistent with the design.
 - **Statistics**: Battle balance, Farming balance, Resources, Recycled
-  resources (destroyed / plundered / gained / lost).
+  resources (destroyed / plundered / gained / lost). The reference's "Account
+  level" is undefined/pointless — **scrapped**, no curve to model.
 - **Messages** (inbox) and **Search** (player/planet lookup).
 - **Events** feed.
 - **Premium** (out of scope), **Vacation mode**, **Sanctions** (*both done in
   `I9`*).
-- **Settings → Game**: quick-dispatch probe count, max recon probes, raid order,
-  fleet labels, tactical retreat, interface/messages-per-page options.
+- **Settings → Game**: quick-dispatch probe count (**integer**
+  `spyShortcutCount`, used by the galaxy "send spy probe(s)" action), max recon
+  probes, raid order, fleet labels, tactical retreat, interface/messages-per-page
+  options.
 - **Settings → Account**: rename/email/password, reset/delete account, profile
   picture, external applications.
 - **`[M]` tag** = **Main Planet** (= homeworld), *not* a moon. **GW has no
@@ -212,7 +235,9 @@ Settings**, Logout. (Bold = we don't have it.)
 - Techs: Space Curvature Drive, Ionization, Energy Focusing, Explosive
   Projectiles, Spy Technology, Advanced Ship Armor, Increased Cargo Capacity,
   Recycling Technology. Effects now known: drives = speed + `−0.5%/lvl` fuel;
-  utility techs = `10·√L %`; recycling = `1%/lvl` debris.
+  weapons techs (Ionization / Energy Focusing / Explosive Projectiles) and the
+  other utility techs = `10·√L %`; recycling = `20% + 1%/lvl` of destroyed value
+  recovered during combat.
   Recycling Technology has *two* jobs: (1) unlock the Recycler ship
   (req: Ship Factory 1 + Combustion Drive 2), (2) raise the % of debris
   collected. Debris never appears on the planet — it is hauled directly
@@ -267,6 +292,7 @@ Alliances (`I6`, *done* — diplomacy still open), Trade/market (`I7`, *done*),
 Events feed (`I3`, *done* — derived, no table), Vacation mode + sanctions
 (`I9`, *done* — scheduler-supported).
 
-**Not standalone** (need a new mechanic first): debris + Recycling Technology,
-Advanced Ship Armor hull bonus, extra cargo tech, Space Curvature Drive
-movement effect, Premium (out of scope — no monetisation).
+**Designed, not yet built:** debris/recycler recovery (see Todo — no field, no
+mission; recyclers must be in the attacking fleet or on the attacked planet).
+**Not standalone** (need a new mechanic first): Advanced Ship Armor hull bonus,
+Space Curvature Drive movement effect, Premium (out of scope — no monetisation).
