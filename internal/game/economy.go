@@ -49,6 +49,9 @@ type PlanetEconomy struct {
 	LutinumProd  float64
 	WaterProd    float64
 	HydrogenProd float64
+	// WaterUse is the hourly water draw of both hydrogen factories combined
+	// (5 × base-factory H₂ + 2 × advanced-factory H₂).
+	WaterUse float64
 
 	MetalCap    int64
 	LutinumCap  int64
@@ -70,7 +73,13 @@ func Recompute(structures map[string]int, techs map[string]int, speed float64) P
 	e.MetalProd = Production("iron_mine", lvl("iron_mine"), speed)
 	e.LutinumProd = Production("lutinum_mine", lvl("lutinum_mine"), speed)
 	e.WaterProd = Production("water_extractor", lvl("water_extractor"), speed)
-	e.HydrogenProd = Production("chemical_factory", lvl("chemical_factory"), speed)
+
+	// Both factories draw from the same water pool; outputs and draws add up.
+	// Chemical Factory is 5:1, Advanced Chemical Factory is 2:1.
+	hBase := Production("chemical_factory", lvl("chemical_factory"), speed)
+	hAdv := Production("advanced_chemical_factory", lvl("advanced_chemical_factory"), speed)
+	e.HydrogenProd = hBase + hAdv
+	e.WaterUse = 5*hBase + 2*hAdv
 
 	e.MetalCap = StorageCapacity(Catalog["iron_storage"].ProdBase, lvl("iron_storage"))
 	e.LutinumCap = StorageCapacity(Catalog["lutinum_storage"].ProdBase, lvl("lutinum_storage"))

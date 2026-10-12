@@ -10,6 +10,10 @@ Read first; one item per session. Keep this file short.
 - Catalog: 13 buildings, 8 research, 6 ships, 8 defenses (original GW names).
 - Economy: ground-truth per-level production tables (no energy gate), storages,
   protected floor.
+- **Economy fidelity** — energy fully ripped out (GalaxyWars has none); exact
+  per-level production tables; Chemical Factory (5:1) + Advanced Chemical
+  Factory (2:1) draw from one shared water pool and add up; two speed modifiers
+  (`GAME_SPEED`, `FLEET_SPEED`).
 - Fleet missions: Transport, Deploy, Attack, Espionage, Colonize; combat + loot
   (no rapid-fire) + return leg; combat/espionage reports.
 - Auth (PBKDF2 + opaque sessions), registration → homeworld.
@@ -167,8 +171,8 @@ Settings**, Logout. (Bold = we don't have it.)
 - Defense: Light Laser Turret, Laser Turret, EMP Launcher, Plasma Turret,
   Rocket Launchers — costs/stats now captured in `03-combat.md` (see the
   "Defense" headline above), all gated by Orbital Defense Station 1.
-- Buildings: Trading Post, Advanced Chemical Factory (water→H₂ 2:1 vs 5:1);
-  alt names Lutinum Refinery / Ship Factory / Water Tanks / Hydrogen Tanks.
+- Buildings: Trading Post; alt names Lutinum Refinery / Ship Factory /
+  Water Tanks / Hydrogen Tanks. (Advanced Chemical Factory is now implemented.)
 
 ### Ready to build now (existing data / mechanics only — no live data)
 

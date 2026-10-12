@@ -108,14 +108,14 @@ func createHomeworld(ctx context.Context, tx *sql.Tx, universeUUID string, userI
 				metal, lutinum, water, hydrogen,
 				metal_cap, lutinum_cap, water_cap, hydrogen_cap,
 				metal_prod, lutinum_prod, water_prod, hydrogen_prod,
-				energy_prod, protected_metal, protected_lutinum, protected_water, protected_hydrogen
+				protected_metal, protected_lutinum, protected_water, protected_hydrogen
 			) VALUES (
 				$1, $2, $3, $4, $5, $6, TRUE,
 				12800, $7, 1,
 				$8, $9, $10, 0,
 				20000, 20000, 20000, 20000,
 				0, 0, 0, 0,
-				30, 4000, 4000, 4000, 4000
+				4000, 4000, 4000, 4000
 			)
 			ON CONFLICT (universe_id, galaxy, system, position) DO NOTHING
 			RETURNING id

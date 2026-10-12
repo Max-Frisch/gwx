@@ -109,8 +109,9 @@ date/time | item (code/name) | level | cost shown | build time shown | productio
 - Full **catalog**: names, costs, cost factors, build times, prerequisites,
   combat stats, cargo/speed/fuel, research effects (incl. Recycling Tech's two
   jobs, debris %).
-- **Economy formulas**: mine/refinery production, hydrogen conversion, energy,
-  storage caps, protected floor, points (we use 1 pt / 1000 resources).
+- **Economy formulas**: mine/refinery production, hydrogen conversion (5:1 and
+  2:1), storage caps, protected floor, points (we use 1 pt / 1000 resources).
+  (No energy — GalaxyWars has none.)
 - **Combat**: attack/shield/hull, per-unit **rapid-fire** table, debris rate,
   loot, shield regen.
 - **Fleet**: speed/distance/fuel formulas and mission behaviour.

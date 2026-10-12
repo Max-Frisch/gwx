@@ -33,6 +33,7 @@ type Planet struct {
 	LutinumProd  float64
 	WaterProd    float64
 	HydrogenProd float64
+	WaterUse     float64
 
 	ProtectedMetal    int64
 	ProtectedLutinum  int64

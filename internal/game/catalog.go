@@ -16,7 +16,8 @@ const (
 )
 
 // Resources is a four-resource amount. Water is a raw resource that the
-// chemical factory converts 1:1 into hydrogen.
+// Chemical Factory converts 5:1 into hydrogen and the Advanced Chemical
+// Factory converts 2:1.
 type Resources struct {
 	Metal    float64 `json:"metal"`
 	Lutinum  float64 `json:"lutinum"`
@@ -66,6 +67,7 @@ var Catalog = func() map[string]Def {
 		{Code: "lutinum_mine", Name: "Lutinum Mine", Kind: KindBuilding, Cost: Resources{Metal: 48, Lutinum: 24}, CostFactor: 1.6, TimeSecs: 40, TimeFactor: 1.25, Produces: "lutinum"},
 		{Code: "water_extractor", Name: "Drilling Tower", Kind: KindBuilding, Cost: Resources{Metal: 60, Lutinum: 40}, CostFactor: 1.5, TimeSecs: 45, TimeFactor: 1.25, Produces: "water"},
 		{Code: "chemical_factory", Name: "Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 200, Lutinum: 100, Water: 100}, CostFactor: 1.6, TimeSecs: 60, TimeFactor: 1.25, Produces: "hydrogen", Prereqs: map[string]int{"water_extractor": 1}},
+		{Code: "advanced_chemical_factory", Name: "Advanced Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 20000, Lutinum: 15000, Hydrogen: 1000}, CostFactor: 1.7, TimeSecs: 3000, TimeFactor: 1.3, Produces: "hydrogen", Prereqs: map[string]int{"water_extractor": 10, "command_center": 6}},
 		{Code: "fusion_reactor", Name: "Fusion Reactor", Kind: KindBuilding, Cost: Resources{Metal: 400, Lutinum: 200, Water: 300}, CostFactor: 1.6, TimeSecs: 90, TimeFactor: 1.3, Prereqs: map[string]int{"research_center": 1}},
 
 		// ---- Buildings: storages ----

@@ -85,7 +85,7 @@
         <div class="cell"><span class="k">Iron</span><span class="v">{{nf .Resources.Metal}}</span><span class="s">{{n .Resources.MetalCap}} · +{{nf .Resources.MetalProd}}/h</span></div>
         <div class="cell"><span class="k">Lutinum</span><span class="v">{{nf .Resources.Lutinum}}</span><span class="s">{{n .Resources.LutinumCap}} · +{{nf .Resources.LutinumProd}}/h</span></div>
         <div class="cell"><span class="k">Water</span><span class="v">{{nf .Resources.Water}}</span><span class="s">{{n .Resources.WaterCap}} · +{{nf .Resources.WaterProd}}/h</span></div>
-        <div class="cell"><span class="k">Hydrogen</span><span class="v">{{nf .Resources.Hydrogen}}</span><span class="s">{{n .Resources.HydrogenCap}} · +{{nf .Resources.HydrogenProd}}/h</span></div>
+        <div class="cell"><span class="k">Hydrogen</span><span class="v">{{nf .Resources.Hydrogen}}</span><span class="s">{{n .Resources.HydrogenCap}} · +{{nf .Resources.HydrogenProd}}/h{{if gt .Resources.WaterUse 0.0}} (−{{nf .Resources.WaterUse}} Wa/h){{end}}</span></div>
       </div>
     </header>
     {{end}}

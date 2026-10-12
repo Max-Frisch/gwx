@@ -112,7 +112,7 @@ base output is intentionally **not** modelled.
 - **Login form** (`internal/web/templates/auth.html:5`): fields `login`
   (username **or** email) + `password`; no CSRF token.
 - **Overview** (`internal/web/templates/overview.html`): planet name+coords,
-  **Empire** card (fields/diameter/energy), **Stockpile** card (four resources +
+  **Empire** card (fields/diameter), **Stockpile** card (four resources +
   protected floor), **Active queues** table
   (`type / item / finishes`), **Incoming fleets** table
   (`mission / from / arrives`). Nav + resource strip live in

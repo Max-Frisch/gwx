@@ -87,13 +87,13 @@ A fourth Uni5 HAR followed the same account to a **newly colonized planet**
 - Sources: **uni5 HARs lead**. A mid-game account is enough because of the
   adaptive level selector (see below); the fresh **Uni6 (Oct 17)** capture is
   optional/confirmatory for spawn defaults + early flow.
-- **Speeds:** the Uni5 reference ran at **2× game speed / 1× fleet speed**, so
-  every duration/production figure mined from it is at 2× (build/research/
-  production halved vs a 1× round). gwx is deliberately configured at
-  **`GAME_SPEED=1`, `RESOURCE_SPEED=1`, `FLEET_SPEED=1`** (`internal/config`), i.e.
-  **1× / 1×**, so the capture's speed multiplier is *not* baked into the catalog —
-  it can be applied cleanly later via the universe-speed knobs. When porting a
-  reference time, multiply by 2 to recover the 1× figure.
+- **Speeds:** the Uni5 reference ran at **2× game speed / 1× fleet speed**. gwx
+  treats the captured production tables as the **x1 base** (the 2× is context
+  only) and exposes exactly **two** runtime modifiers — `GAME_SPEED`
+  (build/research time **and** resource production) and `FLEET_SPEED`
+  (`internal/config`) — so the capture's multiplier is *not* baked into the
+  catalog. There is no energy system; water→hydrogen (5:1 / 2:1) is the only
+  production coupling.
 - HARs stay private (git-ignored); the derived spec is committed under
   `info/galaxywars-spec/`.
 
@@ -139,8 +139,8 @@ with `tools/har/harscan.py` → `extract_catalog.py` → `extract_pages.py` →
 4. Produce `info/galaxywars-spec/`:
    - `01-catalog.md` — buildings/ships/defense/research: costs, factors, times,
      stats, prereqs, effects (incl. Recycling Tech's two jobs).
-   - `02-economy-formulas.md` — production, energy, storage, protected floor,
-     points; tech bonus formulas.
+   - `02-economy-formulas.md` — production (H₂ 5:1 / 2:1; no energy), storage,
+     protected floor, points; tech bonus formulas.
    - `03-combat.md` — attack/shield/hull, rapid-fire table, debris rate, loot.
    - `04-fleet.md` — speed/fuel/range/distance, mission behaviour.
    - `05-ui-flows.md` — trade/marketplace, settings, statistics, highscore

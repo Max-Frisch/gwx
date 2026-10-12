@@ -20,6 +20,7 @@ Append one line per completed session: `date | session | result | commit`.
 2026-10-12 | I6 | alliances: directory/profile/create/apply/accept, internal members/board/management; fixed MEMBER/OFFICER/LEADER rights in AllianceStore; 0003 migration; highscore Alliances tab + [TAG] in galaxy/highscore/search/player | (this commit)
 2026-10-12 | I7 | trade: /trade marketplace (public+private offers, filters), /trade/new (escrowed barter + 2% offer fee), accept/revoke, /trade/history, /trade/storage (credit all, expiry); Trading Post building + 0004 migration; game.Settle fee math | (this commit)
 2026-10-12 | economy | drop the energy system; exact per-level production tables (x1 base, Uni5 2× = context); water→H₂ 5:1 (consumption = 5×H₂) in update_planet_resources (0005); exactly two speed modifiers (GAME_SPEED = build+research+production, FLEET_SPEED) | (this commit)
+2026-10-12 | economy2 | rip out OGame energy everywhere (drop energy_used/energy_prod, schema + insert); implement Advanced Chemical Factory (water→H₂ 2:1) alongside Chemical Factory (5:1), both drawing one shared water pool that adds up and throttles together at zero (new planets.water_use + 0006 function); docs | (this commit)
 ```
 
 ## Recon (2026-10-12)

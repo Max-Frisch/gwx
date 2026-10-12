@@ -52,11 +52,13 @@ universe, or a fast seasonal one.
 ## The game
 
 - **Resources:** Iron, Lutinum, Water, Hydrogen. Water is pumped by the Drilling
-  Tower and converted **5:1 into hydrogen** (five water per H₂) by the Chemical
-  Factory — if water runs dry, hydrogen stops.
+  Tower; the Chemical Factory (**5:1**) and Advanced Chemical Factory (**2:1**)
+  convert it into hydrogen, both drawing from the same water pool — if water
+  runs dry, hydrogen stops.
 - **Buildings:** Command Center (faster builds), Research Center, the three
-  extraction buildings, Chemical Factory, Fusion Reactor (gates the Planetary
-  Shield), four storages, Shipyard, Orbital Defense Station, Planetary Shield.
+  extraction buildings, Chemical Factory, Advanced Chemical Factory, Fusion
+  Reactor (gates the Planetary Shield), four storages, Shipyard, Orbital Defense
+  Station, Planetary Shield.
 - **No energy.** There is no electricity system: mines always produce at 100%.
 - **Research (account-wide):** Energy, Combustion/Ion/Space-Folding drives,
   Weapons, Defense, Cargo, Espionage. Drives gate the bigger hulls.

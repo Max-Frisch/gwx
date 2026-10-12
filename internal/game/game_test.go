@@ -44,6 +44,19 @@ func TestProductionMatchesReference(t *testing.T) {
 	if Production("chemical_factory", 3, 1) != 28 {
 		t.Errorf("hydrogen L3: want 28, got %v", Production("chemical_factory", 3, 1))
 	}
+	if Production("advanced_chemical_factory", 1, 1) != 100 {
+		t.Errorf("advanced chem L1: want 100, got %v", Production("advanced_chemical_factory", 1, 1))
+	}
+
+	// Both hydrogen factories draw from the same pool: outputs add up, and the
+	// water draw is 5 × base H₂ + 2 × advanced H₂.
+	both := Recompute(map[string]int{"chemical_factory": 1, "advanced_chemical_factory": 1}, map[string]int{}, 1)
+	if both.HydrogenProd != 108 {
+		t.Fatalf("combined H₂ L1: want 108 (8+100), got %v", both.HydrogenProd)
+	}
+	if both.WaterUse != 240 {
+		t.Fatalf("water use L1: want 240 (5·8 + 2·100), got %v", both.WaterUse)
+	}
 
 	// The speed knob scales output linearly.
 	if got := Recompute(map[string]int{"iron_mine": 3}, map[string]int{}, 15).MetalProd; got != 113*15 {

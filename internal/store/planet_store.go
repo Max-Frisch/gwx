@@ -21,7 +21,7 @@ const planetCols = `
 	diameter_km, fields_max, fields_used,
 	metal, lutinum, water, hydrogen,
 	metal_cap, lutinum_cap, water_cap, hydrogen_cap,
-	metal_prod, lutinum_prod, water_prod, hydrogen_prod,
+	metal_prod, lutinum_prod, water_prod, hydrogen_prod, water_use,
 	protected_metal, protected_lutinum, protected_water, protected_hydrogen,
 	last_resource_calc_at`
 
@@ -34,7 +34,7 @@ func scanPlanet(row interface {
 		&p.DiameterKM, &p.FieldsMax, &p.FieldsUsed,
 		&p.Metal, &p.Lutinum, &p.Water, &p.Hydrogen,
 		&p.MetalCap, &p.LutinumCap, &p.WaterCap, &p.HydrogenCap,
-		&p.MetalProd, &p.LutinumProd, &p.WaterProd, &p.HydrogenProd,
+		&p.MetalProd, &p.LutinumProd, &p.WaterProd, &p.HydrogenProd, &p.WaterUse,
 		&p.ProtectedMetal, &p.ProtectedLutinum, &p.ProtectedWater, &p.ProtectedHydrogen,
 		&p.LastCalc,
 	)
@@ -166,11 +166,11 @@ func (s *PlanetStore) RecomputeWith(ctx context.Context, p *Planet) error {
 	_, err = s.db.ExecContext(ctx, `
 		UPDATE planets SET
 			metal_cap = $2, lutinum_cap = $3, water_cap = $4, hydrogen_cap = $5,
-			metal_prod = $6, lutinum_prod = $7, water_prod = $8, hydrogen_prod = $9,
-			protected_metal = $10, protected_lutinum = $11, protected_water = $12, protected_hydrogen = $13
+			metal_prod = $6, lutinum_prod = $7, water_prod = $8, hydrogen_prod = $9, water_use = $10,
+			protected_metal = $11, protected_lutinum = $12, protected_water = $13, protected_hydrogen = $14
 		WHERE id = $1
 	`, p.ID, e.MetalCap, e.LutinumCap, e.WaterCap, e.HydrogenCap,
-		e.MetalProd, e.LutinumProd, e.WaterProd, e.HydrogenProd,
+		e.MetalProd, e.LutinumProd, e.WaterProd, e.HydrogenProd, e.WaterUse,
 		e.ProtectedMetal, e.ProtectedLutinum, e.ProtectedWater, e.ProtectedHydrogen)
 	return err
 }
