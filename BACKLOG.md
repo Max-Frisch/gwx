@@ -36,9 +36,11 @@ Read first; one item per session. Keep this file short.
 - [ ] **JSON API** — thin `/api/v1` surface for tooling/bots.
 - [ ] **Full-loop integration test** — register → … → abandon.
 - [ ] **Anti-farm / noob protection** — optional points-ratio guard.
-- [ ] **Follow-up HAR walk** — capture the pages missing from Uni5: `/defense`
-      (unit costs/stats), trade, events, messages, search, alliance, highscore,
-      statistics, premium, settings. Dump with `tools/har/harscan.py`.
+- [ ] **Follow-up HAR walk** — *captures done* (new Uni5 HARs + Login HAR).
+      Work is split into runnable sessions in `info/sessions/` (E1–E8 extract,
+      I1–I9 build). Run one file per fresh session. E1 closes the `/defense` gap;
+      E2–E7 mine trade/alliance/rankings/messages/premium/onboarding; E8
+      consolidates; I1–I9 implement. See `info/sessions/README.md`.
 
 ## Reference spec (derived from Uni5 HARs — `info/galaxywars-spec/`)
 

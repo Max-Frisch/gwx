@@ -18,8 +18,23 @@ committed under `info/galaxywars-spec/` (`01-catalog`, `02-economy-formulas`,
   research bonuses).
 - `tools/har/gen_spec.py` — emits the `info/galaxywars-spec/*.md` files.
 
-Still missing (needs a fresh capture): `/defense` unit page, trade, events,
-messages, search, alliance, highscore, statistics, premium, settings.
+### Update — follow-up Uni5 HARs arrived (new pages captured)
+
+Three new HARs were added to `info/recordings/Uni5/` (Login/overview, a 232 MB
+CRS+fleet HAR, and a 160 MB HAR that covers **all** the pages the first pass
+missed). Together they capture `/defense` + defense techtrees, trade, alliance,
+highscore, statistics, premium, settings, search, events and messages.
+
+The remaining work is **split into small, self-contained sessions** so each can
+run in a clean context. See **`info/sessions/README.md`** for the index, the
+common `harscan` recipe, and the dependency graph:
+
+- **E1–E8** — extraction → committed `info/galaxywars-spec/*.md` (defense, trade,
+  alliance, rankings/statistics, messages/events/search, premium/settings,
+  onboarding, consolidation).
+- **I1–I9** — implementation in gwx, ordered by difficulty.
+
+Run one file per fresh session, e.g. `execute info/sessions/E1-defense-catalog.md`.
 
 ## Prior state
 
