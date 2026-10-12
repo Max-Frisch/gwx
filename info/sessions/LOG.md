@@ -5,7 +5,9 @@ Append one line per completed session: `date | session | result | commit`.
 ```
 2026-10-12 | planning | split Uni5 HAR work into E1-E8 + I1-I9; recon index committed | (this commit)
 2026-10-12 | E1 | defense catalog + combat spec (5 units; 03-combat gap closed) | 074fddc
-2026-10-12 | E2 | trade/marketplace spec (07-trade.md) | (this commit)
+2026-10-12 | E2 | trade/marketplace spec (07-trade.md) | 717fe63
+2026-10-12 | E3 | alliance spec (08-alliance.md; rank rights not exercised in capture) | 747b229
+2026-10-12 | E4 | highscore + statistics spec (09-rankings-statistics.md) | 37178ed
 ```
 
 ## Recon (2026-10-12)
