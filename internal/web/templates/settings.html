@@ -5,6 +5,8 @@
 <div class="tabs">
   <a href="/settings/account" class="{{if eq .Tab "account"}}active{{end}}">Account</a>
   <a href="/settings/game" class="{{if eq .Tab "game"}}active{{end}}">Game</a>
+  <a href="/settings/vacation" class="{{if eq .Tab "vacation"}}active{{end}}">Vacation mode</a>
+  <a href="/settings/sanction" class="{{if eq .Tab "sanction"}}active{{end}}">Sanctions</a>
 </div>
 
 {{if eq .Tab "game"}}
@@ -46,6 +48,42 @@
     </div>
     <button type="submit">Save</button>
   </form>
+</div>
+{{else if eq .Tab "vacation"}}
+<h2>Vacation mode</h2>
+<div class="panel" style="max-width:560px">
+{{if .OnVacation}}
+  <p>You have been on vacation since <b>{{.VacationSince}}</b>. It auto-ends after 21 days ({{.VacationUntil}}) if you do not return.</p>
+  <p class="muted">Production is frozen, your build/research/unit queues are paused, and you cannot attack or be attacked or spied. Trade offers stay active.</p>
+  {{if .VacationReady}}
+  <form method="post" action="/settings/vacation">
+    <input type="hidden" name="action" value="leave">
+    <button type="submit">Leave vacation</button>
+  </form>
+  {{else}}
+  <p class="muted">You can return once the 12-hour minimum has elapsed.</p>
+  {{end}}
+{{else}}
+  <p>Vacation mode freezes production, pauses your queues and protects you from attacks and reconnaissance while you are away. It lasts at least 12 hours and ends automatically after 21 days.</p>
+  {{if .FleetsInFlight}}
+  <p class="error">Some of your fleets are still in flight. Once they have landed, you can switch to vacation mode.</p>
+  {{else}}
+  <form method="post" action="/settings/vacation">
+    <input type="hidden" name="action" value="start">
+    <button type="submit">Start vacation</button>
+  </form>
+  {{end}}
+{{end}}
+</div>
+{{else if eq .Tab "sanction"}}
+<h2>Sanctions</h2>
+<div class="panel" style="max-width:560px">
+{{if .Sanctioned}}
+  <p class="error">Your account is currently sanctioned. Starting construction, research or unit orders and sending fleets are restricted.</p>
+  {{if .SanctionNote}}<p>Reason: <b>{{.SanctionNote}}</b></p>{{end}}
+{{else}}
+  <p class="muted">No active sanctions.</p>
+{{end}}
 </div>
 {{else}}
 <div class="panel" style="max-width:460px">

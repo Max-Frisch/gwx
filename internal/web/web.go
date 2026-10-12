@@ -115,6 +115,9 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("POST /settings/account", h.requireUser(h.SettingsAccountSubmit))
 	mux.HandleFunc("GET /settings/game", h.requireUser(h.SettingsGamePage))
 	mux.HandleFunc("POST /settings/game", h.requireUser(h.SettingsGameSubmit))
+	mux.HandleFunc("GET /settings/vacation", h.requireUser(h.SettingsVacationPage))
+	mux.HandleFunc("POST /settings/vacation", h.requireUser(h.SettingsVacationSubmit))
+	mux.HandleFunc("GET /settings/sanction", h.requireUser(h.SettingsSanctionPage))
 	mux.HandleFunc("POST /queue/{qid}/cancel", h.requireUser(h.QueueCancelSubmit))
 
 	mux.HandleFunc("GET /alliance", h.requireUser(h.AlliancePage))
@@ -224,6 +227,11 @@ func (h *Handler) base(ctx context.Context, r *http.Request, userID int64, title
 	if n, err := h.messages.UnreadCount(ctx, userID); err == nil {
 		b.MessagesUnread = n
 	}
+	if fl, err := h.auth.AccountFlags(ctx, userID); err == nil {
+		b.Sanctioned = fl.Sanctioned
+		b.SanctionNote = fl.SanctionNote
+		b.OnVacation = fl.VacationActive(time.Now())
+	}
 	return b
 }
 
@@ -310,6 +318,20 @@ func msg(err error) string {
 		return "You cannot accept your own offer."
 	case errors.Is(err, store.ErrTradePrivate):
 		return "That offer is directed at another player."
+	case errors.Is(err, store.ErrOnVacation):
+		return "You are in vacation mode — you cannot act until you return."
+	case errors.Is(err, store.ErrSanctioned):
+		return "Your account is sanctioned — actions are restricted."
+	case errors.Is(err, store.ErrTargetOnVacation):
+		return "That player is in vacation mode."
+	case errors.Is(err, store.ErrFleetsInFlight):
+		return "Some of your fleets are still in flight. Once they have landed, you can switch to vacation mode."
+	case errors.Is(err, store.ErrAlreadyOnVacation):
+		return "You are already in vacation mode."
+	case errors.Is(err, store.ErrNotOnVacation):
+		return "You are not in vacation mode."
+	case errors.Is(err, store.ErrVacationMinimum):
+		return "Vacation mode lasts at least 12 hours before you can return."
 	case errors.Is(err, store.ErrUserExists):
 		return "That username or email is already taken."
 	case errors.Is(err, store.ErrUnknownCode):
@@ -1776,6 +1798,51 @@ func (h *Handler) SettingsGameSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	flashRedirect(w, r, "/settings/game", "Settings saved.", "")
+}
+
+func (h *Handler) SettingsVacationPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	fl, _ := h.auth.AccountFlags(ctx, userID)
+	d := settingsData{
+		baseData: h.base(ctx, r, userID, "Settings", h.homeID(ctx, userID)),
+		Tab:      "vacation",
+	}
+	if fl.VacationSince.Valid {
+		d.VacationSince = fl.VacationSince.Time.Format("2006-01-02 15:04")
+		d.VacationReady = store.CanLeaveVacation(fl.VacationSince.Time, time.Now())
+	}
+	if fl.VacationUntil.Valid {
+		d.VacationUntil = fl.VacationUntil.Time.Format("2006-01-02 15:04")
+	}
+	if fs, err := h.fleets.ListActive(ctx, userID); err == nil {
+		d.FleetsInFlight = len(fs) > 0
+	}
+	h.render(w, "settings", http.StatusOK, d)
+}
+
+func (h *Handler) SettingsVacationSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	back := "/settings/vacation"
+	switch r.FormValue("action") {
+	case "start":
+		flashRedirect(w, r, back, "Vacation mode enabled.", msg(h.auth.StartVacation(ctx, userID)))
+	case "leave":
+		flashRedirect(w, r, back, "Vacation mode ended.", msg(h.auth.EndVacation(ctx, userID)))
+	default:
+		flashRedirect(w, r, back, "", "Unknown action.")
+	}
+}
+
+func (h *Handler) SettingsSanctionPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	d := settingsData{
+		baseData: h.base(ctx, r, userID, "Settings", h.homeID(ctx, userID)),
+		Tab:      "sanction",
+	}
+	h.render(w, "settings", http.StatusOK, d)
 }
 
 // ---- submit handlers ----

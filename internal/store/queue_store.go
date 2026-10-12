@@ -130,6 +130,9 @@ func (s *QueueStore) StartBuilding(ctx context.Context, universeCode string, use
 	if err != nil {
 		return err
 	}
+	if err := ensureQueueingAllowedTx(ctx, tx, userID); err != nil {
+		return err
+	}
 	if _, err := accrueTx(ctx, tx, planetID); err != nil {
 		return err
 	}
@@ -195,6 +198,9 @@ func (s *QueueStore) StartResearch(ctx context.Context, universeCode string, use
 	if err != nil {
 		return err
 	}
+	if err := ensureQueueingAllowedTx(ctx, tx, userID); err != nil {
+		return err
+	}
 	structs, err := loadStructuresTx(ctx, tx, planetID)
 	if err != nil {
 		return err
@@ -247,6 +253,9 @@ func (s *QueueStore) StartUnits(ctx context.Context, universeCode string, userID
 
 	u, err := s.universeTx(ctx, tx, universeCode)
 	if err != nil {
+		return err
+	}
+	if err := ensureQueueingAllowedTx(ctx, tx, userID); err != nil {
 		return err
 	}
 	structs, err := loadStructuresTx(ctx, tx, planetID)

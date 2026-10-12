@@ -22,6 +22,11 @@ type baseData struct {
 	MessagesUnread int
 	Flash          string
 	Error          string
+
+	// Account-lifecycle notices shown as a banner on every page.
+	OnVacation   bool
+	Sanctioned   bool
+	SanctionNote string
 }
 
 type resView struct {
@@ -268,6 +273,13 @@ type settingsData struct {
 	MessagesPerPage    int
 	SpyShortcutCount   int
 	SpyLimitOnSpy      int
+
+	// Vacation status (the lifecycle flags themselves live in baseData so the
+	// banner on every page can read them).
+	VacationSince  string
+	VacationUntil  string
+	VacationReady  bool
+	FleetsInFlight bool
 }
 
 type authData struct {

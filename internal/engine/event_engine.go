@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"gwx/internal/game"
+	"gwx/internal/store"
 )
 
 // EventEngine is the durable scheduler.
@@ -95,15 +96,30 @@ func (e *EventEngine) StartScheduler(ctx context.Context) {
 }
 
 func (e *EventEngine) processDue(ctx context.Context) {
+	e.processVacations(ctx)
 	e.processQueues(ctx)
 	e.processFleets(ctx)
 }
 
+// processVacations auto-ends any vacation whose 21-day window has elapsed. The
+// store pushes the account's paused queues back by the time spent away.
+func (e *EventEngine) processVacations(ctx context.Context) {
+	if n, err := store.FinalizeExpiredVacations(ctx, e.db); err != nil {
+		log.Printf("[ENGINE] finalize vacations: %v", err)
+	} else if n > 0 {
+		log.Printf("[ENGINE] auto-ended %d vacation(s)", n)
+	}
+}
+
 func (e *EventEngine) processQueues(ctx context.Context) {
+	// Vacationing accounts have their queues paused: skip them until they
+	// return (or the 21-day window auto-ends above).
 	rows, err := e.db.QueryContext(ctx, `
-		SELECT id FROM queues
-		WHERE status = 'IN_PROGRESS' AND finish_at <= NOW()
-		ORDER BY finish_at LIMIT 100
+		SELECT q.id FROM queues q
+		JOIN users u ON u.id = q.user_id
+		WHERE q.status = 'IN_PROGRESS' AND q.finish_at <= NOW()
+		  AND NOT (u.vacation_since IS NOT NULL AND u.vacation_until IS NOT NULL AND NOW() < u.vacation_until)
+		ORDER BY q.finish_at LIMIT 100
 	`)
 	if err != nil {
 		log.Printf("[ENGINE] queue scan: %v", err)
@@ -140,10 +156,12 @@ func (e *EventEngine) resolveQueue(ctx context.Context, queueID int64) error {
 		universeID  string
 	)
 	err = tx.QueryRowContext(ctx, `
-		SELECT kind, code, target_level, quantity, planet_id, user_id, universe_id::text
-		FROM queues
-		WHERE id = $1 AND status = 'IN_PROGRESS' AND finish_at <= NOW()
-		FOR UPDATE SKIP LOCKED
+		SELECT q.kind, q.code, q.target_level, q.quantity, q.planet_id, q.user_id, q.universe_id::text
+		FROM queues q
+		JOIN users u ON u.id = q.user_id
+		WHERE q.id = $1 AND q.status = 'IN_PROGRESS' AND q.finish_at <= NOW()
+		  AND NOT (u.vacation_since IS NOT NULL AND u.vacation_until IS NOT NULL AND NOW() < u.vacation_until)
+		FOR UPDATE OF q SKIP LOCKED
 	`, queueID).Scan(&kind, &code, &targetLevel, &quantity, &planetID, &userID, &universeID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil // claimed elsewhere or already done

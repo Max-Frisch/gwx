@@ -77,8 +77,10 @@ Settings. [change-home/abandon: **build now**]
 
 ## Settings → Vacation mode — `/settings/vacation/`
 
-Not a form here but a **status/description card** (the capture is blocked). The
-copy pins the mechanic precisely [needs mechanic]:
+Status/description card (the capture is blocked). The copy pins the mechanic. A
+minimal slice is **implemented in `I9`**; the exact gwx gate rules below.
+
+Reference copy:
 
 - Can **only start when no own fleets are in flight** (a red note appears
   otherwise: *"Some of your fleets are still in flight. Once they have landed,
@@ -89,6 +91,30 @@ copy pins the mechanic precisely [needs mechanic]:
 - **Protection from new attacks and reconnaissance**, but **already-launched
   fleets still arrive**.
 - **Minimum 12 hours**; **auto-ends after 21 days** if you don't return.
+
+### Implemented in gwx (`I9`)
+
+Columns `users.vacation_since` + `users.vacation_until` (migration `0008`).
+
+- **Start** (`POST action=start`): refused with `ErrFleetsInFlight` while any own
+  fleet is `OUTBOUND`/`RETURNING`. Production is settled to *now* first, then
+  `vacation_since = NOW()`, `vacation_until = NOW() + 21 days`.
+- **While active:**
+  - `StartBuilding` / `StartResearch` / `StartUnits` return `ErrOnVacation`.
+  - `FleetStore.Dispatch` returns `ErrOnVacation` for **all** missions.
+  - `Dispatch` of an `ATTACK`/`ESPIONAGE` against a vacationing owner returns
+    `ErrTargetOnVacation` (protection); already-launched fleets still resolve.
+  - `update_planet_resources()` discounts any elapsed time that overlaps
+    `[vacation_since, LEAST(NOW(), vacation_until)]`, so production is frozen
+    whether the planet is queried during or only after the vacation.
+  - The scheduler skips vacationing users' `queues`; on resume their
+    `start_at`/`finish_at` are pushed back by the time spent away, so no build
+    time is lost.
+  - Trade offers/storage are untouched (they are not queue- or fleet-gated).
+- **Leave** (`POST action=leave`): refused with `ErrVacationMinimum` before the
+  12h minimum. On success the queues are shifted and the flags cleared.
+- **Auto-end:** the scheduler calls `store.FinalizeExpiredVacations` each tick;
+  when `NOW() >= vacation_until` (21 days) the account is returned the same way.
 
 ## Settings → Account — `/settings/account`
 
@@ -115,9 +141,12 @@ Action buttons (sub-routes, DTOs not captured):
 
 ## Settings → Sanctions — `/settings/sanction`
 
-Empty table `From | Until | Sanction | Category` (this account has none). No
-form — sanctions are imposed by operators. **[out of scope]** (no admin tooling
-in gwx).
+`From | Until | Sanction | Category` table (this account has none). Sanctions
+are imposed by operators; there is **no admin tooling in gwx**. `I9` implements
+the *read-only* piece: columns `users.sanctioned` + `users.sanction_reason`, a
+`/settings/sanction` page that shows the reason, and a site-wide warning banner.
+A sanctioned account cannot start queues or send fleets (`ErrSanctioned`) — set
+the flags directly in the database until an admin surface exists.
 
 ## Premium
 
@@ -165,6 +194,7 @@ Ledger table `Date | Galaxium | Note` (empty here) + a **Payments** button →
 | GET | `/settings/planet/<uuid>/change-home` | set main planet |
 | GET | `/settings/planet/<uuid>/leave` | abandon planet |
 | GET | `/settings/vacation/` | vacation status / start |
+| POST | `/settings/vacation` | start / leave (`action=start|leave`) |
 | GET | `/settings/account` | account forms |
 | POST | `/settings/account` | `change_username` / `change_mail` / `change_password` |
 | GET | `/settings/account/{reset,delete,external-application,avatar}` | account maintenance |
@@ -195,12 +225,13 @@ settings (change username / email / password)* as **build-now**.
 4. **Planets tab [build now]** — reuse the existing planet list; add
    `change-home` (flip `[M]`/main flag) and `leave`/abandon (needs a
    *last-planet* guard); the free-planet counter derives from the colony cap.
-5. **Vacation mode [needs mechanic]** — a `vacation_since` timestamp on the
-   account: pause all `queues` scheduling, freeze production, block new
-   attacks/spy on the player's planets, keep active trade offers; enforce
-   min-12 h / max-21-day windows. This is a real scheduler feature (see
-   **I9-premium-vacation**, optional).
-6. **Sanctions [out of scope]** — no admin/operator tooling in gwx.
+5. **Vacation mode [done — `I9`]** — `vacation_since`/`vacation_until` on the
+   account: production frozen (in `update_planet_resources`), queues paused by
+   the scheduler, new attacks/spy blocked both ways, active trade offers kept;
+   min-12 h / max-21-day windows enforced. See the gate rules above.
+6. **Sanctions [done — `I9`, read-only]** — `sanctioned` + `sanction_reason`
+   flags, a `/settings/sanction` view and a banner; no operator tooling (set the
+   flags in the DB).
 7. **Premium [out of scope]** — no payments; record only. The one perk with a
    gameplay equivalent (*Ad-free*) is meaningless for gwx.
 

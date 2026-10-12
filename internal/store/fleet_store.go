@@ -88,6 +88,9 @@ func (s *FleetStore) Dispatch(ctx context.Context, p DispatchParams) (int64, err
 	if !ownerID.Valid || ownerID.Int64 != p.UserID {
 		return 0, ErrNotOwner
 	}
+	if err := ensureDispatchAllowedTx(ctx, tx, p.UserID); err != nil {
+		return 0, err
+	}
 
 	techs, err := loadTechsTx(ctx, tx, p.UserID)
 	if err != nil {
@@ -122,6 +125,17 @@ func (s *FleetStore) Dispatch(ctx context.Context, p DispatchParams) (int64, err
 	case "TRANSPORT", "ATTACK", "ESPIONAGE":
 		if !targetID.Valid {
 			return 0, ErrNoTarget
+		}
+		if p.Mission == "ATTACK" || p.Mission == "ESPIONAGE" {
+			var targetOwner sql.NullInt64
+			if err := tx.QueryRowContext(ctx, `SELECT user_id FROM planets WHERE id = $1`, targetID.Int64).Scan(&targetOwner); err != nil {
+				return 0, err
+			}
+			if targetOwner.Valid {
+				if err := ensureAttackableTx(ctx, tx, targetOwner.Int64); err != nil {
+					return 0, err
+				}
+			}
 		}
 	default:
 		return 0, ErrUnknownCode

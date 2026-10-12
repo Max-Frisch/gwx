@@ -79,6 +79,12 @@ Read first; one item per session. Keep this file short.
   techs added to gate Plasma/Rocket. Defense split out of the shipyard into its
   own `/defense` page + nav entry; `ckk` documented as a derived
   `(Attack+Defense)/8000` coefficient (`I8-defense-roster.md`).
+- **I9 vacation + sanctions** — `users.vacation_since/vacation_until` freeze
+  production (in `update_planet_resources`), pause queues in the scheduler, and
+  block attacks/spy both ways; `/settings/vacation` starts/leaves (min 12h,
+  auto-end 21d via `store.FinalizeExpiredVacations`). `users.sanctioned` +
+  `sanction_reason` gate queues/fleets and show a read-only `/settings/sanction`
+  page plus a banner (migration `0008`; `11-premium-settings.md`).
 
 ## Todo (ordered)
 - [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
@@ -153,7 +159,8 @@ Settings**, Logout. (Bold = we don't have it.)
   resources (destroyed / plundered / gained / lost).
 - **Messages** (inbox) and **Search** (player/planet lookup).
 - **Events** feed.
-- **Premium**, **Vacation mode**, **Sanctions**.
+- **Premium** (out of scope), **Vacation mode**, **Sanctions** (*both done in
+  `I9`*).
 - **Settings → Game**: quick-dispatch probe count, max recon probes, raid order,
   fleet labels, tactical retreat, interface/messages-per-page options.
 - **Settings → Account**: rename/email/password, reset/delete account, profile
@@ -219,8 +226,9 @@ build task in `info/sessions/`:
 
 **Bigger but still self-contained** (own tables, no external dependency):
 Alliances (`I6`, *done* — diplomacy still open), Trade/market (`I7`, *done*),
-Events feed (`I3`, *done* — derived, no table), Vacation mode (`I9`).
+Events feed (`I3`, *done* — derived, no table), Vacation mode + sanctions
+(`I9`, *done* — scheduler-supported).
 
 **Not standalone** (need a new mechanic first): debris + Recycling Technology,
 Advanced Ship Armor hull bonus, extra cargo tech, Space Curvature Drive
-movement effect, Premium, Sanctions.
+movement effect, Premium (out of scope — no monetisation).

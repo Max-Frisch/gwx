@@ -93,6 +93,8 @@
     {{end}}
     <main class="content"><div class="inner">
       {{if or (eq .Title "Buildings") (eq .Title "Research") (eq .Title "Shipyard") (eq .Title "Defense")}}{{template "tabs" .}}{{end}}
+      {{if .Sanctioned}}<div class="error">Your account is sanctioned{{if .SanctionNote}} — {{.SanctionNote}}{{end}}. Actions are restricted; see <a href="/settings/sanction">Settings &rarr; Sanctions</a>.</div>{{end}}
+      {{if .OnVacation}}<div class="flash">You are in <a href="/settings/vacation">vacation mode</a> — production is frozen and you cannot attack or be attacked.</div>{{end}}
       {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
       {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
 {{end}}

@@ -67,6 +67,9 @@ universe, or a fast seasonal one.
 - **Defense:** Light Laser Turret, Laser Turret, EMP Launcher, Plasma Turret,
   Rocket Launchers.
 - **Missions:** Transport, Deploy, Attack, Espionage, Colonize.
+- **Account lifecycle:** vacation mode (freezes production, pauses queues, blocks
+  attacks both ways; 12h minimum, 21d auto-end) and operator sanctions (flag +
+  banner + gated actions).
 
 ### Signature mechanics
 
