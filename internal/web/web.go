@@ -41,6 +41,7 @@ type Handler struct {
 	queues       *store.QueueStore
 	fleets       *store.FleetStore
 	reports      *store.ReportStore
+	messages     *store.MessageStore
 	auth         *store.AuthStore
 	scores       *store.ScoreStore
 	tmpl         *template.Template
@@ -61,6 +62,7 @@ func New(db *sql.DB, universeCode string) *Handler {
 		queues:       store.NewQueueStore(db),
 		fleets:       store.NewFleetStore(db),
 		reports:      store.NewReportStore(db),
+		messages:     store.NewMessageStore(db),
 		auth:         store.NewAuthStore(db),
 		scores:       store.NewScoreStore(db),
 		tmpl:         tmpl,
@@ -91,6 +93,10 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /galaxy", h.requireUser(h.GalaxyRedirect))
 	mux.HandleFunc("GET /galaxy/{galaxy}/{system}", h.requireUser(h.GalaxyPage))
 	mux.HandleFunc("GET /reports", h.requireUser(h.ReportsPage))
+	mux.HandleFunc("GET /messages", h.requireUser(h.MessagesPage))
+	mux.HandleFunc("POST /messages/{id}/read", h.requireUser(h.MessageReadSubmit))
+	mux.HandleFunc("POST /messages/{id}/delete", h.requireUser(h.MessageDeleteSubmit))
+	mux.HandleFunc("POST /messages/{id}/archive", h.requireUser(h.MessageArchiveSubmit))
 	mux.HandleFunc("GET /highscore", h.requireUser(h.HighscorePage))
 	mux.HandleFunc("GET /search", h.requireUser(h.SearchPage))
 	mux.HandleFunc("GET /player/{id}", h.requireUser(h.PlayerPage))
@@ -173,6 +179,9 @@ func (h *Handler) base(ctx context.Context, r *http.Request, userID int64, title
 	if st, err := h.auth.Settings(ctx, userID); err == nil {
 		b.NavRight = st.NavigationPosition == "right"
 	}
+	if n, err := h.messages.UnreadCount(ctx, userID); err == nil {
+		b.MessagesUnread = n
+	}
 	return b
 }
 
@@ -206,7 +215,11 @@ func flashRedirect(w http.ResponseWriter, r *http.Request, to, okMsg, errMsg str
 		q.Set("err", errMsg)
 	}
 	if len(q) > 0 {
-		to += "?" + q.Encode()
+		sep := "?"
+		if strings.Contains(to, "?") {
+			sep = "&"
+		}
+		to += sep + q.Encode()
 	}
 	http.Redirect(w, r, to, http.StatusSeeOther)
 }
@@ -239,6 +252,8 @@ func msg(err error) string {
 		return "That username or email is already taken."
 	case errors.Is(err, store.ErrUnknownCode):
 		return "Unknown item."
+	case errors.Is(err, store.ErrNotFound):
+		return "Not found."
 	default:
 		return err.Error()
 	}
@@ -601,12 +616,94 @@ func (h *Handler) ReportsPage(w http.ResponseWriter, r *http.Request) {
 		var pretty bytes.Buffer
 		_ = json.Indent(&pretty, rep.Payload, "", "  ")
 		d.Reports = append(d.Reports, reportRow{
+			ID:   rep.ID,
 			Kind: rep.Kind, Title: rep.Title,
 			When: rep.CreatedAt.Format("2006-01-02 15:04"),
 			Body: pretty.String(),
 		})
 	}
 	h.render(w, "reports", http.StatusOK, d)
+}
+
+func (h *Handler) MessagesPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+
+	filter := r.URL.Query().Get("filter")
+	switch filter {
+	case "system", "report", "unread", "archive":
+	default:
+		filter = "all"
+	}
+
+	st, _ := h.auth.Settings(ctx, userID)
+	perPage := st.MessagesPerPage
+	if perPage <= 0 {
+		perPage = 20
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+
+	f := store.MessageFilter{}
+	switch filter {
+	case "system", "report":
+		f.Category = filter
+	case "unread":
+		f.UnreadOnly = true
+	case "archive":
+		f.Archived = true
+	}
+
+	d := messagesData{baseData: h.base(ctx, r, userID, "Messages", h.homeID(ctx, userID)), Filter: filter, Page: page}
+	total, _ := h.messages.Count(ctx, userID, f)
+	d.Total = total
+	d.Pages = (total + perPage - 1) / perPage
+	if d.Pages < 1 {
+		d.Pages = 1
+	}
+	if page > d.Pages {
+		page = d.Pages
+		d.Page = page
+	}
+	d.PrevPage = page - 1
+	d.NextPage = page + 1
+	msgs, _ := h.messages.List(ctx, userID, page, perPage, f)
+	for _, m := range msgs {
+		row := messageRow{
+			ID: m.ID, Category: m.Category, Kind: m.Kind, Title: m.Title, Body: m.Body,
+			When:   m.CreatedAt.Format("2006-01-02 15:04"),
+			IsRead: m.IsRead,
+		}
+		if m.ReportID.Valid {
+			row.ReportID = m.ReportID.Int64
+		}
+		d.Rows = append(d.Rows, row)
+	}
+	h.render(w, "messages", http.StatusOK, d)
+}
+
+func (h *Handler) MessageReadSubmit(w http.ResponseWriter, r *http.Request) {
+	h.messageAction(w, r, func(userID, id int64) error { return h.messages.MarkRead(r.Context(), userID, id) }, "Marked as read.")
+}
+
+func (h *Handler) MessageDeleteSubmit(w http.ResponseWriter, r *http.Request) {
+	h.messageAction(w, r, func(userID, id int64) error { return h.messages.Delete(r.Context(), userID, id) }, "Message deleted.")
+}
+
+func (h *Handler) MessageArchiveSubmit(w http.ResponseWriter, r *http.Request) {
+	h.messageAction(w, r, func(userID, id int64) error { return h.messages.Archive(r.Context(), userID, id) }, "Message archived.")
+}
+
+func (h *Handler) messageAction(w http.ResponseWriter, r *http.Request, fn func(userID, id int64) error, okMsg string) {
+	userID, _ := h.userID(r)
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	to := r.Referer()
+	if to == "" {
+		to = "/messages"
+	}
+	flashRedirect(w, r, to, okMsg, msg(fn(userID, id)))
 }
 
 func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {

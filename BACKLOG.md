@@ -30,6 +30,12 @@ Read first; one item per session. Keep this file short.
   and `/settings` with Account (rename / email / password, current-password
   gated) and Game (nav position, locale, messages-per-page, spy knobs) tabs.
   New `users.settings` JSONB; password change revokes other sessions.
+- **I2 messages** — `/messages` inbox: system notifications (building/research/
+  ship/defense completions, own-fleet returns) and pointers to combat/espionage
+  reports, filtered by kind, with read / archive / delete, an unread badge in
+  the sidebar, and deep links to the matching `/reports#report-{id}` entry.
+  New `messages` table; emitted from the engine where queues/fleets resolve and
+  reports are written. (`10-messages-events-search.md`)
 
 ## Todo (ordered)
 - [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
@@ -155,9 +161,9 @@ build task in `info/sessions/`:
    destroyed / plundered. ("Recycled" needs debris first.)
 5. **Defense roster (`I8`)** — the five units are catalog rows + prereqs and
    immediately build/fight; real costs/stats in `03-combat.md`.
-6. **Messages from `reports` + system feed (`I2`)** — list combat/espionage
-   reports by kind with read/delete/clear, and build/research/fleet text events
-   (`10-messages-events-search.md`).
+6. **Messages from `reports` + system feed (`I2`)** — *done.* `/messages` lists
+   combat/espionage reports by kind plus system notifications with read/archive/
+   delete and an unread badge (`10-messages-events-search.md`).
 7. **Highscore expansion (`I5`)** — Alliances tab (`ScoreStore.Alliances`
    aggregation) and sortable Players headers; *Battles* is external-only.
 8. **Static Help / Game rules pages + footer links** — pure templates.

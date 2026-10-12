@@ -18,6 +18,7 @@ type baseData struct {
 	Planets        []store.OwnedPlanet
 	Resources      *resView
 	NavRight       bool
+	MessagesUnread int
 	Flash          string
 	Error          string
 }
@@ -105,6 +106,7 @@ type galaxyRow struct {
 }
 
 type reportRow struct {
+	ID    int64
 	Kind  string
 	Title string
 	When  string
@@ -236,6 +238,28 @@ type galaxyData struct {
 type reportsData struct {
 	baseData
 	Reports []reportRow
+}
+
+type messageRow struct {
+	ID       int64
+	Category string
+	Kind     string
+	Title    string
+	Body     string
+	When     string
+	IsRead   bool
+	ReportID int64
+}
+
+type messagesData struct {
+	baseData
+	Filter   string
+	Page     int
+	Pages    int
+	PrevPage int
+	NextPage int
+	Total    int
+	Rows     []messageRow
 }
 
 // ---- formatting helpers (also exposed to templates) ----

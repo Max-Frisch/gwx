@@ -30,9 +30,13 @@ test:
 lint:
 	go vet ./...
 
-# Applies migrations through the compose Postgres container (no local psql needed).
+# Applies every migration in order through the compose Postgres container
+# (no local psql needed). Migrations are idempotent, so this is safe to re-run.
 migrate:
-	docker exec -i $(DB_CONTAINER) psql -U $(DB_USER) -d $(DB_NAME) -v ON_ERROR_STOP=1 < migrations/0001_init.sql
+	@for f in migrations/*.sql; do \
+		echo "applying $$f"; \
+		docker exec -i $(DB_CONTAINER) psql -U $(DB_USER) -d $(DB_NAME) -v ON_ERROR_STOP=1 < $$f || exit 1; \
+	done
 
 up:
 	docker compose up -d

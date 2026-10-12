@@ -1,0 +1,55 @@
+{{define "messages"}}
+{{template "head" .}}
+<h1>Messages</h1>
+
+<div class="tabs">
+  <a href="/messages?filter=all" class="{{if eq .Filter "all"}}active{{end}}">All</a>
+  <a href="/messages?filter=system" class="{{if eq .Filter "system"}}active{{end}}">System</a>
+  <a href="/messages?filter=report" class="{{if eq .Filter "report"}}active{{end}}">Reports</a>
+  <a href="/messages?filter=unread" class="{{if eq .Filter "unread"}}active{{end}}">Unread</a>
+  <a href="/messages?filter=archive" class="{{if eq .Filter "archive"}}active{{end}}">Archive</a>
+</div>
+
+<div class="panel">
+{{if .Rows}}
+<table>
+  <tr>
+    <th style="width:110px">Kind</th>
+    <th>Message</th>
+    <th style="width:130px">Received</th>
+    <th style="width:230px"></th>
+  </tr>
+  {{range .Rows}}
+  <tr>
+    <td><span class="tag">{{.Kind}}</span></td>
+    <td>
+      {{if not .IsRead}}<span class="unread-dot"></span>{{end}}
+      {{if .ReportID}}<a href="/reports#report-{{.ReportID}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
+      {{if .Body}}<div class="muted" style="font-size:12px">{{.Body}}</div>{{end}}
+    </td>
+    <td class="muted">{{.When}}</td>
+    <td>
+      <div class="row" style="gap:6px">
+        {{if not .IsRead}}
+        <form method="post" action="/messages/{{.ID}}/read"><button class="ghost" type="submit">Read</button></form>
+        {{end}}
+        <form method="post" action="/messages/{{.ID}}/archive"><button class="ghost" type="submit">Archive</button></form>
+        <form method="post" action="/messages/{{.ID}}/delete" onsubmit="return confirm('Delete this message?')"><button class="bad" type="submit">Delete</button></form>
+      </div>
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{else}}<span class="muted">No messages here.</span>{{end}}
+</div>
+
+{{if gt .Pages 1}}
+<div class="row" style="justify-content:center">
+  {{if gt .Page 1}}<a class="btn ghost" href="/messages?filter={{.Filter}}&page={{.PrevPage}}">← Newer</a>{{end}}
+  <span class="muted">Page {{.Page}} / {{.Pages}} ({{n .Total}})</span>
+  {{if lt .Page .Pages}}<a class="btn ghost" href="/messages?filter={{.Filter}}&page={{.NextPage}}">Older →</a>{{end}}
+</div>
+{{end}}
+
+{{template "foot" .}}
+{{end}}

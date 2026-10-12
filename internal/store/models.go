@@ -122,3 +122,15 @@ type Report struct {
 	Payload   []byte
 	CreatedAt time.Time
 }
+
+// Message is one inbox entry: a system notification or a report pointer.
+type Message struct {
+	ID        int64
+	Category  string
+	Kind      string
+	Title     string
+	Body      string
+	ReportID  sql.NullInt64
+	IsRead    bool
+	CreatedAt time.Time
+}

@@ -4,7 +4,7 @@
 <div class="panel">
 {{if .Reports}}
 {{range .Reports}}
-  <div class="card" style="margin-bottom:10px">
+  <div class="card" id="report-{{.ID}}" style="margin-bottom:10px">
     <div class="row"><span class="tag">{{.Kind}}</span> <b>{{.Title}}</b> <span class="spacer"></span> <small class="muted">{{.When}}</small></div>
     <pre class="muted" style="white-space:pre-wrap;font-size:12px;margin:8px 0 0">{{.Body}}</pre>
   </div>

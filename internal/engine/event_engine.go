@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -31,6 +32,50 @@ const (
 	colonyStartLut   = 500
 	colonyStartWater = 500
 )
+
+// insertMessageTx appends one inbox entry inside the resolving transaction.
+func insertMessageTx(ctx context.Context, tx *sql.Tx, universeID string, userID int64, category, kind, title, body string, reportID int64) error {
+	var ref any
+	if reportID > 0 {
+		ref = reportID
+	}
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO messages (universe_id, user_id, category, kind, title, body, report_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, universeID, userID, category, kind, title, body, ref)
+	return err
+}
+
+// planetCoordsTx renders "g:s:p" for a planet id.
+func planetCoordsTx(ctx context.Context, tx *sql.Tx, planetID int64) (string, error) {
+	var g, s, p int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT galaxy, system, position FROM planets WHERE id = $1`, planetID).Scan(&g, &s, &p); err != nil {
+		return "", err
+	}
+	return coords(g, s, p), nil
+}
+
+// queueMessage renders the system notification for a completed queue order.
+// It is pure so it can be unit-tested without a database.
+func queueMessage(kind, code string, level int, quantity int64, at string) (msgKind, title string) {
+	name := code
+	if d, ok := game.Get(code); ok {
+		name = d.Name
+	}
+	switch kind {
+	case "building":
+		return "building", fmt.Sprintf("Construction of %s (level %d) on %s has been completed.", name, level, at)
+	case "research":
+		return "research", fmt.Sprintf("Research of %s (level %d) has been completed.", name, level)
+	case "ship":
+		return "ship", fmt.Sprintf("Production of %d × %s on %s has been completed.", quantity, name, at)
+	case "defense":
+		return "defense", fmt.Sprintf("Production of %d × %s on %s has been completed.", quantity, name, at)
+	default:
+		return kind, fmt.Sprintf("Order completed on %s.", at)
+	}
+}
 
 // StartScheduler blocks, resolving due work roughly once per second.
 func (e *EventEngine) StartScheduler(ctx context.Context) {
@@ -138,6 +183,14 @@ func (e *EventEngine) resolveQueue(ctx context.Context, queueID int64) error {
 		UPDATE queues SET status = 'COMPLETED', quantity_done = COALESCE(quantity, 0) WHERE id = $1
 	`, queueID); err != nil {
 		return err
+	}
+
+	// Notify the player (best-effort: a missing coords lookup must not block).
+	if at, err := planetCoordsTx(ctx, tx, planetID); err == nil {
+		msgKind, title := queueMessage(kind, code, int(targetLevel.Int64), quantity.Int64, at)
+		if err := insertMessageTx(ctx, tx, universeID, userID, "system", msgKind, title, "", 0); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }
@@ -325,7 +378,7 @@ func (e *EventEngine) resolveFleet(ctx context.Context, fleetID int64) error {
 	}
 
 	if phase == "RETURNING" {
-		return e.finishReturnTx(ctx, tx, fleetID, userID, originID, units)
+		return e.finishReturnTx(ctx, tx, fleetID, userID, universeID, originID, units)
 	}
 
 	switch mission {
@@ -395,7 +448,7 @@ func sendHomeTx(ctx context.Context, tx *sql.Tx, fleetID int64, units map[string
 }
 
 // finishReturnTx deposits the fleet's surviving ships and cargo back at origin.
-func (e *EventEngine) finishReturnTx(ctx context.Context, tx *sql.Tx, fleetID, userID, originID int64, units map[string]int64) error {
+func (e *EventEngine) finishReturnTx(ctx context.Context, tx *sql.Tx, fleetID, userID int64, universeID string, originID int64, units map[string]int64) error {
 	var cm, cl, cw, ch int64
 	if err := tx.QueryRowContext(ctx, `
 		SELECT cargo_metal, cargo_lutinum, cargo_water, cargo_hydrogen FROM fleets WHERE id = $1
@@ -433,6 +486,12 @@ func (e *EventEngine) finishReturnTx(ctx context.Context, tx *sql.Tx, fleetID, u
 	_, err := tx.ExecContext(ctx, `UPDATE fleets SET phase = 'RESOLVED' WHERE id = $1`, fleetID)
 	if err != nil {
 		return err
+	}
+	if at, err := planetCoordsTx(ctx, tx, originID); err == nil {
+		if err := insertMessageTx(ctx, tx, universeID, userID, "system", "own-fleet",
+			"Your fleet has returned to "+at+".", "", 0); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }
@@ -585,10 +644,15 @@ func (e *EventEngine) resolveEspionageTx(ctx context.Context, tx *sql.Tx, fleetI
 			"yourEspionageTech": techs["espionage_tech"],
 		}
 		raw, _ := json.Marshal(payload)
-		if _, err := tx.ExecContext(ctx, `
+		var reportID int64
+		if err := tx.QueryRowContext(ctx, `
 			INSERT INTO reports (universe_id, user_id, kind, title, payload)
-			VALUES ($1, $2, 'espionage', $3, $4)
-		`, universeID, userID, "Espionage: "+coords(tg, ts, tp), raw); err != nil {
+			VALUES ($1, $2, 'espionage', $3, $4) RETURNING id
+		`, universeID, userID, "Espionage: "+coords(tg, ts, tp), raw).Scan(&reportID); err != nil {
+			return err
+		}
+		if err := insertMessageTx(ctx, tx, universeID, userID, "report", "spy",
+			"Espionage: "+coords(tg, ts, tp), "", reportID); err != nil {
 			return err
 		}
 	}
@@ -693,17 +757,27 @@ func (e *EventEngine) resolveAttackTx(ctx context.Context, tx *sql.Tx, fleetID, 
 		},
 	}
 	raw, _ := json.Marshal(payload)
-	if _, err := tx.ExecContext(ctx, `
+	var attackReportID int64
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO reports (universe_id, user_id, kind, title, payload)
-		VALUES ($1, $2, 'combat', $3, $4)
-	`, universeID, userID, "Attack on "+coords(tg, ts, tp), raw); err != nil {
+		VALUES ($1, $2, 'combat', $3, $4) RETURNING id
+	`, universeID, userID, "Attack on "+coords(tg, ts, tp), raw).Scan(&attackReportID); err != nil {
+		return err
+	}
+	if err := insertMessageTx(ctx, tx, universeID, userID, "report", "attack",
+		"Attack on "+coords(tg, ts, tp), "", attackReportID); err != nil {
 		return err
 	}
 	if defOwner.Valid {
-		if _, err := tx.ExecContext(ctx, `
+		var defReportID int64
+		if err := tx.QueryRowContext(ctx, `
 			INSERT INTO reports (universe_id, user_id, kind, title, payload)
-			VALUES ($1, $2, 'combat', $3, $4)
-		`, universeID, defOwner.Int64, "Defense at "+coords(tg, ts, tp), raw); err != nil {
+			VALUES ($1, $2, 'combat', $3, $4) RETURNING id
+		`, universeID, defOwner.Int64, "Defense at "+coords(tg, ts, tp), raw).Scan(&defReportID); err != nil {
+			return err
+		}
+		if err := insertMessageTx(ctx, tx, universeID, defOwner.Int64, "report", "defense",
+			"Defense at "+coords(tg, ts, tp), "", defReportID); err != nil {
 			return err
 		}
 	}
