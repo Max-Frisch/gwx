@@ -10,7 +10,8 @@ Append one line per completed session: `date | session | result | commit`.
 2026-10-12 | E4 | highscore + statistics spec (09-rankings-statistics.md) | 37178ed
 2026-10-12 | E5 | messages/events/search spec (10-messages-events-search.md) | c00d3b4
 2026-10-12 | E6 | premium + settings spec (11-premium-settings.md) | c31bfa2
-2026-10-12 | E7 | login + overview onboarding spec (12-onboarding.md) | (this commit)
+2026-10-12 | E7 | login + overview onboarding spec (12-onboarding.md) | 2f744c3
+2026-10-12 | E8 | consolidated 01-12 spec; rewrote 05 nav; gen_spec owns 01-04/06; refreshed BACKLOG/HANDOFF | (this commit)
 ```
 
 ## Recon (2026-10-12)

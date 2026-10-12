@@ -88,5 +88,11 @@ for i in ("combustionDrive", "ionDrive", "spaceCurvatureDrive", "spaceFoldingDri
         pass
 print("\n== ship build time (per ship-factory level) ==")
 for i in ("schakal", "falcon", "longeagleX"):
-    s = col(i, "Construction time")
+    try:
+        s = col(i, "Construction time")
+    except ValueError:
+        # build times are HH:MM:SS strings, not numbers; report raw values
+        s = [(int(r["Level"]), next(v for k, v in r.items()
+                                    if k.replace("\n", " ").startswith("Construction time")))
+             for r in rows(i) if "Level" in r]
     print("%-12s time L1..6=%s" % (i, [y for _, y in s[:6]]))

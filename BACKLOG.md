@@ -21,6 +21,10 @@ Read first; one item per session. Keep this file short.
 - **Highscore / Hall of Fame** — Players + Planets tabs, sortable. Economy
   points only (buildings + research) from `game.LevelPoints` /
   `store.ScoreStore`; no military points. Link under Community.
+- **Uni5 follow-up HAR walk** — all previously-missing pages captured and mined
+  (defense, trade, alliance, highscore/statistics, messages/events/search,
+  premium/settings, login/overview). Spec now `info/galaxywars-spec/01`–`12`;
+  implementation split into `I1`–`I9` in `info/sessions/`.
 
 ## Todo (ordered)
 - [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
@@ -36,17 +40,14 @@ Read first; one item per session. Keep this file short.
 - [ ] **JSON API** — thin `/api/v1` surface for tooling/bots.
 - [ ] **Full-loop integration test** — register → … → abandon.
 - [ ] **Anti-farm / noob protection** — optional points-ratio guard.
-- [ ] **Follow-up HAR walk** — *captures done* (new Uni5 HARs + Login HAR).
-      Work is split into runnable sessions in `info/sessions/` (E1–E8 extract,
-      I1–I9 build). Run one file per fresh session. E1 closes the `/defense` gap;
-      E2–E7 mine trade/alliance/rankings/messages/premium/onboarding; E8
-      consolidates; I1–I9 implement. See `info/sessions/README.md`.
 
 ## Reference spec (derived from Uni5 HARs — `info/galaxywars-spec/`)
 
 Real GalaxyWars v3.16.19-beta data extracted from the private Uni5 captures
-(`tools/har/harscan.py` → `extract_catalog.py` → `gen_spec.py`). Full details in
-`info/galaxywars-spec/01..06`. Headline facts worth folding into gwx:
+(`tools/har/harscan.py` → `extract_catalog.py` → `extract_pages.py` →
+`fit_formulas.py` → `gen_spec.py`). Full details in
+`info/galaxywars-spec/01..12`; implementation queue in `info/sessions/`.
+Headline facts worth folding into gwx:
 
 - **Cost scaling:** `cost(L) = base × M(L)`, `M(1)=M(2)=1`, then
   `1,2,4,7,11.5,18,26.5,37,51,67.5,87,…` ≈ `(L³+15)/20` (near-cubic growth).
@@ -58,10 +59,15 @@ Real GalaxyWars v3.16.19-beta data extracted from the private Uni5 captures
 - **Hydrogen:** Chemical Factory water→H₂ **5:1**; Advanced Chemical Factory
   **2:1**.
 - **Points:** constant per item/level, economy-only (matches our model).
-- **Defense page gap:** only idents captured (`lightLaserTower`, `laserTower`,
-  `empLauncher`, `plasmaTower`, `rocketDefenseCannons`) — no costs/stats.
-- **Not captured at all:** trade, events, messages, search, alliance,
-  highscore, statistics, premium, settings, `/defense`.
+- **Defense (now captured — `03-combat.md`):** all five units have costs/stats.
+  `lightLaserTower` 600 Iron (Atk 350/Def 150, ckk 0.06); `laserTower` 2.000
+  Iron + 200 Lutinum (1.000/700, 0.22); `empLauncher` 200 Iron + 5.000 Lutinum
+  (1.800/1.000, 0.35); `plasmaTower` 2.000 Iron + 2.000 Lutinum + 50 Water
+  (700/1.400, 0.26); `rocketDefenseCannons` 15.000 Iron + 2.000 Lutinum + 2.000
+  Water (4.500/8.100, 1.58). All require Orbital Defense Station 1.
+- **Follow-up pages (now captured):** trade (`07`), alliance (`08`), highscore +
+  statistics (`09`), messages/events/search (`10`), premium/settings (`11`),
+  login/overview (`12`) — see the matching files for field-level detail.
 
 ## Content for later (from GalaxyWars reference screenshots in `info/`)
 
@@ -113,34 +119,44 @@ Settings**, Logout. (Bold = we don't have it.)
   Tjuger, Longeagle V, Noah (ark), Small Trader, Large Trader. Colonization
   Ship + Recycler + Spy Probe already covered. Our "Trade Ship"/"Colony Ship"
   map to their Trader / Colonization Ship.
-- Defense: EMP Launcher, Rocket Launchers (+ Light/Laser Turret, Plasma Turret);
-  costs/stats NOT captured (no `/defense` page in the HAR).
+- Defense: Light Laser Turret, Laser Turret, EMP Launcher, Plasma Turret,
+  Rocket Launchers — costs/stats now captured in `03-combat.md` (see the
+  "Defense" headline above), all gated by Orbital Defense Station 1.
 - Buildings: Trading Post, Advanced Chemical Factory (water→H₂ 2:1 vs 5:1);
   alt names Lutinum Refinery / Ship Factory / Water Tanks / Hydrogen Tanks.
 
 ### Ready to build now (existing data / mechanics only — no live data)
 
 These need no new subsystems and no external data; the tables/mechanics already
-exist:
+exist. Ordering is cheapest/highest-value first; the bracketed session is the
+build task in `info/sessions/`:
 
-1. **Highscore / Hall of Fame** — done (Players + Planets). Compute economy
+1. **Highscore / Hall of Fame** — *done* (Players + Planets). Compute economy
    points from `planet_items` (building levels) + `user_techs` (research
    levels). Economy/research only, no military points.
-2. **Search** — find planets by name and players by username (`planets`,
-   `users`).
-3. **Account settings** — change username / email / password (auth store already
-   does hashing + sessions).
-4. **Statistics from `reports`** — aggregate the combat JSONB payloads for
+2. **Account settings (`I1`)** — change username / email / password, plus
+   interface prefs (`navigationPosition`, `messagesPerPage`, `locale`); the auth
+   store already does hashing + sessions (`11-premium-settings.md`).
+3. **Search + player profile (`I1`)** — find planets by name and players by
+   username (`planets`, `users`); `/player/<uuid>` hub with trajectory + planets
+   (`10-messages-events-search.md`).
+4. **Statistics from `reports` (`I4`)** — aggregate the combat JSONB payloads for
    destroyed / plundered. ("Recycled" needs debris first.)
-5. **Static Help / Game rules pages + footer links** — pure templates.
-6. **Roster additions that work with today's combat model** — new ships
+5. **Defense roster (`I8`)** — the five units are catalog rows + prereqs and
+   immediately build/fight; real costs/stats in `03-combat.md`.
+6. **Messages from `reports` + system feed (`I2`)** — list combat/espionage
+   reports by kind with read/delete/clear, and build/research/fleet text events
+   (`10-messages-events-search.md`).
+7. **Highscore expansion (`I5`)** — Alliances tab (`ScoreStore.Alliances`
+   aggregation) and sortable Players headers; *Battles* is external-only.
+8. **Static Help / Game rules pages + footer links** — pure templates.
+9. **Roster additions that work with today's combat model** — new ships
    (Jackal, Renegade, Raider, Falcon, Tjuger, Longeagle V, Noah, Small/Large
-   Trader) and defenses (EMP Launcher, Rocket Launchers) are just catalog rows +
-   prereqs and immediately build/fight. Prereq-only techs (Ionization,
+   Trader) are just catalog rows + prereqs. Prereq-only techs (Ionization,
    Explosive Projectiles, Energy Focusing) can gate them.
 
 **Bigger but still self-contained** (own tables, no external dependency):
-Alliances, Trade/market, Vacation mode, Events feed.
+Alliances (`I6`), Trade/market (`I7`), Events feed (`I3`), Vacation mode (`I9`).
 
 **Not standalone** (need a new mechanic first): debris + Recycling Technology,
 Advanced Ship Armor hull bonus, extra cargo tech, Space Curvature Drive

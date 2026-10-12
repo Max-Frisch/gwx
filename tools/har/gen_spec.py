@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""Generate info/galaxywars-spec/*.md from the derived catalog.
+"""Generate info/galaxywars-spec/{01..04,06}.md from the derived catalog.
 
 Run after: harscan dump-all + extract_catalog.py + extract_pages.py
+
+Ownership: this script regenerates 01-04 and 06 only. 05 and 07-12 are
+hand-authored (see `info/sessions/`) and must not be clobbered by a rerun.
 """
 import json
 import os
@@ -337,51 +340,8 @@ lines.append("Distance/fuel/duration are server-computed (oGame-style quadratic 
              "consumption` = −0.5%/level).\n")
 W["04-fleet.md"] = "\n".join(lines) + "\n"
 
-# ------------------------------------------------------------- 05 ui flows
-lines = []
-lines.append("# GWX ↔ GalaxyWars spec — 05 UI flows & navigation\n")
-lines.append("Navigation (left sidebar; not all pages captured in this HAR):\n")
-lines.append("```")
-lines.append("PLANET     Overview   /app/<c>/planet")
-lines.append("           Construction /building")
-lines.append("           Research     /research")
-lines.append("           Ships/Defense /ship   (+ /defense, not captured)")
-lines.append("           Trade        /trading            (not captured)")
-lines.append("           Technology   /technology-tree/{building,research,ship,defense}   (tabbed)")
-lines.append("UNIVERSE   Fleets       /fleet/attack")
-lines.append("           Galaxy       /galaxy[/g/s]")
-lines.append("           Events       /event                (not captured)")
-lines.append("COMMUNITY  Messages     /message              (not captured)")
-lines.append("           Search       /search               (not captured)")
-lines.append("           Alliance     /alliance/search      (not captured)")
-lines.append("           Highscore    /highscore/player     (not captured)")
-lines.append("ACCOUNT    Statistics   /statistic/battle-balance (not captured)")
-lines.append("           Premium      /premium/packages     (not captured)")
-lines.append("           Settings     /settings/game        (not captured)")
-lines.append("```\n")
-lines.append("## Captured surfaces\n")
-lines.append(table(["Surface", "Endpoints", "What to copy"],
-                   [["Construction", "`/building`, `/building/append/<ident>`, `/building/remove/<id>`",
-                     "Grouped cards (Main / Resource / Attack-Defense), level badge, cost pills, "
-                     "duration, red/green affordability vs stock, upgrade link."],
-                    ["Research", "`/research`, `/research/append/<ident>`, `/research/remove/<id>`",
-                     "Grouped by Drive / Weapons / Ship research; descriptions state the "
-                     "per-level effect."],
-                    ["Ships", "`/ship` (GET/POST)", "Card per ship: cost, time, quantity input, "
-                     "`max. N` shortcut."],
-                    ["Technology", "`/technology-tree/{building,research,ship}/{ident}`",
-                     "Info card + requirement list + point/level + **adaptive level-calculator** "
-                     "(Command-Center-at-level / from-to inputs) rendering a cost/time/effect table."],
-                    ["Galaxy", "`/galaxy/<g>/<s>`", "Per-planet tiles: name, points, owner, own/other "
-                     "styling, fleet + target-list shortcut buttons, empty slots."],
-                    ["Fleet", "`/fleet/{attack,spy,own,expedition}?coordinate=…`",
-                     "Mission tabs, ship grid, order block, raid order, target lists, battle simulator."]]))
-lines.append("")
-lines.append("## Not captured (follow-up HAR needed)\n")
-lines.append("Trade/marketplace, Events, Messages, Search, Alliance, Highscore tabs, "
-             "Statistics, Premium, Settings (all tabs), Help/rules, and the "
-             "`/defense` unit page.\n")
-W["05-ui-flows.md"] = "\n".join(lines) + "\n"
+# 05-ui-flows.md is hand-authored (consolidated in E8): gen_spec does not own it.
+# 07-12 are hand-authored too. gen_spec owns 01-04 and 06 only.
 
 # ------------------------------------------------------- 06 queue management
 lines = []
