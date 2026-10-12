@@ -71,6 +71,13 @@ git-ignored, intermediate dumps live in `info/captures/derived/`.
 - Sources: **uni5 HARs lead**. A mid-game account is enough because of the
   adaptive level selector (see below); the fresh **Uni6 (Oct 17)** capture is
   optional/confirmatory for spawn defaults + early flow.
+- **Speeds:** the Uni5 reference ran at **2× game speed / 1× fleet speed**, so
+  every duration/production figure mined from it is at 2× (build/research/
+  production halved vs a 1× round). gwx is deliberately configured at
+  **`GAME_SPEED=1`, `RESOURCE_SPEED=1`, `FLEET_SPEED=1`** (`internal/config`), i.e.
+  **1× / 1×**, so the capture's speed multiplier is *not* baked into the catalog —
+  it can be applied cleanly later via the universe-speed knobs. When porting a
+  reference time, multiply by 2 to recover the 1× figure.
 - HARs stay private (git-ignored); the derived spec is committed under
   `info/galaxywars-spec/`.
 

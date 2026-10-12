@@ -35,6 +35,10 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
 
+	// Defaults are 1x/1x/1x. The GalaxyWars reference (uni5 Uni5 captures) ran at
+	// 2x game speed / 1x fleet speed; the catalog values mined from it are
+	// therefore 2x-speed figures. Keeping gwx at 1x lets a round re-scale them
+	// cleanly through these knobs instead of baking the capture's speed in.
 	gameSpeed, err := floatEnv("GAME_SPEED", 1)
 	if err != nil {
 		return nil, err
