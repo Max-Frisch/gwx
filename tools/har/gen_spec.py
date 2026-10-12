@@ -79,6 +79,13 @@ def ship_costs(it):
     return d
 
 
+def calc_at_level(it, key, level):
+    for L, v in calc_col(it, key):
+        if L == level:
+            return v
+    return "—"
+
+
 def table(headers, rows):
     s = "| " + " | ".join(headers) + " |\n"
     s += "|" + "|".join(["---"] * len(headers)) + "|\n"
@@ -136,6 +143,14 @@ for it in b:
         series = calc_col(it, c.split("(")[0].strip())
         sample = ", ".join("L%s=%s" % (L, v) for L, v in series[:5])
         lines.append("- **%s** — `%s`: %s" % (it["name"], c, sample))
+
+df = by_kind("defense")
+lines.append("\n## Defense\n")
+rows = []
+for it in df:
+    reqs = "; ".join(it.get("requirements") or []) or "—"
+    rows.append([it["name"], "`%s`" % it["ident"], fmt_cost(ship_costs(it)), reqs])
+lines.append(table(["Name", "ident", "Base cost (per unit)", "Requirements"], rows))
 
 W["01-catalog.md"] = "\n".join(lines) + "\n"
 
@@ -234,16 +249,44 @@ for ident in ("schakal", "falcon", "longeagleX"):
     series = calc_col(it, "Construction time")
     lines.append("- **%s:** %s" % (it["name"], ", ".join("F%s=%s" % (L, v) for L, v in series[:11])))
 
-lines.append("\n## Defense (gap)\n")
-lines.append("Defense unit idents appear in the **battle simulator** payload, but the "
-             "`/app/<coord>/defense` page was **not visited** in this capture, so "
-             "defense costs/stats are missing. Known idents (with client labels):")
-lines.append(table(["ident", "Label"],
-                   [["lightLaserTower", "Light Laser Turret"],
-                    ["laserTower", "Laser Turret"],
-                    ["empLauncher", "EMP Launcher"],
-                    ["plasmaTower", "Plasma Turret"],
-                    ["rocketDefenseCannons", "Rocket Launchers"]]))
+lines.append("\n## Defense\n")
+lines.append("Defense units are fixed emplacements: they have **no cargo, speed or "
+             "consumption**. Stats come from the technology-tree defense pages "
+             "(`Base` = hull default, `Current` = with this account's research). The "
+             "calculator's `Level` input is the **Orbital Defense Station** level; the "
+             "build time below is at this account's current ODS level (L4, matching "
+             "the `/defense` page's `Duration`).\n")
+df = by_kind("defense")
+def_rows = []
+for it in df:
+    st = it.get("stats", {})
+
+    def base_of(k):
+        return fnum(st.get(k, {}).get("base")) if k in st else "—"
+
+    def cur_of(k):
+        return fnum(st.get(k, {}).get("current")) if k in st else "—"
+
+    ods = (it.get("calc") or {}).get("props", {}).get("levelCurrent")
+    bt = calc_at_level(it, "Construction time", ods) if ods is not None else "—"
+    def_rows.append([it["name"], "`%s`" % it["ident"], fmt_cost(ship_costs(it)),
+                     "%s→%s" % (base_of("Attack"), cur_of("Attack")),
+                     "%s→%s" % (base_of("Defense"), cur_of("Defense")),
+                     "%s→%s" % (base_of("ckk"), cur_of("ckk")),
+                     bt,
+                     "; ".join(it.get("requirements") or []) or "—"])
+lines.append(table(["Unit", "ident", "Cost", "Attack", "Defense", "ckk",
+                    "Build time", "Requirements"], def_rows))
+
+lines.append("\n### Client ident → gwx code mapping\n")
+lines.append("The client idents differ from gwx's codes; the roster "
+             "(`internal/game/catalog.go`) adopts this mapping:\n")
+lines.append(table(["GW ident", "Label", "gwx code"],
+                   [["lightLaserTower", "Light Laser Turret", "`light_laser` (retune)"],
+                    ["laserTower", "Laser Turret", "`heavy_laser` → rename/replace"],
+                    ["empLauncher", "EMP Launcher", "`emp_launcher` (new)"],
+                    ["plasmaTower", "Plasma Turret", "`plasma_turret` (retune)"],
+                    ["rocketDefenseCannons", "Rocket Launchers", "`rocket_launcher` (new)"]]))
 lines.append("Planetary Shield + Fusion Reactor are the two defense-relevant "
              "*buildings* (shield energy comes from the fusion reactor).\n")
 

@@ -51,3 +51,14 @@ Reference client: `GalaxyWars v3.16.19-beta`, universe `uni5`, constructor plane
 - **Water Tanks** — `Cannot be plundered`: L1=7.200, L2=10.800, L3=16.800, L4=25.200, L5=36.000
 - **Hydrogen Tanks** — `Storage`: L1=360.000, L2=540.000, L3=840.000, L4=1.260.000, L5=1.800.000
 - **Hydrogen Tanks** — `Cannot be plundered`: L1=7.200, L2=10.800, L3=16.800, L4=25.200, L5=36.000
+
+## Defense
+
+| Name | ident | Base cost (per unit) | Requirements |
+|---|---|---|---|
+| Laser Turret | `laserTower` | 2.000 Iron, 200 Lutinum | Orbital Defense Station  (1/1); Combustion Drive  (1/1) |
+| EMP Launcher | `empLauncher` | 200 Iron, 5.000 Lutinum | Orbital Defense Station  (1/1) |
+| Plasma Turret | `plasmaTower` | 2.000 Iron, 2.000 Lutinum, 50 Water | Orbital Defense Station  (1/1); Ionization  (0/4) |
+| Light Laser Turret | `lightLaserTower` | 600 Iron | Orbital Defense Station  (1/1) |
+| Rocket Launchers | `rocketDefenseCannons` | 15.000 Iron, 2.000 Lutinum, 2.000 Water | Orbital Defense Station  (1/1); Explosive Projectiles  (0/10) |
+

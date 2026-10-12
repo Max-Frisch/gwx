@@ -46,16 +46,30 @@ The ship calculator's `Level` input is the **Ship Factory level**; it lists the 
 - **Falcon:** F1=10:00:00, F2=05:00:00, F3=02:51:25, F4=01:49:05, F5=01:15:00, F6=00:52:10, F7=00:38:42, F8=00:30:00, F9=00:24:00, F10=00:19:40, F11=00:16:12
 - **Longeagle X:** F1=13 Tage, 21:20:00, F2=6 Tage, 22:40:00, F3=3 Tage, 23:14:17, F4=2 Tage, 12:36:21, F5=1 Tag, 17:40:00, F6=1 Tag, 04:59:07, F7=21:30:19, F8=16:40:00, F9=13:20:00, F10=10:55:44, F11=09:00:32
 
-## Defense (gap)
+## Defense
 
-Defense unit idents appear in the **battle simulator** payload, but the `/app/<coord>/defense` page was **not visited** in this capture, so defense costs/stats are missing. Known idents (with client labels):
-| ident | Label |
-|---|---|
-| lightLaserTower | Light Laser Turret |
-| laserTower | Laser Turret |
-| empLauncher | EMP Launcher |
-| plasmaTower | Plasma Turret |
-| rocketDefenseCannons | Rocket Launchers |
+Defense units are fixed emplacements: they have **no cargo, speed or consumption**. Stats come from the technology-tree defense pages (`Base` = hull default, `Current` = with this account's research). The calculator's `Level` input is the **Orbital Defense Station** level; the build time below is at this account's current ODS level (L4, matching the `/defense` page's `Duration`).
+
+| Unit | ident | Cost | Attack | Defense | ckk | Build time | Requirements |
+|---|---|---|---|---|---|---|---|
+| Laser Turret | `laserTower` | 2.000 Iron, 200 Lutinum | 1.000→1.000 | 700→871 | 0.22→0.24 | 00:15:09 | Orbital Defense Station  (1/1); Combustion Drive  (1/1) |
+| EMP Launcher | `empLauncher` | 200 Iron, 5.000 Lutinum | 1.800→1.800 | 1.000→1.244 | 0.35→0.39 | 00:37:52 | Orbital Defense Station  (1/1) |
+| Plasma Turret | `plasmaTower` | 2.000 Iron, 2.000 Lutinum, 50 Water | 700→700 | 1.400→1.742 | 0.26→0.29 | 00:01:17 | Orbital Defense Station  (1/1); Ionization  (0/4) |
+| Light Laser Turret | `lightLaserTower` | 600 Iron | 350→350 | 150→186 | 0.06→0.07 | 00:01:30 | Orbital Defense Station  (1/1) |
+| Rocket Launchers | `rocketDefenseCannons` | 15.000 Iron, 2.000 Lutinum, 2.000 Water | 4.500→4.500 | 8.100→10.084 | 1.58→1.76 | 00:15:09 | Orbital Defense Station  (1/1); Explosive Projectiles  (0/10) |
+
+
+### Client ident → gwx code mapping
+
+The client idents differ from gwx's codes; the roster (`internal/game/catalog.go`) adopts this mapping:
+
+| GW ident | Label | gwx code |
+|---|---|---|
+| lightLaserTower | Light Laser Turret | `light_laser` (retune) |
+| laserTower | Laser Turret | `heavy_laser` → rename/replace |
+| empLauncher | EMP Launcher | `emp_launcher` (new) |
+| plasmaTower | Plasma Turret | `plasma_turret` (retune) |
+| rocketDefenseCannons | Rocket Launchers | `rocket_launcher` (new) |
 
 Planetary Shield + Fusion Reactor are the two defense-relevant *buildings* (shield energy comes from the fusion reactor).
 
