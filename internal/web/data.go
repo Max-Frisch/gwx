@@ -78,19 +78,39 @@ type queuePartialData struct {
 	Queue          *queueView
 }
 
-type buildRow struct {
-	Code       string
+// buildQueueRow is one line of the construction queue table.
+type buildQueueRow struct {
+	Ordinal    int
+	ID         int64
 	Name       string
-	Level      int
-	NextLevel  int
-	Unlocked   bool
-	Missing    []string
-	Affordable bool
-	Queued     bool
-	CostStr    string
-	TimeStr    string
-	Desc       string
-	Icon       string
+	Duration   string
+	Remaining  string
+	FinishUnix int64
+}
+
+// buildQueuePartialData backs the self-polling construction queue fragment.
+type buildQueuePartialData struct {
+	ActivePlanetID int64
+	BuildQueue     []buildQueueRow
+	QueueUsed      int
+	QueueSlots     int
+	QueueFull      bool
+}
+
+type buildRow struct {
+	Code        string
+	Name        string
+	Level       int
+	NextLevel   int
+	Queued      bool
+	QueuedCount int
+	Unlocked    bool
+	Missing     []string
+	Affordable  bool
+	CostStr     string
+	TimeStr     string
+	Desc        string
+	Icon        string
 	// Art is an optional image tile for the card. Empty today (the catalog
 	// carries SVG icons only), so the template falls back to the placeholder.
 	Art   string
@@ -445,8 +465,11 @@ type buildingSection struct {
 
 type buildingsData struct {
 	baseData
-	Sections []buildingSection
-	Queue    *queueView
+	Sections   []buildingSection
+	BuildQueue []buildQueueRow
+	QueueUsed  int
+	QueueSlots int
+	QueueFull  bool
 }
 
 // resProdRow is one line of the resources overview table. The four resource
@@ -682,6 +705,15 @@ func until(t time.Time) string {
 	d := time.Until(t)
 	if d <= 0 {
 		return "now"
+	}
+	return humanDur(int64(d.Seconds()))
+}
+
+// untilDur formats a fixed duration between two instants.
+func untilDur(start, finish time.Time) string {
+	d := finish.Sub(start)
+	if d <= 0 {
+		return "0s"
 	}
 	return humanDur(int64(d.Seconds()))
 }

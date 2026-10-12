@@ -24,6 +24,10 @@ type Config struct {
 	MaxGalaxies  int
 	MaxSystems   int
 	EndsAt       *time.Time
+
+	// BuildQueueSlots is how many building construction orders a planet may
+	// queue at once (the reference construction queue holds 6).
+	BuildQueueSlots int
 }
 
 // Load reads and validates configuration. DATABASE_URL is the only required
@@ -58,18 +62,23 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	queueSlots, err := intEnv("BUILD_QUEUE_SLOTS", 6)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
-		Env:          getenv("APP_ENV", "development"),
-		HTTPAddr:     getenv("HTTP_ADDR", ":8090"),
-		DatabaseURL:  dbURL,
-		UniverseCode: getenv("UNIVERSE_CODE", "universe_gwx_1"),
-		UniverseName: getenv("UNIVERSE_NAME", "Classic Universe"),
-		GameSpeed:    gameSpeed,
-		FleetSpeed:   fleetSpeed,
-		MaxGalaxies:  maxGal,
-		MaxSystems:   maxSys,
-		EndsAt:       endsAt,
+		Env:             getenv("APP_ENV", "development"),
+		HTTPAddr:        getenv("HTTP_ADDR", ":8090"),
+		DatabaseURL:     dbURL,
+		UniverseCode:    getenv("UNIVERSE_CODE", "universe_gwx_1"),
+		UniverseName:    getenv("UNIVERSE_NAME", "Classic Universe"),
+		GameSpeed:       gameSpeed,
+		FleetSpeed:      fleetSpeed,
+		MaxGalaxies:     maxGal,
+		MaxSystems:      maxSys,
+		EndsAt:          endsAt,
+		BuildQueueSlots: queueSlots,
 	}, nil
 }
 

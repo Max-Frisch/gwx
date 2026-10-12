@@ -43,6 +43,7 @@ just editing `.env` and restarting:
 | `GAME_SPEED` | build + research time **and** resource production multiplier (higher = faster) |
 | `FLEET_SPEED` | fleet travel speed multiplier |
 | `MAX_GALAXIES`, `MAX_SYSTEMS` | universe bounds |
+| `BUILD_QUEUE_SLOTS` | building construction queue length per planet (default 6) |
 | `ENDS_AT` | optional RFC3339 seasonal end (empty = long-term universe) |
 
 GalaxyWars has exactly **two** speed modifiers — game speed and fleet speed.
@@ -107,7 +108,9 @@ Key ideas (borrowed from the sibling `neoxnova` project):
   `FOR UPDATE SKIP LOCKED`, re-checks the condition inside the transaction and
   applies the effect idempotently. Safe to restart; multi-instance safe.
 - **One generic queue table** drives construction, research and ship/defense
-  production; partial unique indexes enforce one active order per scope.
+  production. Research and ship/defense keep one active order per scope via
+  partial unique indexes; a planet may chain up to `BUILD_QUEUE_SLOTS` (default
+  6) building orders, each scheduled right after the previous one.
 - **Catalog-keyed store.** `planet_items` holds buildings (as levels) and
   ships/defense (as counts); `user_techs` holds account-wide research.
 

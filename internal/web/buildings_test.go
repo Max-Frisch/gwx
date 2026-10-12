@@ -14,12 +14,14 @@ func TestBuildingsTemplateRenders(t *testing.T) {
 	tmpl := template.Must(template.New("").Funcs(fm).ParseFS(templatesFS, "templates/*.html"))
 
 	d := buildingsData{
-		baseData: baseData{Title: "Buildings", ActivePlanetID: 5},
+		baseData:   baseData{Title: "Buildings", ActivePlanetID: 5},
+		QueueSlots: 6, QueueUsed: 5,
 		Sections: []buildingSection{{
 			Name: "Main buildings",
 			Rows: []buildRow{
 				{
-					Code: "command_center", Name: "Command Center", Level: 1, NextLevel: 2,
+					Code: "command_center", Name: "Command Center", Level: 4, NextLevel: 10,
+					Queued: true, QueuedCount: 5,
 					Unlocked: true, Affordable: true, Icon: "i-home", Desc: "The heart of it all.",
 					TimeStr: "1m 0s", Costs: []costPart{{Label: "Iron", Class: "m", Amount: "300", OK: true}},
 				},
@@ -31,12 +33,16 @@ func TestBuildingsTemplateRenders(t *testing.T) {
 			},
 		}},
 	}
+	d.BuildQueue = []buildQueueRow{{Ordinal: 1, ID: 1, Name: "Command Center Level 5", Duration: "1m 0s", Remaining: "5m 0s", FinishUnix: 1700000300}}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "buildings", d); err != nil {
 		t.Fatalf("buildings template: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"Main buildings", "Command Center", "Upgrade to level 2", "300", "Requires:", "i-home"} {
+	for _, want := range []string{
+		"Main buildings", "Command Center", "Level 4 (+5)", "Upgrade to level 10",
+		"300", "Requires:", "i-home", "Construction queue", "(5/6)",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("buildings page missing %q", want)
 		}
@@ -50,13 +56,13 @@ func TestHtmxContentRenders(t *testing.T) {
 	fm := template.FuncMap{"n": fmtInt, "nf": fmtFloat, "coords": coords}
 	tmpl := template.Must(template.New("").Funcs(fm).ParseFS(templatesFS, "templates/*.html"))
 
-	q := queueView{ID: 9, Kind: "building", Name: "Iron Mine → 3", Remaining: "1m 0s", FinishUnix: 1700000000}
 	d := buildingsData{
 		baseData: baseData{
 			Title: "Buildings", ActivePlanetID: 5, HX: true,
 			Flash: "Construction started.", Resources: &resView{Metal: 500},
 		},
-		Queue: &q,
+		QueueSlots: 6, QueueUsed: 1,
+		BuildQueue: []buildQueueRow{{Ordinal: 1, ID: 9, Name: "Iron Mine Level 3", Duration: "1m 0s", Remaining: "1m 0s", FinishUnix: 1700000000}},
 		Sections: []buildingSection{{
 			Name: "Resource buildings",
 			Rows: []buildRow{{Code: "iron_mine", Name: "Iron Mine", NextLevel: 3, Unlocked: true, Affordable: true, Icon: "i-mine"}},
@@ -69,7 +75,7 @@ func TestHtmxContentRenders(t *testing.T) {
 	out := buf.String()
 	for _, want := range []string{
 		"hx-post=", `hx-target="#page-content"`, `data-countdown="1700000000"`,
-		`hx-swap-oob="true"`, `id="res-strip"`, "Construction started.",
+		`hx-swap-oob="true"`, `id="res-strip"`, "Construction started.", "Construction queue",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("buildings-content missing %q", want)
@@ -77,11 +83,15 @@ func TestHtmxContentRenders(t *testing.T) {
 	}
 
 	var qbuf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&qbuf, "queue-panel", queuePartialData{ActivePlanetID: 5, Queue: &q}); err != nil {
-		t.Fatalf("queue-panel template: %v", err)
+	bd := buildQueuePartialData{
+		ActivePlanetID: 5, QueueSlots: 6, QueueUsed: 1,
+		BuildQueue: []buildQueueRow{{Ordinal: 1, ID: 9, Name: "Iron Mine Level 3", Duration: "1m 0s", Remaining: "1m 0s", FinishUnix: 1700000000}},
+	}
+	if err := tmpl.ExecuteTemplate(&qbuf, "build-queue-panel", bd); err != nil {
+		t.Fatalf("build-queue-panel template: %v", err)
 	}
 	if !strings.Contains(qbuf.String(), `hx-get="/partials/queue/5?kind=building"`) {
-		t.Errorf("queue-panel missing self-poll attribute: %s", qbuf.String())
+		t.Errorf("build-queue-panel missing self-poll attribute: %s", qbuf.String())
 	}
 
 	var rbuf bytes.Buffer

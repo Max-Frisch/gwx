@@ -290,6 +290,8 @@ func msg(err error) string {
 		return "Not enough hydrogen for fuel (and cargo)."
 	case errors.Is(err, store.ErrQueueBusy):
 		return "That queue is already busy."
+	case errors.Is(err, store.ErrQueueFull):
+		return "The construction queue is full."
 	case errors.Is(err, store.ErrPrerequisites):
 		return "Prerequisites not met."
 	case errors.Is(err, store.ErrNoFields):
@@ -490,25 +492,47 @@ func (h *Handler) buildingsView(ctx context.Context, r *http.Request, userID, id
 	gameSpeed, _ := h.gameSpeed(ctx)
 
 	d := buildingsData{baseData: h.base(ctx, r, userID, "Buildings", id)}
-	if q, ok := h.activeQueue(ctx, id, userID, "building"); ok {
-		v := newQueueView(q)
-		d.Queue = &v
+	d.QueueSlots = h.buildQueueSlots(ctx)
+	buildOrders, _ := h.buildingQueue(ctx, id, userID)
+	queuedByCode := map[string]int{}
+	for i, q := range buildOrders {
+		var level int64
+		if q.TargetLevel.Valid {
+			level = q.TargetLevel.Int64
+		}
+		name := q.Code
+		if def, ok := game.Get(q.Code); ok {
+			name = fmt.Sprintf("%s Level %d", def.Name, level)
+		}
+		d.BuildQueue = append(d.BuildQueue, buildQueueRow{
+			Ordinal:    i + 1,
+			ID:         q.ID,
+			Name:       name,
+			Duration:   untilDur(q.StartAt, q.FinishAt),
+			Remaining:  until(q.FinishAt),
+			FinishUnix: q.FinishAt.Unix(),
+		})
+		queuedByCode[q.Code]++
 	}
+	d.QueueUsed = len(d.BuildQueue)
+	d.QueueFull = d.QueueSlots > 0 && d.QueueUsed >= d.QueueSlots
 
 	byGroup := map[string][]buildRow{}
 	for _, def := range sortedDefs(game.KindBuilding) {
-		next := structs[def.Code] + 1
+		queued := queuedByCode[def.Code]
+		next := structs[def.Code] + queued + 1
 		cost := def.LevelCost(next)
 		row := buildRow{
 			Code: def.Code, Name: def.Name, Level: structs[def.Code], NextLevel: next,
-			Unlocked:   game.PrereqsMet(def, structs, techs),
-			Queued:     d.Queue != nil && strings.HasPrefix(d.Queue.Name, def.Name),
-			CostStr:    costString(cost),
-			Costs:      costParts(cost, p),
-			TimeStr:    humanDur(int64(def.LevelTime(next) * game.BuildTimeMultiplier(structs["command_center"]) / gameSpeed)),
-			Affordable: p.Metal >= cost.Metal && p.Lutinum >= cost.Lutinum && p.Water >= cost.Water && p.Hydrogen >= cost.Hydrogen,
-			Desc:       def.Desc,
-			Icon:       def.Icon,
+			Queued:      queued > 0,
+			QueuedCount: queued,
+			Unlocked:    game.PrereqsMet(def, structs, techs),
+			CostStr:     costString(cost),
+			Costs:       costParts(cost, p),
+			TimeStr:     humanDur(int64(def.LevelTime(next) * game.BuildTimeMultiplier(structs["command_center"]) / gameSpeed)),
+			Affordable:  p.Metal >= cost.Metal && p.Lutinum >= cost.Lutinum && p.Water >= cost.Water && p.Hydrogen >= cost.Hydrogen,
+			Desc:        def.Desc,
+			Icon:        def.Icon,
 		}
 		if row.Icon == "" {
 			row.Icon = "i-build"
@@ -2268,8 +2292,35 @@ func (h *Handler) QueuePartial(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	kind := r.URL.Query().Get("kind")
+	if kind == "building" {
+		buildOrders, _ := h.buildingQueue(r.Context(), id, userID)
+		bd := buildQueuePartialData{ActivePlanetID: id, QueueSlots: h.buildQueueSlots(r.Context())}
+		for i, q := range buildOrders {
+			var level int64
+			if q.TargetLevel.Valid {
+				level = q.TargetLevel.Int64
+			}
+			name := q.Code
+			if def, ok := game.Get(q.Code); ok {
+				name = fmt.Sprintf("%s Level %d", def.Name, level)
+			}
+			bd.BuildQueue = append(bd.BuildQueue, buildQueueRow{
+				Ordinal:    i + 1,
+				ID:         q.ID,
+				Name:       name,
+				Duration:   untilDur(q.StartAt, q.FinishAt),
+				Remaining:  until(q.FinishAt),
+				FinishUnix: q.FinishAt.Unix(),
+			})
+		}
+		bd.QueueUsed = len(bd.BuildQueue)
+		bd.QueueFull = bd.QueueSlots > 0 && bd.QueueUsed >= bd.QueueSlots
+		h.render(w, "build-queue-panel", http.StatusOK, bd)
+		return
+	}
 	d := queuePartialData{ActivePlanetID: id}
-	if q, ok := h.activeQueue(r.Context(), id, userID, r.URL.Query().Get("kind")); ok {
+	if q, ok := h.activeQueue(r.Context(), id, userID, kind); ok {
 		v := newQueueView(q)
 		d.Queue = &v
 	}
@@ -2289,6 +2340,30 @@ func (h *Handler) activeQueue(ctx context.Context, planetID, userID int64, kind 
 		}
 	}
 	return store.Queue{}, false
+}
+
+// buildingQueue returns a planet's active building orders in the order they
+// will run (earliest finish first).
+func (h *Handler) buildingQueue(ctx context.Context, planetID, userID int64) ([]store.Queue, error) {
+	qs, err := h.queues.Active(ctx, planetID, userID)
+	if err != nil {
+		return nil, err
+	}
+	var out []store.Queue
+	for _, q := range qs {
+		if q.Kind == "building" {
+			out = append(out, q)
+		}
+	}
+	return out, nil
+}
+
+// buildQueueSlots returns the universe's building-queue capacity (0 when unset).
+func (h *Handler) buildQueueSlots(ctx context.Context) int {
+	var v int
+	_ = h.db.QueryRowContext(ctx,
+		`SELECT build_queue_slots FROM universes WHERE code_name = $1`, h.universeCode).Scan(&v)
+	return v
 }
 
 func (h *Handler) gameSpeed(ctx context.Context) (float64, error) {

@@ -51,3 +51,39 @@
   {{end}}
 </div>
 {{end}}
+
+{{/* build-queue-panel is the multi-slot construction queue (buildings only).
+     It self-polls every 5s so the cumulative "time remaining" column resyncs
+     with the server while the client-side ticker counts down in between. */}}
+{{define "build-queue-panel"}}
+{{if .BuildQueue}}
+<div id="build-queue" hx-get="/partials/queue/{{.ActivePlanetID}}?kind=building" hx-trigger="every 5s" hx-swap="outerHTML">
+  <h2 class="section-head">Construction queue <span class="muted">({{.QueueUsed}}/{{.QueueSlots}})</span></h2>
+  <div class="panel">
+    <table>
+      <tr>
+        <th style="width:40px">#</th>
+        <th>Building</th>
+        <th style="width:160px">Construction time</th>
+        <th style="width:160px">Time remaining</th>
+        <th style="width:40px"></th>
+      </tr>
+      {{range .BuildQueue}}
+      <tr>
+        <td class="muted">{{.Ordinal}}</td>
+        <td>{{.Name}}</td>
+        <td>{{.Duration}}</td>
+        <td><span data-countdown="{{.FinishUnix}}">{{.Remaining}}</span></td>
+        <td>
+          <form method="post" action="/queue/{{.ID}}/cancel"
+                hx-post="/queue/{{.ID}}/cancel" hx-target="#page-content" hx-swap="innerHTML">
+            <button class="bad" type="submit" title="Cancel (refund)">✕</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </table>
+  </div>
+</div>
+{{end}}
+{{end}}

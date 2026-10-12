@@ -10,6 +10,7 @@ var (
 	ErrInsufficientShips     = errors.New("insufficient ships")
 	ErrInsufficientFuel      = errors.New("insufficient hydrogen")
 	ErrQueueBusy             = errors.New("build queue is busy")
+	ErrQueueFull             = errors.New("construction queue is full")
 	ErrPrerequisites         = errors.New("prerequisites not met")
 	ErrUnknownCode           = errors.New("unknown build code")
 	ErrInvalidQuantity       = errors.New("invalid quantity")

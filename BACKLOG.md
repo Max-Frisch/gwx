@@ -139,6 +139,16 @@ Read first; one item per session. Keep this file short.
   own techs. `game.CombatTechs`/`CombatTechsFromLevels`/`weaponMultiplier`,
   `Simulate` signature, unit cards show the weapon class
   (`internal/game/combat.go`, `catalog.go`; `03-combat.md`).
+- **Construction queue (6 slots)** — a planet chains up to
+  `BUILD_QUEUE_SLOTS` (default 6) building orders, client-side scheduled
+  back-to-back so the engine needs no change; each order targets the next level
+  (`current + already-queued + 1`) and the card adapts its cost/time and shows
+  `Level N (+queued)`. `/buildings` gained the reference **Construction queue**
+  table (#, building, construction time, cumulative time remaining, cancel).
+  Cancelling a level refunds it, renumbers later same-building orders down and
+  re-chains the timeline (with a price-difference refund). Slot cap enforced in
+  Go under the planet row lock; `uq_queue_building` dropped, `universes
+  .build_queue_slots` added (migration `0009`; `06-queue-management.md`).
 
 ## Todo (ordered)
 
