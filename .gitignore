@@ -3,3 +3,7 @@ bin/
 *.exe
 server.log
 cookies.txt
+
+# Raw capture artifacts stay private (HARs embed session cookies/tokens).
+*.har
+info/captures/
