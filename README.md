@@ -1,7 +1,8 @@
 # gwx
 
-A deliberately small, self-contained **GalaxyWars-style** browser game — a hobby
-retro revival of the classic German `.de` game, not a clone of any live service.
+A deliberately small, self-contained **GalaxyWars-style** browser game — a
+personal hobby project reviving the old glory of **GalaxyWars**, not a clone of
+any live service.
 Four resources, one catalog, no moons, no expeditions, no premium, no academy.
 
 The design goal is **simplicity + fog of war**: there is no military score, so
