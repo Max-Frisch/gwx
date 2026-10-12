@@ -24,6 +24,8 @@ Append one line per completed session: `date | session | result | commit`.
 2026-10-12 | I8 | defense roster: 5 real GW units retuned (Light/Laser/EMP/Plasma/Rocket), placeholders dropped (0007), Ionization + Explosive Projectiles techs, /defense page split from shipyard, ckk = (Atk+Def)/8000 documented | (this commit)
 2026-10-12 | I9 | vacation mode + sanctions: users.vacation_since/until + sanctioned/reason (0008); production freeze in update_planet_resources, scheduler queue-pause + auto-end (FinalizeExpiredVacations), attack/queue/dispatch gates, /settings/vacation + /settings/sanction + banner | (this commit)
 2026-10-12 | testing | full-loop integration test: ephemeral Postgres + migrations + real UI/scheduler at x10000/x100000; register→build→research→shipyard→raid→loot→return→colonize (+ transport); skips without a DB | (this commit)
+2026-10-12 | UI cards | Construction card layout (grouped: Main/Resource/Military; per-resource cost tint, SVG tiles, Upgrade-to-level buttons) + Resources sub-tab (per-building output incl. −water, totals, storage, plunder-protected); Construction tabs reduced to Buildings+Resources | (this commit)
+2026-10-12 | UI perf | fix scroll jank: remove per-card backdrop-filter (each card re-blurred the fixed starfield every frame). Queued U1 (info/sessions/U1-ui-refresh.md) for responsive+fast layout, design tokens, vendored htmx | (this commit)
 ```
 
 ## Recon (2026-10-12)

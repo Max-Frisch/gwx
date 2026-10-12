@@ -102,8 +102,10 @@ E7 onboarding┘
 | I7 | [trade](I7-trade.md) | build | — | E2 |
 | I8 | [defense-roster](I8-defense-roster.md) | build | — | E1 |
 | I9 | [premium-vacation](I9-premium-vacation.md) | build (opt) | — | E6 |
+| U1 | [ui-refresh](U1-ui-refresh.md) | build (UI) | — | card layout (shipped) |
 
 ## Status
 
 - [x] E1  - [x] E2  - [x] E3  - [x] E4  - [x] E5  - [x] E6  - [x] E7  - [x] E8
 - [x] I1  - [x] I2  - [x] I3  - [x] I4  - [x] I5  - [x] I6  - [x] I7  - [x] I8  - [x] I9
+- [ ] U1 (ui-refresh) — responsive + fast layout, htmx partials, design tokens

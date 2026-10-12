@@ -1,0 +1,49 @@
+{{define "resources"}}
+{{template "head" .}}
+<h1>Resources</h1>
+
+<div class="panel">
+<h2>Resource production per hour</h2>
+<table class="res-table">
+  <tr>
+    <th></th>
+    <th class="num m">Iron</th>
+    <th class="num l">Lutinum</th>
+    <th class="num w">Water</th>
+    <th class="num h">Hydrogen</th>
+  </tr>
+  {{range .Rows}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td class="num">{{.Metal}}</td>
+    <td class="num">{{.Lutinum}}</td>
+    <td class="num">{{.Water}}</td>
+    <td class="num">{{.Hydrogen}}</td>
+  </tr>
+  {{end}}
+  <tr class="total">
+    <td>{{.Total.Name}}</td>
+    <td class="num">{{.Total.Metal}}</td>
+    <td class="num">{{.Total.Lutinum}}</td>
+    <td class="num">{{.Total.Water}}</td>
+    <td class="num">{{.Total.Hydrogen}}</td>
+  </tr>
+  <tr class="section"><td colspan="5">Storage</td></tr>
+  <tr>
+    <td>{{.Storage.Name}}</td>
+    <td class="num">{{.Storage.Metal}}</td>
+    <td class="num">{{.Storage.Lutinum}}</td>
+    <td class="num">{{.Storage.Water}}</td>
+    <td class="num">{{.Storage.Hydrogen}}</td>
+  </tr>
+  <tr>
+    <td class="muted">{{.Protected.Name}}</td>
+    <td class="num">{{.Protected.Metal}}</td>
+    <td class="num">{{.Protected.Lutinum}}</td>
+    <td class="num">{{.Protected.Water}}</td>
+    <td class="num">{{.Protected.Hydrogen}}</td>
+  </tr>
+</table>
+</div>
+{{template "foot" .}}
+{{end}}

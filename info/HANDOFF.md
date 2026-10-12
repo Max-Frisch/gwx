@@ -56,6 +56,26 @@ A fourth Uni5 HAR followed the same account to a **newly colonized planet**
   `internal/engine/event_engine.go` (`colonyStart*`). Homeworld spawn unchanged
   (1000/1000/500).
 
+### Update — UI cards + Resources tab; U1 queued
+
+Construction (`/buildings`) is now a GigraWars-style card layout (grouped
+Main/Resource/Military buildings; SVG tile, blurb, per-resource cost tinted
+green/red, `Upgrade to level N`), and the Construction tabs are now just
+**Buildings** and **Resources**. `/resources/{id}` is the production overview:
+per-building hourly output (factories show their `−water`), net totals, storage
+capacity and the plunder-protected share. Catalog gained `Group`/`Desc`/`Icon`
+(`internal/game/catalog.go`).
+
+**Perf note:** the first cut gave every card a `backdrop-filter: blur(2px)`;
+because the starfield is `background-attachment: fixed`, that re-blurred the
+background on every scroll frame and lagged badly. Fixed by using an opaque card
+fill. Rule going forward: **no `backdrop-filter`/`filter` on repeated list items.**
+
+**Next (optional):** `info/sessions/U1-ui-refresh.md` — a focused UI session
+(responsive breakpoints, design tokens, vendored htmx for partial updates, polish
++ perf guardrails). Stack stays stdlib `html/template` + hand-written CSS; no
+Tailwind/Templ/Node.
+
 ## Prior state
 
 ## Repo state

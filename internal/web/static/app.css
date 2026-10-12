@@ -131,6 +131,51 @@ a:hover { color: var(--link-hi); text-decoration: underline; }
 .tabs a.active { background: var(--accent); color: #fff; }
 .tabs .disabled { padding: 8px 18px; color: var(--muted-2); font-size: 13.5px; cursor: not-allowed; }
 
+/* ---- building cards (GigraWars-style) ---- */
+.section-head {
+  font-size: 13px; font-weight: 600; color: #e7ecf3;
+  background: rgba(255, 255, 255, .03); border: 1px solid var(--line-soft);
+  padding: 9px 14px; margin: 22px 0 10px; border-radius: 3px;
+}
+.bcard {
+  display: flex; align-items: center; gap: 16px;
+  /* Opaque fill on purpose: a backdrop-filter blur per card re-blurs the fixed
+     starfield on every scroll frame and makes long lists janky. */
+  background: #141a25; border: 1px solid var(--line-soft);
+  border-radius: 3px; padding: 12px 14px; margin-bottom: 8px;
+}
+.bcard.locked { opacity: .62; }
+.bcard-img {
+  flex: 0 0 150px; width: 150px; height: 84px; border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(64, 96, 150, .30), transparent 70%),
+    linear-gradient(180deg, #0c1626, #0a1220);
+  border: 1px solid var(--line);
+}
+.ic-lg { width: 52px; height: 52px; fill: none; stroke: var(--link); stroke-width: 1.4;
+         stroke-linecap: round; stroke-linejoin: round; opacity: .92; }
+.bcard-body { flex: 1; min-width: 0; }
+.bcard-title { font-size: 15px; font-weight: 600; color: #f0f3f8; }
+.bcard-level { color: var(--muted); font-size: 12px; font-weight: 400; }
+.bcard-desc { color: var(--muted); margin: 5px 0 8px; font-size: 12.5px; }
+.bcard-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; font-size: 12.5px; }
+.bcard-meta .dur, .bcard-meta .req { color: var(--muted-2); }
+.bcard-meta .req { color: #d9b06a; }
+.v-ok { color: var(--ok); }
+.v-bad { color: #e0736a; }
+.bcard-action { flex: 0 0 auto; }
+.bcard-action form { margin: 0; }
+.bcard-action button[disabled] { background: #2a3342; color: var(--muted-2); cursor: not-allowed; }
+
+/* ---- resources overview ---- */
+.res-table th.num, .res-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.res-table tr.total td { border-top: 1px solid var(--line); font-weight: 600; color: #fff; }
+.res-table tr.section td {
+  padding-top: 20px; color: var(--muted-2); font-size: 11px;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
 /* ---- pagination ---- */
 .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 4px 0 16px; font-size: 12px; }
 

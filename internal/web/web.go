@@ -9,6 +9,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"log"
@@ -89,6 +90,7 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /overview/{id}", h.requireUser(h.OverviewPage))
 	mux.HandleFunc("GET /buildings/{id}", h.requireUser(h.BuildingsPage))
 	mux.HandleFunc("POST /buildings/{id}/build", h.requireUser(h.BuildSubmit))
+	mux.HandleFunc("GET /resources/{id}", h.requireUser(h.ResourcesPage))
 	mux.HandleFunc("GET /research/{id}", h.requireUser(h.ResearchPage))
 	mux.HandleFunc("POST /research/{id}/start", h.requireUser(h.ResearchSubmit))
 	mux.HandleFunc("GET /shipyard/{id}", h.requireUser(h.ShipyardPage))
@@ -482,23 +484,108 @@ func (h *Handler) BuildingsPage(w http.ResponseWriter, r *http.Request) {
 		d.Queue = &v
 	}
 
+	byGroup := map[string][]buildRow{}
 	for _, def := range sortedDefs(game.KindBuilding) {
 		next := structs[def.Code] + 1
 		cost := def.LevelCost(next)
 		row := buildRow{
-			Code: def.Code, Name: def.Name, Level: structs[def.Code],
+			Code: def.Code, Name: def.Name, Level: structs[def.Code], NextLevel: next,
 			Unlocked:   game.PrereqsMet(def, structs, techs),
 			Queued:     d.Queue != nil && strings.HasPrefix(d.Queue.Name, def.Name),
 			CostStr:    costString(cost),
+			Costs:      costParts(cost, p),
 			TimeStr:    humanDur(int64(def.LevelTime(next) * game.BuildTimeMultiplier(structs["command_center"]) / gameSpeed)),
 			Affordable: p.Metal >= cost.Metal && p.Lutinum >= cost.Lutinum && p.Water >= cost.Water && p.Hydrogen >= cost.Hydrogen,
+			Desc:       def.Desc,
+			Icon:       def.Icon,
+		}
+		if row.Icon == "" {
+			row.Icon = "i-build"
 		}
 		if !row.Unlocked {
 			row.Missing = game.MissingPrereqs(def, structs, techs)
 		}
-		d.Rows = append(d.Rows, row)
+		group := def.Group
+		if group == "" {
+			group = "Buildings"
+		}
+		byGroup[group] = append(byGroup[group], row)
+	}
+	for _, g := range buildingGroups {
+		if rows := byGroup[g]; len(rows) > 0 {
+			d.Sections = append(d.Sections, buildingSection{Name: g, Rows: rows})
+		}
 	}
 	h.render(w, "buildings", http.StatusOK, d)
+}
+
+// ResourcesPage is the production overview: the exact hourly output per
+// producing building (factories show their water draw as a negative), the net
+// total, storage capacity and the plunder-protected share of each storage.
+func (h *Handler) ResourcesPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id := pathID(r)
+	p, ok := h.owned(r.Context(), userID, id)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	ctx := r.Context()
+	structs, _ := h.planets.Structures(ctx, id)
+	gameSpeed, _ := h.gameSpeed(ctx)
+
+	d := resourcesData{baseData: h.base(ctx, r, userID, "Resources", id)}
+	d.Rows = append(d.Rows, resProdRow{Name: "Base production"})
+
+	producers := []struct {
+		code, name string
+		waterRatio float64
+	}{
+		{"iron_mine", "Iron Mine", 0},
+		{"lutinum_mine", "Lutinum Mine", 0},
+		{"water_extractor", "Drilling Tower", 0},
+		{"chemical_factory", "Chemical Factory", 5},
+		{"advanced_chemical_factory", "Advanced Chemical Factory", 2},
+	}
+	for _, pr := range producers {
+		level := structs[pr.code]
+		if level <= 0 {
+			continue
+		}
+		out := game.Production(pr.code, level, gameSpeed)
+		row := resProdRow{Name: fmt.Sprintf("%s (Level %d)", pr.name, level)}
+		switch pr.code {
+		case "iron_mine":
+			row.Metal = fmtSigned(out)
+		case "lutinum_mine":
+			row.Lutinum = fmtSigned(out)
+		case "water_extractor":
+			row.Water = fmtSigned(out)
+		default:
+			row.Hydrogen = fmtSigned(out)
+			row.Water = fmtSigned(-pr.waterRatio * out)
+		}
+		d.Rows = append(d.Rows, row)
+	}
+
+	d.Total = resProdRow{
+		Name:     "Total",
+		Metal:    fmtSigned(p.MetalProd),
+		Lutinum:  fmtSigned(p.LutinumProd),
+		Water:    fmtSigned(p.WaterProd - p.WaterUse),
+		Hydrogen: fmtSigned(p.HydrogenProd),
+	}
+	d.Storage = resProdRow{
+		Name:  "Storage capacity",
+		Metal: fmtAmount(float64(p.MetalCap)), Lutinum: fmtAmount(float64(p.LutinumCap)),
+		Water: fmtAmount(float64(p.WaterCap)), Hydrogen: fmtAmount(float64(p.HydrogenCap)),
+	}
+	d.Protected = resProdRow{
+		Name:  "(of which cannot be plundered)",
+		Metal: fmtAmount(float64(p.ProtectedMetal)), Lutinum: fmtAmount(float64(p.ProtectedLutinum)),
+		Water: fmtAmount(float64(p.ProtectedWater)), Hydrogen: fmtAmount(float64(p.ProtectedHydrogen)),
+	}
+	h.render(w, "resources", http.StatusOK, d)
 }
 
 func (h *Handler) ResearchPage(w http.ResponseWriter, r *http.Request) {
@@ -2013,6 +2100,10 @@ func (h *Handler) universeSpeeds(ctx context.Context) (game, resource, fleet flo
 	}
 	return
 }
+
+// buildingGroups is the display order of the building card categories. Any
+// group not listed here is appended afterwards.
+var buildingGroups = []string{"Main buildings", "Resource buildings", "Military buildings", "Buildings"}
 
 func sortedDefs(kind game.Kind) []game.Def {
 	defs := game.DefsOf(kind)

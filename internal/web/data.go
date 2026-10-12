@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -67,12 +68,25 @@ type buildRow struct {
 	Code       string
 	Name       string
 	Level      int
+	NextLevel  int
 	Unlocked   bool
 	Missing    []string
 	Affordable bool
 	Queued     bool
 	CostStr    string
 	TimeStr    string
+	Desc       string
+	Icon       string
+	Costs      []costPart
+}
+
+// costPart is one resource of an item's price: its label, the CSS class that
+// tints the label, the formatted amount and whether the planet can cover it.
+type costPart struct {
+	Label  string
+	Class  string
+	Amount string
+	OK     bool
 }
 
 type unitRow struct {
@@ -402,10 +416,32 @@ type overviewData struct {
 	Incoming []fleetRow
 }
 
+// buildingSection groups the building cards under a category heading.
+type buildingSection struct {
+	Name string
+	Rows []buildRow
+}
+
 type buildingsData struct {
 	baseData
-	Rows  []buildRow
-	Queue *queueView
+	Sections []buildingSection
+	Queue    *queueView
+}
+
+// resProdRow is one line of the resources overview table. The four resource
+// cells are pre-formatted (signed for production, plain for capacity) so the
+// template stays logic-free.
+type resProdRow struct {
+	Name                            string
+	Metal, Lutinum, Water, Hydrogen string
+}
+
+type resourcesData struct {
+	baseData
+	Rows      []resProdRow
+	Total     resProdRow
+	Storage   resProdRow
+	Protected resProdRow
 }
 
 type researchData struct {
@@ -592,6 +628,31 @@ func fmtFloat(f float64) string {
 	return fmtInt64(int64(f + 0.5))
 }
 
+// fmtAmount renders a resource amount with two decimals and thousands
+// separators (e.g. "18,810.24"). Used on the resources overview.
+func fmtAmount(f float64) string {
+	neg := f < 0
+	if neg {
+		f = -f
+	}
+	cents := int64(math.Round(f * 100))
+	s := fmtInt64(cents/100) + fmt.Sprintf(".%02d", cents%100)
+	if neg && cents != 0 {
+		return "-" + s
+	}
+	return s
+}
+
+// fmtSigned is fmtAmount with an explicit "+" for positive output. Zero stays
+// unsigned.
+func fmtSigned(f float64) string {
+	s := fmtAmount(f)
+	if f > 0 {
+		return "+" + s
+	}
+	return s
+}
+
 func coords(g, s, p int) string {
 	return strconv.Itoa(g) + ":" + strconv.Itoa(s) + ":" + strconv.Itoa(p)
 }
@@ -622,6 +683,23 @@ func humanDur(secs int64) string {
 	default:
 		return fmt.Sprintf("%ds", s)
 	}
+}
+
+// costParts splits a price into its non-zero resources with the planet's
+// affordability so the card can tint each value green (ok) or red (short).
+func costParts(c game.Resources, p *store.Planet) []costPart {
+	var parts []costPart
+	add := func(v, have float64, label, class string) {
+		if v <= 0 {
+			return
+		}
+		parts = append(parts, costPart{Label: label, Class: class, Amount: fmtFloat(v), OK: have >= v})
+	}
+	add(c.Metal, p.Metal, "Iron", "m")
+	add(c.Lutinum, p.Lutinum, "Lutinum", "l")
+	add(c.Water, p.Water, "Water", "w")
+	add(c.Hydrogen, p.Hydrogen, "Hydrogen", "h")
+	return parts
 }
 
 func costString(c game.Resources) string {

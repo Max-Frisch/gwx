@@ -51,6 +51,12 @@ type Def struct {
 	Produces string // "metal","lutinum","water","hydrogen"
 	ProdBase float64
 
+	// Presentation (buildings): the category heading the card is grouped
+	// under, a one-line blurb and the SVG sprite symbol used as its tile.
+	Group string
+	Desc  string
+	Icon  string
+
 	// Prerequisites: code -> minimum level (building level or tech level).
 	Prereqs map[string]int
 }
@@ -59,28 +65,28 @@ type Def struct {
 var Catalog = func() map[string]Def {
 	defs := []Def{
 		// ---- Buildings: command + research ----
-		{Code: "command_center", Name: "Command Center", Kind: KindBuilding, Cost: Resources{Metal: 200, Lutinum: 100}, CostFactor: 1.5, TimeSecs: 60, TimeFactor: 1.25},
-		{Code: "research_center", Name: "Research Center", Kind: KindBuilding, Cost: Resources{Metal: 200, Lutinum: 200, Water: 100}, CostFactor: 1.8, TimeSecs: 90, TimeFactor: 1.3, Prereqs: map[string]int{"command_center": 1}},
+		{Code: "command_center", Name: "Command Center", Kind: KindBuilding, Cost: Resources{Metal: 200, Lutinum: 100}, CostFactor: 1.5, TimeSecs: 60, TimeFactor: 1.25, Group: "Main buildings", Icon: "i-home", Desc: "The heart of your planetary complex. Upgrading it speeds up every construction on this planet."},
+		{Code: "research_center", Name: "Research Center", Kind: KindBuilding, Cost: Resources{Metal: 200, Lutinum: 200, Water: 100}, CostFactor: 1.8, TimeSecs: 90, TimeFactor: 1.3, Prereqs: map[string]int{"command_center": 1}, Group: "Main buildings", Icon: "i-flask", Desc: "The technological centre of your planet. Higher levels let you research new technologies faster."},
 
 		// ---- Buildings: resource production ----
-		{Code: "iron_mine", Name: "Iron Mine", Kind: KindBuilding, Cost: Resources{Metal: 60, Lutinum: 15}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "metal"},
-		{Code: "lutinum_mine", Name: "Lutinum Mine", Kind: KindBuilding, Cost: Resources{Metal: 48, Lutinum: 24}, CostFactor: 1.6, TimeSecs: 40, TimeFactor: 1.25, Produces: "lutinum"},
-		{Code: "water_extractor", Name: "Drilling Tower", Kind: KindBuilding, Cost: Resources{Metal: 60, Lutinum: 40}, CostFactor: 1.5, TimeSecs: 45, TimeFactor: 1.25, Produces: "water"},
-		{Code: "chemical_factory", Name: "Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 200, Lutinum: 100, Water: 100}, CostFactor: 1.6, TimeSecs: 60, TimeFactor: 1.25, Produces: "hydrogen", Prereqs: map[string]int{"water_extractor": 1}},
-		{Code: "advanced_chemical_factory", Name: "Advanced Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 20000, Lutinum: 15000, Hydrogen: 1000}, CostFactor: 1.7, TimeSecs: 3000, TimeFactor: 1.3, Produces: "hydrogen", Prereqs: map[string]int{"water_extractor": 10, "command_center": 6}},
-		{Code: "fusion_reactor", Name: "Fusion Reactor", Kind: KindBuilding, Cost: Resources{Metal: 400, Lutinum: 200, Water: 300}, CostFactor: 1.6, TimeSecs: 90, TimeFactor: 1.3, Prereqs: map[string]int{"research_center": 1}},
+		{Code: "iron_mine", Name: "Iron Mine", Kind: KindBuilding, Cost: Resources{Metal: 60, Lutinum: 15}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "metal", Group: "Resource buildings", Icon: "i-mine", Desc: "Extracts the basic material iron. The further it is upgraded, the more iron is mined."},
+		{Code: "lutinum_mine", Name: "Lutinum Mine", Kind: KindBuilding, Cost: Resources{Metal: 48, Lutinum: 24}, CostFactor: 1.6, TimeSecs: 40, TimeFactor: 1.25, Produces: "lutinum", Group: "Resource buildings", Icon: "i-mine", Desc: "Extracts lutinum, needed by many fundamental and advanced technologies."},
+		{Code: "water_extractor", Name: "Drilling Tower", Kind: KindBuilding, Cost: Resources{Metal: 60, Lutinum: 40}, CostFactor: 1.5, TimeSecs: 45, TimeFactor: 1.25, Produces: "water", Group: "Resource buildings", Icon: "i-drill", Desc: "Draws water from the depths of the planet with laser cutters and tractor beams."},
+		{Code: "chemical_factory", Name: "Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 200, Lutinum: 100, Water: 100}, CostFactor: 1.6, TimeSecs: 60, TimeFactor: 1.25, Produces: "hydrogen", Prereqs: map[string]int{"water_extractor": 1}, Group: "Resource buildings", Icon: "i-factory", Desc: "Converts water into hydrogen at a ratio of 5:1. Stops when the water runs dry."},
+		{Code: "advanced_chemical_factory", Name: "Advanced Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 20000, Lutinum: 15000, Hydrogen: 1000}, CostFactor: 1.7, TimeSecs: 3000, TimeFactor: 1.3, Produces: "hydrogen", Prereqs: map[string]int{"water_extractor": 10, "command_center": 6}, Group: "Resource buildings", Icon: "i-factory", Desc: "A more efficient refinery that converts water into hydrogen at a ratio of 2:1."},
+		{Code: "fusion_reactor", Name: "Fusion Reactor", Kind: KindBuilding, Cost: Resources{Metal: 400, Lutinum: 200, Water: 300}, CostFactor: 1.6, TimeSecs: 90, TimeFactor: 1.3, Prereqs: map[string]int{"research_center": 1}, Group: "Resource buildings", Icon: "i-atom", Desc: "Feeds the planetary grid. A prerequisite for the Planetary Shield."},
 
 		// ---- Buildings: storages ----
-		{Code: "iron_storage", Name: "Iron Storage", Kind: KindBuilding, Cost: Resources{Metal: 100}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "storage_metal", ProdBase: 20000},
-		{Code: "lutinum_storage", Name: "Lutinum Storage", Kind: KindBuilding, Cost: Resources{Metal: 100}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "storage_lutinum", ProdBase: 20000},
-		{Code: "water_storage", Name: "Water Tanks", Kind: KindBuilding, Cost: Resources{Metal: 100}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "storage_water", ProdBase: 20000},
-		{Code: "hydrogen_storage", Name: "Hydrogen Tanks", Kind: KindBuilding, Cost: Resources{Metal: 100}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "storage_hydrogen", ProdBase: 20000},
+		{Code: "iron_storage", Name: "Iron Storage", Kind: KindBuilding, Cost: Resources{Metal: 100}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "storage_metal", ProdBase: 20000, Group: "Resource buildings", Icon: "i-tank", Desc: "Increases the iron storage capacity of the planet."},
+		{Code: "lutinum_storage", Name: "Lutinum Storage", Kind: KindBuilding, Cost: Resources{Metal: 100}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "storage_lutinum", ProdBase: 20000, Group: "Resource buildings", Icon: "i-tank", Desc: "Increases the lutinum storage capacity of the planet."},
+		{Code: "water_storage", Name: "Water Tanks", Kind: KindBuilding, Cost: Resources{Metal: 100}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "storage_water", ProdBase: 20000, Group: "Resource buildings", Icon: "i-tank", Desc: "Increases the water storage capacity of the planet."},
+		{Code: "hydrogen_storage", Name: "Hydrogen Tanks", Kind: KindBuilding, Cost: Resources{Metal: 100}, CostFactor: 1.5, TimeSecs: 30, TimeFactor: 1.25, Produces: "storage_hydrogen", ProdBase: 20000, Group: "Resource buildings", Icon: "i-tank", Desc: "Increases the hydrogen storage capacity of the planet."},
 
 		// ---- Buildings: military ----
-		{Code: "shipyard", Name: "Shipyard", Kind: KindBuilding, Cost: Resources{Metal: 400, Lutinum: 200, Water: 100}, CostFactor: 1.6, TimeSecs: 120, TimeFactor: 1.3, Prereqs: map[string]int{"command_center": 1}},
-		{Code: "trading_post", Name: "Trading Post", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 2000}, CostFactor: 1.6, TimeSecs: 120, TimeFactor: 1.3, Prereqs: map[string]int{"shipyard": 1}},
-		{Code: "orbital_defense", Name: "Orbital Defense Station", Kind: KindBuilding, Cost: Resources{Metal: 300, Lutinum: 200}, CostFactor: 1.6, TimeSecs: 90, TimeFactor: 1.3, Prereqs: map[string]int{"shipyard": 1}},
-		{Code: "planetary_shield", Name: "Planetary Shield", Kind: KindBuilding, Cost: Resources{Metal: 500, Lutinum: 300, Water: 200}, CostFactor: 1.6, TimeSecs: 120, TimeFactor: 1.3, Prereqs: map[string]int{"orbital_defense": 1}},
+		{Code: "shipyard", Name: "Shipyard", Kind: KindBuilding, Cost: Resources{Metal: 400, Lutinum: 200, Water: 100}, CostFactor: 1.6, TimeSecs: 120, TimeFactor: 1.3, Prereqs: map[string]int{"command_center": 1}, Group: "Military buildings", Icon: "i-ship", Desc: "Builds ships. Higher levels unlock bigger hulls."},
+		{Code: "trading_post", Name: "Trading Post", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 2000}, CostFactor: 1.6, TimeSecs: 120, TimeFactor: 1.3, Prereqs: map[string]int{"shipyard": 1}, Group: "Main buildings", Icon: "i-fleet", Desc: "Connects you to the intergalactic trade network and opens offer slots."},
+		{Code: "orbital_defense", Name: "Orbital Defense Station", Kind: KindBuilding, Cost: Resources{Metal: 300, Lutinum: 200}, CostFactor: 1.6, TimeSecs: 90, TimeFactor: 1.3, Prereqs: map[string]int{"shipyard": 1}, Group: "Military buildings", Icon: "i-shield", Desc: "Orbital platform hosting your planetary defense turrets."},
+		{Code: "planetary_shield", Name: "Planetary Shield", Kind: KindBuilding, Cost: Resources{Metal: 500, Lutinum: 300, Water: 200}, CostFactor: 1.6, TimeSecs: 120, TimeFactor: 1.3, Prereqs: map[string]int{"orbital_defense": 1}, Group: "Military buildings", Icon: "i-shield", Desc: "A shield that protects the whole planet. Requires an Orbital Defense Station."},
 
 		// ---- Research ----
 		{Code: "energy_tech", Name: "Energy Research", Kind: KindResearch, Cost: Resources{Metal: 0, Lutinum: 400, Water: 200}, CostFactor: 2.0, TimeSecs: 120, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1}},

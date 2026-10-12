@@ -94,7 +94,22 @@ Read first; one item per session. Keep this file short.
   `sanction_reason` gate queues/fleets and show a read-only `/settings/sanction`
   page plus a banner (migration `0008`; `11-premium-settings.md`).
 
+- **UI: Construction cards + Resources tab** — `/buildings` is now a
+  GigraWars-style card list (grouped Main/Resource/Military, SVG tiles,
+  per-resource cost tint green/red, `Upgrade to level N` buttons) and the
+  Construction tabs are just **Buildings** + **Resources** (`/resources/{id}`:
+  per-building hourly output incl. the factories' `−water`, net totals, storage
+  capacity, plunder-protected share). Catalog gained `Group`/`Desc`/`Icon`.
+  Perf: **no `backdrop-filter` on per-card/list items** — it re-blurred the fixed
+  starfield every scroll frame and janked long lists.
+
 ## Todo (ordered)
+- [ ] **U1 UI refresh** (`info/sessions/U1-ui-refresh.md`) — responsive + fast
+      layout: design-token layer in `app.css`, **vendored htmx** (no build step)
+      for partial updates (queue/resource/build), mobile breakpoints, visual
+      polish pass, and performance guardrails (no per-item blur;
+      `content-visibility` for long lists). Chosen stack: stdlib
+      `html/template` + hand-written CSS + htmx (no Tailwind/Templ/Node).
 - [ ] **Rapid-fire combat** — per-unit rapid-fire table, behind a universe flag.
 - [ ] **Alliance diplomacy** — NAP/war declarations between alliances (follow-up
       to I6; membership, ranks, applications and the shared board already land).
