@@ -103,8 +103,11 @@ Read first; one item per session. Keep this file short.
   + Orbital Defense Station + Fusion Reactor), the full 14-ship roster and the
   three research *categories* (Drive / Weapons / Ship) replacing the OGame-style
   Energy/Weapons/Defense items. Storage is `60_000·L²+300_000` with a 2%
-  concealed floor. Research and Ships/Defense now reuse the Construction card
-  layout. (`internal/game/catalog.go`, `economy.go`, `web.go`, templates.)
+  concealed floor. Per-unit build times are the captured level-1 durations,
+  scaled by the Ship Factory / Orbital Defense Station level as `4/(1+F)²`.
+  Research and Ships/Defense now reuse the Construction card layout.
+  (`internal/game/catalog.go`, `economy.go`, `game_math.go`, `web.go`,
+  `queue_store.go`, templates.)
 - **UI: Construction cards + Resources tab** — `/buildings` is now a
   GigraWars-style card list (grouped Main/Resource/Military, SVG tiles,
   per-resource cost tint green/red, `Upgrade to level N` buttons) and the
