@@ -13,6 +13,7 @@ import (
 	"html/template"
 	"io/fs"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -102,6 +103,8 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /fleet/{id}", h.requireUser(h.FleetPage))
 	mux.HandleFunc("POST /fleet/{id}/dispatch", h.requireUser(h.FleetDispatchSubmit))
 	mux.HandleFunc("POST /fleet/{id}/recall", h.requireUser(h.FleetRecallSubmit))
+	mux.HandleFunc("GET /simulator/{id}", h.requireUser(h.SimulatorPage))
+	mux.HandleFunc("POST /simulator/{id}", h.requireUser(h.SimulatorSubmit))
 	mux.HandleFunc("GET /galaxy", h.requireUser(h.GalaxyRedirect))
 	mux.HandleFunc("GET /galaxy/{galaxy}/{system}", h.requireUser(h.GalaxyPage))
 	mux.HandleFunc("GET /reports", h.requireUser(h.ReportsPage))
@@ -2106,6 +2109,136 @@ func (h *Handler) DefenseSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	flashRedirect(w, r, back, "Production queued.", msg(err))
+}
+
+// combatRounds is how many rounds the simulator lets a battle run before it
+// calls a stalemate, matching the live engine's six-round cap.
+const combatRounds = 6
+
+// SimulatorPage renders the battle simulator, seeded with the planet's current
+// ships (attacker column) and defense (defender column).
+func (h *Handler) SimulatorPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id := pathID(r)
+	d, ok := h.simulatorView(r.Context(), r, userID, id)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	h.render(w, "simulator", http.StatusOK, d)
+}
+
+// SimulatorSubmit runs the two entered line-ups through the deterministic
+// sample battle and the stochastic win-chance estimate.
+func (h *Handler) SimulatorSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id := pathID(r)
+	d, ok := h.simulatorView(r.Context(), r, userID, id)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	h.render(w, "simulator", http.StatusOK, d)
+}
+
+// simulatorView builds the editable unit columns (seeded on a GET, read from
+// the form on a POST) and, for a POST, the sampled battle result.
+func (h *Handler) simulatorView(ctx context.Context, r *http.Request, userID, id int64) (simulatorData, bool) {
+	if _, ok := h.owned(ctx, userID, id); !ok {
+		return simulatorData{}, false
+	}
+	techs, _ := h.planets.Techs(ctx, userID)
+	ownShips, _ := h.planets.Units(ctx, id, "ship")
+	ownDefense, _ := h.planets.Units(ctx, id, "defense")
+	compute := r.Method == http.MethodPost
+
+	attacker := map[string]int64{}
+	defender := map[string]int64{}
+	d := simulatorData{baseData: h.base(ctx, r, userID, "Simulator", id)}
+	for _, def := range simulatorDefs() {
+		var a, dfd int64
+		if compute {
+			a = formCount(r, "a_"+def.Code)
+			dfd = formCount(r, "d_"+def.Code)
+		} else if def.Kind == game.KindShip {
+			a = ownShips[def.Code]
+		} else {
+			dfd = ownDefense[def.Code]
+		}
+		if a > 0 {
+			attacker[def.Code] = a
+		}
+		if dfd > 0 {
+			defender[def.Code] = dfd
+		}
+		icon := def.Icon
+		if icon == "" {
+			icon = "i-ship"
+		}
+		d.Rows = append(d.Rows, simulatorRow{
+			Code: def.Code, Name: def.Name, Kind: string(def.Kind), Icon: icon,
+			Stats:    "Atk " + fmtInt(def.Attack) + weaponLabel(def.Weapon) + " · Def " + fmtInt(def.Shield) + " · Hull " + fmtInt(def.Hull),
+			Attacker: a, Defender: dfd,
+		})
+	}
+	if compute {
+		d.Result = simulateBattle(attacker, defender, techs)
+	}
+	return d, true
+}
+
+// simulatorDefs lists every combat unit (ships then defense) in catalog order.
+func simulatorDefs() []game.Def {
+	return append(sortedDefs(game.KindShip), sortedDefs(game.KindDefense)...)
+}
+
+// simulateBattle runs the deterministic sample battle (for the loss table) and
+// samples the stochastic win chance. Both sides use the player's own research,
+// as the reference seeds the simulator with the account's levels.
+func simulateBattle(attacker, defender map[string]int64, techs map[string]int) *simulatorResult {
+	ct := game.CombatTechsFromLevels(techs)
+	res := game.Simulate(attacker, defender, ct, ct, combatRounds)
+	chance := game.WinChance(attacker, defender, ct, ct, combatRounds,
+		rand.New(rand.NewSource(time.Now().UnixNano())))
+
+	out := &simulatorResult{
+		WinPct:           fmt.Sprintf("%.2f%%", chance*100),
+		Trials:           game.CombatTrials,
+		Rounds:           res.Rounds,
+		AttackerSurvived: game.TotalUnits(res.AttackerSurvivors),
+		DefenderSurvived: game.TotalUnits(res.DefenderSurvivors),
+	}
+	seen := map[string]bool{}
+	for code := range attacker {
+		seen[code] = true
+	}
+	for code := range defender {
+		seen[code] = true
+	}
+	for _, def := range simulatorDefs() {
+		if !seen[def.Code] {
+			continue
+		}
+		out.Rows = append(out.Rows, simulatorOutcomeRow{
+			Name:             def.Name,
+			AttackerBefore:   attacker[def.Code],
+			AttackerLost:     res.AttackerLosses[def.Code],
+			AttackerSurvived: res.AttackerSurvivors[def.Code],
+			DefenderBefore:   defender[def.Code],
+			DefenderLost:     res.DefenderLosses[def.Code],
+			DefenderSurvived: res.DefenderSurvivors[def.Code],
+		})
+	}
+	return out
+}
+
+// formCount reads a non-negative integer form field (missing/invalid -> 0).
+func formCount(r *http.Request, name string) int64 {
+	v, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue(name)), 10, 64)
+	if v < 0 {
+		return 0
+	}
+	return v
 }
 
 func (h *Handler) FleetDispatchSubmit(w http.ResponseWriter, r *http.Request) {

@@ -168,20 +168,38 @@ Read first; one item per session. Keep this file short.
   ordinary `users` rows (so queues/fleets/reports/highscore/galaxy all work) but
   can never authenticate and carry a 🤖 marker in highscore + galaxy.
   `internal/game/npc_test.go` + `internal/integration/npc_test.go`.
+- **NPC actions** — the brain now acts beyond buildings. Each decision cycle in
+  `engine.runNPC` runs, best-effort and profile-weighted: **unit/defense
+  production** (`game.RankedUnits` + `NPCUnitBatch` → `QueueStore.StartUnits`),
+  **colonizing** (`npcColonizeDecide` dispatches an already-built colony ship to
+  a random empty slot), **attack reaction** (`npcReactDecide` scouts the attacker
+  with a probe via `FleetStore.Dispatch`, and *rarely* lifts its ships off the
+  attacked planet — the sloppy random "fleet in the air" fleet-save to a random
+  target). Profile knobs are now real probabilities: `NPCProfile.SpyChance` /
+  `FleetSaveChance` / `ColonizeChance`, plus strategy-weighted unit choice
+  (aggressive favours warships, passive defense, builder traders/colonies) and
+  difficulty scaling all of them. New `NPCStore.RandomEmptySlot` /
+  `RandomTarget`; `internal/integration/npc_test.go` covers all four actions.
+- **Combat win chance + Battle simulator** — `game.Simulate` stays the
+  deterministic aggregate sample battle (its core is factored out as
+  `resolveBattle`, `rng=nil`); new `game.WinChance` samples the *same* model
+  `CombatTrials` (1000) times with a per-round attack roll (triangular around 1)
+  and returns the attacker's chance of clearing the defender, in `[0,1]` —
+  degenerate line-ups answer exactly (no attackers → 0, empty defence → 1), so
+  even an overwhelming force can show <100% and, rarely, lose. New
+  `/simulator/{id}` page (`SimulatorPage`/`SimulatorSubmit`, nav: UNIVERSE):
+  attacker/defender columns for every ship + defense, seeded from the planet's
+  stationed ships/defense and the player's own research, showing the win chance
+  plus a deterministic sample battle's per-unit losses. Tests:
+  `internal/game/combat_winchance_test.go`, `internal/web/simulator_test.go`,
+  `internal/integration/simulator_test.go`.
 
 ## Todo (ordered)
 
-**Next up — start here:** build **Combat win chance**. Keep the deterministic
-aggregate engine but compute and show a **win probability** in the simulator
-(the reference exposes only a % win/lose chance; even 99.98% can lose). Rapid
-Fire is not in the reference — dropped, so there is no per-unit rapid-fire table.
-Pick up at: `internal/game/combat.go` (`Simulate`), and once a fleet simulator
-page exists, its view model.
+**Next up — start here:** build **Espionage quick dispatch** — wire the stored
+`settings.spyShortcutCount` into the galaxy view's "send spy probe(s)" action
+(probe count). Pick up at the galaxy page's spy action and `users.settings`.
 
-- [ ] **Combat win chance** — keep the deterministic aggregate engine but compute
-      and show a **win probability** in the simulator (the reference exposes only
-      a % win/lose chance; even 99.98% can lose). Rapid Fire is not in the
-      reference — dropped, so there is no per-unit rapid-fire table.
 - [ ] **Espionage quick dispatch** — wire the stored `settings.spyShortcutCount`
       into the galaxy view's "send spy probe(s)" action (probe count).
 - [ ] **Alliance diplomacy** — NAP/war declarations between alliances (follow-up
@@ -189,12 +207,6 @@ page exists, its view model.
 - [ ] **Seasonal lifecycle** — automatic archive/reset at `ENDS_AT`; round seeding.
 - [ ] **JSON API** — thin `/api/v1` surface for tooling/bots.
 - [ ] **Anti-farm / noob protection** — optional points-ratio guard.
-- [ ] **NPC actions** — extend the brain past buildings: unit/defense production,
-      colonizing, reacting to being attacked with the odd espionage, and the
-      sloppy random "fleet in the air" fleet-save (deliberate saves only rarely,
-      on an incoming attack). Hooks are in `engine.runNPC`; every action reuses
-      `QueueStore`/`FleetStore`. Profile knobs (strategy/difficulty/activity) are
-      already stored — they just need to influence more than building choice.
 
 ## Reference spec (derived from Uni5 HARs — `info/galaxywars-spec/`)
 

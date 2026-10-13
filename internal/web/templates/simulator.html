@@ -1,0 +1,43 @@
+{{define "simulator"}}
+{{template "head" .}}
+<h1>Battle simulator</h1>
+
+<div class="panel">
+<h3>Line-ups</h3>
+<form method="post" action="/simulator/{{.ActivePlanetID}}">
+  <table>
+    <tr><th>Unit</th><th>Stats</th><th>Attacker</th><th>Defender</th></tr>
+    {{range .Rows}}
+    <tr>
+      <td><svg class="ic"><use href="#{{.Icon}}"/></svg> {{.Name}} <span class="muted">{{.Kind}}</span></td>
+      <td class="muted">{{.Stats}}</td>
+      <td><input type="number" name="a_{{.Code}}" value="{{.Attacker}}" min="0"></td>
+      <td><input type="number" name="d_{{.Code}}" value="{{.Defender}}" min="0"></td>
+    </tr>
+    {{end}}
+  </table>
+  <button type="submit">Simulate battle</button>
+  <small class="muted">Seeded with this planet's stationed ships (attacker) and defense (defender). Both sides use your own research levels.</small>
+</form>
+</div>
+
+{{if .Result}}
+<div class="panel">
+  <h3>Result</h3>
+  <p class="sim-win"><strong>{{.Result.WinPct}}</strong> attacker win chance
+    <span class="muted">(sampled over {{n .Result.Trials}} battles; the table is one deterministic sample)</span></p>
+  <p class="muted">Rounds: {{.Result.Rounds}} · Attacker survivors: {{n .Result.AttackerSurvived}} · Defender survivors: {{n .Result.DefenderSurvived}}</p>
+  <table>
+    <tr><th>Unit</th><th>Attacker before</th><th>Lost</th><th>Survived</th><th>Defender before</th><th>Lost</th><th>Survived</th></tr>
+    {{range .Result.Rows}}
+    <tr>
+      <td>{{.Name}}</td>
+      <td>{{n .AttackerBefore}}</td><td class="bad">{{n .AttackerLost}}</td><td>{{n .AttackerSurvived}}</td>
+      <td>{{n .DefenderBefore}}</td><td class="bad">{{n .DefenderLost}}</td><td>{{n .DefenderSurvived}}</td>
+    </tr>
+    {{end}}
+  </table>
+</div>
+{{end}}
+{{template "foot" .}}
+{{end}}

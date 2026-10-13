@@ -518,6 +518,45 @@ type fleetData struct {
 	OriginS  int
 }
 
+// simulatorRow is one editable unit line in the battle simulator: the count
+// entered for each side plus the unit's combat stats.
+type simulatorRow struct {
+	Code     string
+	Name     string
+	Kind     string
+	Icon     string
+	Stats    string
+	Attacker int64
+	Defender int64
+}
+
+// simulatorOutcomeRow is one unit's result in the deterministic sample battle.
+type simulatorOutcomeRow struct {
+	Name             string
+	AttackerBefore   int64
+	AttackerLost     int64
+	AttackerSurvived int64
+	DefenderBefore   int64
+	DefenderLost     int64
+	DefenderSurvived int64
+}
+
+// simulatorResult is the sampled battle plus the stochastic win estimate.
+type simulatorResult struct {
+	WinPct           string
+	Trials           int
+	Rounds           int
+	AttackerSurvived int64
+	DefenderSurvived int64
+	Rows             []simulatorOutcomeRow
+}
+
+type simulatorData struct {
+	baseData
+	Rows   []simulatorRow
+	Result *simulatorResult
+}
+
 type galaxyData struct {
 	baseData
 	Galaxy     int

@@ -1,6 +1,9 @@
 package game
 
-import "math"
+import (
+	"math"
+	"math/rand"
+)
 
 // CombatResult summarises a resolved battle. Losses are recorded per unit so
 // reports and statistics can price what was destroyed.
@@ -53,7 +56,18 @@ func (d Def) weaponMultiplier(t CombatTechs) float64 {
 // hull pool. Shields fully regenerate every round. Each side applies its own
 // Weapons research (matched to each unit's weapon class) and its own Ship Armor
 // to its shields.
+//
+// Simulate is the deterministic sample battle: it rolls nothing, so identical
+// inputs always give the same result. WinChance samples the same model
+// stochastically to estimate how often the attacker actually wins.
 func Simulate(attacker, defender map[string]int64, attackerTechs, defenderTechs CombatTechs, maxRounds int) CombatResult {
+	return resolveBattle(attacker, defender, attackerTechs, defenderTechs, maxRounds, nil)
+}
+
+// resolveBattle is the shared core of Simulate and WinChance. When rng is nil
+// each round's attack is exact (the deterministic Simulate); otherwise the
+// attack is rolled so two identical battles can still diverge.
+func resolveBattle(attacker, defender map[string]int64, attackerTechs, defenderTechs CombatTechs, maxRounds int, rng *rand.Rand) CombatResult {
 	att := copyCounts(attacker)
 	def := copyCounts(defender)
 	attStartCounts := copyCounts(att)
@@ -66,6 +80,10 @@ func Simulate(attacker, defender map[string]int64, attackerTechs, defenderTechs 
 		rounds++
 		attPower := sideAttack(att, attackerTechs)
 		defPower := sideAttack(def, defenderTechs)
+		if rng != nil {
+			attPower *= combatRoll(rng)
+			defPower *= combatRoll(rng)
+		}
 		attShield := sideShield(att, attackerTechs.ShipArmor)
 		defShield := sideShield(def, defenderTechs.ShipArmor)
 
@@ -85,6 +103,43 @@ func Simulate(attacker, defender map[string]int64, attackerTechs, defenderTechs 
 		AttackerLost:      attStart - total(att),
 		DefenderLost:      defStart - total(def),
 	}
+}
+
+// CombatTrials is how many stochastic battles WinChance samples. 1000 keeps the
+// estimate stable to well under a percentage point while staying cheap enough
+// to run on every simulator request.
+const CombatTrials = 1000
+
+// combatRoll is a per-round attack multiplier around 1: the sum of two uniforms
+// is triangular on [0,2] with mean 1, so a round can swing either way but is
+// usually near the average. This is the only randomness in the model.
+func combatRoll(rng *rand.Rand) float64 {
+	return rng.Float64() + rng.Float64()
+}
+
+// WinChance estimates the attacker's probability of clearing the defender
+// (defender survivors == 0) by sampling CombatTrials stochastic battles through
+// the same aggregate model as Simulate. It returns a value in [0,1]; the
+// reference exposes this as a win/lose percentage because even an overwhelming
+// force can, rarely, lose.
+//
+// Callers supply the rng so a seed makes it reproducible. Degenerate line-ups
+// are answered exactly: no attackers is 0, an empty defence is 1.
+func WinChance(attacker, defender map[string]int64, attackerTechs, defenderTechs CombatTechs, maxRounds int, rng *rand.Rand) float64 {
+	if total(attacker) == 0 {
+		return 0
+	}
+	if total(defender) == 0 {
+		return 1
+	}
+	wins := 0
+	for i := 0; i < CombatTrials; i++ {
+		res := resolveBattle(attacker, defender, attackerTechs, defenderTechs, maxRounds, rng)
+		if total(res.DefenderSurvivors) == 0 {
+			wins++
+		}
+	}
+	return float64(wins) / float64(CombatTrials)
 }
 
 // diffCounts returns the units present in start but no longer in end, keyed by

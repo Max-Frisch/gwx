@@ -251,6 +251,10 @@ h3 { font-size: 14px; margin: 0 0 var(--s2); }
 }
 .panel.row { display: flex; align-items: center; gap: var(--s3); }
 
+/* ---- battle simulator ---- */
+.sim-win { font-size: 15px; color: #e7ecf3; margin: 0 0 6px; }
+.sim-win strong { font-size: var(--t-xl); color: var(--accent-hi); font-weight: 600; margin-right: 6px; }
+
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 9px var(--s3); font-size: var(--t-md); border-bottom: 1px solid var(--line-soft); }
 th { background: rgba(255, 255, 255, .03); color: var(--muted); font-weight: 500;

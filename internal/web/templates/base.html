@@ -58,6 +58,7 @@
       <div class="side-group">
         <div class="label">Universe</div>
         <a href="/fleet/{{.ActivePlanetID}}" class="{{if eq .Title "Fleet"}}active{{end}}"><svg class="ic"><use href="#i-fleet"/></svg>Fleets</a>
+        <a href="/simulator/{{.ActivePlanetID}}" class="{{if eq .Title "Simulator"}}active{{end}}"><svg class="ic"><use href="#i-atom"/></svg>Simulator</a>
         <a href="/galaxy" class="{{if eq .Title "Galaxy"}}active{{end}}"><svg class="ic"><use href="#i-galaxy"/></svg>Galaxy</a>
         <a href="/events" class="{{if eq .Title "Events"}}active{{end}}"><svg class="ic"><use href="#i-event"/></svg>Events</a>
       </div>
