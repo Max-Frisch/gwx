@@ -107,6 +107,7 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("POST /simulator/{id}", h.requireUser(h.SimulatorSubmit))
 	mux.HandleFunc("GET /galaxy", h.requireUser(h.GalaxyRedirect))
 	mux.HandleFunc("GET /galaxy/{galaxy}/{system}", h.requireUser(h.GalaxyPage))
+	mux.HandleFunc("POST /galaxy/spy", h.requireUser(h.GalaxySpySubmit))
 	mux.HandleFunc("GET /reports", h.requireUser(h.ReportsPage))
 	mux.HandleFunc("GET /events", h.requireUser(h.EventsPage))
 	mux.HandleFunc("GET /messages", h.requireUser(h.MessagesPage))
@@ -869,6 +870,9 @@ func (h *Handler) GalaxyPage(w http.ResponseWriter, r *http.Request) {
 		PrevSystem: maxInt(1, s-1),
 		NextSystem: minInt(maxS, s+1),
 	}
+	if st, err := h.auth.Settings(ctx, userID); err == nil {
+		d.SpyCount = st.SpyShortcutCount
+	}
 	rows, _ := h.planets.Scan(ctx, h.universeCode, g, s)
 	tags, _ := h.alliances.TagsByUser(ctx, h.universeCode)
 	byPos := map[int]store.ScanRow{}
@@ -890,9 +894,44 @@ func (h *Handler) GalaxyPage(w http.ResponseWriter, r *http.Request) {
 			gr.IsHomeworld = row.IsHomeworld
 			gr.IsNPC = row.IsNPC
 		}
+		gr.CanSpy = d.SpyCount > 0 && gr.PlanetID != 0 && gr.OwnerID != 0 && gr.OwnerID != userID
 		d.Rows = append(d.Rows, gr)
 	}
 	h.render(w, "galaxy", http.StatusOK, d)
+}
+
+// GalaxySpySubmit is the one-click "send spy probe(s)" action from the galaxy
+// view. It dispatches the player's configured quick-dispatch probe count
+// (settings.spyShortcutCount) as an ESPIONAGE flight from the homeworld to the
+// clicked coordinates.
+func (h *Handler) GalaxySpySubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	g, _ := strconv.Atoi(r.FormValue("g"))
+	s, _ := strconv.Atoi(r.FormValue("s"))
+	pos, _ := strconv.Atoi(r.FormValue("p"))
+	back := "/galaxy/" + strconv.Itoa(g) + "/" + strconv.Itoa(s)
+
+	st, _ := h.auth.Settings(ctx, userID)
+	if st.SpyShortcutCount <= 0 {
+		flashRedirect(w, r, back, "", "Quick dispatch is disabled in your settings.")
+		return
+	}
+	origin := h.homeID(ctx, userID)
+	if origin == 0 {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	_, err := h.fleets.Dispatch(ctx, store.DispatchParams{
+		UniverseCode: h.universeCode,
+		UserID:       userID,
+		OriginID:     origin,
+		Mission:      "ESPIONAGE",
+		TargetG:      g, TargetS: s, TargetP: pos,
+		SpeedPct: 1,
+		Ships:    map[string]int64{"spy_probe": int64(st.SpyShortcutCount)},
+	})
+	flashRedirect(w, r, back, "Spy probes dispatched.", msg(err))
 }
 
 func (h *Handler) ReportsPage(w http.ResponseWriter, r *http.Request) {

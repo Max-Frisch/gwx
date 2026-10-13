@@ -167,6 +167,7 @@ type galaxyRow struct {
 	OwnerTag    string
 	IsHomeworld bool
 	IsNPC       bool
+	CanSpy      bool
 }
 
 type reportRow struct {
@@ -564,6 +565,9 @@ type galaxyData struct {
 	PrevSystem int
 	NextSystem int
 	Rows       []galaxyRow
+	// SpyCount is the player's configured quick-dispatch probe count
+	// (settings.spyShortcutCount); 0 disables the one-click spy action.
+	SpyCount int
 }
 
 type reportsData struct {

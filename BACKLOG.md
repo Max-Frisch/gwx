@@ -193,15 +193,22 @@ Read first; one item per session. Keep this file short.
   plus a deterministic sample battle's per-unit losses. Tests:
   `internal/game/combat_winchance_test.go`, `internal/web/simulator_test.go`,
   `internal/integration/simulator_test.go`.
+- **Espionage quick dispatch** — the galaxy view now has a one-click **Spy**
+  action per occupied, non-own planet: it dispatches the account's configured
+  quick-dispatch probe count (`settings.spyShortcutCount`, `0` disables it) as an
+  `ESPIONAGE` flight from the homeworld to the clicked coordinates, so scouting no
+  longer round-trips through the Fleet form. New `POST /galaxy/spy`
+  (`GalaxySpySubmit`); `galaxyData.SpyCount` + `galaxyRow.CanSpy` gate the button,
+  with an eye icon in the actions column. Tests:
+  `internal/web/galaxy_test.go`, `internal/integration/galaxy_spy_test.go`.
 
 ## Todo (ordered)
 
-**Next up — start here:** build **Espionage quick dispatch** — wire the stored
-`settings.spyShortcutCount` into the galaxy view's "send spy probe(s)" action
-(probe count). Pick up at the galaxy page's spy action and `users.settings`.
+**Next up — start here:** build **Alliance diplomacy** — NAP/war declarations
+between alliances (follow-up to I6; membership, ranks, applications and the
+shared board already land). Pick up at `AllianceStore` and the alliance
+screens.
 
-- [ ] **Espionage quick dispatch** — wire the stored `settings.spyShortcutCount`
-      into the galaxy view's "send spy probe(s)" action (probe count).
 - [ ] **Alliance diplomacy** — NAP/war declarations between alliances (follow-up
       to I6; membership, ranks, applications and the shared board already land).
 - [ ] **Seasonal lifecycle** — automatic archive/reset at `ENDS_AT`; round seeding.
@@ -274,9 +281,9 @@ Settings**, Logout. (Bold = we don't have it.)
 - **Premium** (out of scope), **Vacation mode**, **Sanctions** (*both done in
   `I9`*).
 - **Settings → Game**: quick-dispatch probe count (**integer**
-  `spyShortcutCount`, used by the galaxy "send spy probe(s)" action), max recon
-  probes, raid order, fleet labels, tactical retreat, interface/messages-per-page
-  options.
+  `spyShortcutCount`, used by the galaxy "send spy probe(s)" action —
+  *wired; see Done*), max recon probes, raid order, fleet labels, tactical
+  retreat, interface/messages-per-page options.
 - **Settings → Account**: rename/email/password, reset/delete account, profile
   picture, external applications.
 - **`[M]` tag** = **Main Planet** (= homeworld), *not* a moon. **GW has no
