@@ -265,6 +265,9 @@ tr:last-child td { border-bottom: 0; }
 
 /* ---- cards / grid ---- */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s3); }
+/* Overview: a couple of content-heavy cards — auto-fit lets them grow to fill the
+   row instead of being pinned to the 240px auto-fill track and clipping text. */
+.grid.overview { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
 .card { background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: var(--r2); padding: var(--s3); transition: border-color var(--dur) var(--ease); }
 .card:hover { border-color: #3a4657; }
 .card h3 { margin: 0 0 6px; font-size: 14px; }
