@@ -1,16 +1,25 @@
 package game
 
+import "math"
+
 // ProtectedFraction is the share of a resource storage capacity that cannot be
 // plundered ("concealed" area). Captured exactly at 2% of Storage(L).
 const ProtectedFraction = 0.02
 
-// StorageCapacity returns the resource ceiling granted by a storage building,
-// exactly as captured: Storage(L) = 60_000·L² + 300_000.
-func StorageCapacity(level int) int64 {
+// StorageCapacity returns the resource ceiling granted by a storage building at
+// the given universe speed. The base curve is captured exactly at
+// Storage(L) = 60_000·L² + 300_000. Capacity then scales linearly with the game
+// speed so it keeps pace with production (which also scales linearly): the fill
+// time and the storage-to-output ratio that governs plunder stay constant at
+// any speed, and the concealed floor (a fixed share of capacity) follows.
+func StorageCapacity(level int, speed float64) int64 {
 	if level < 0 {
 		level = 0
 	}
-	return int64(60000*level*level + 300000)
+	if speed <= 0 {
+		speed = 1
+	}
+	return int64(math.Round(float64(60000*level*level+300000) * speed))
 }
 
 // Production returns a producer's hourly output at the given level, scaled by
@@ -78,10 +87,10 @@ func Recompute(structures map[string]int, techs map[string]int, speed float64) P
 	e.HydrogenProd = hBase + hAdv
 	e.WaterUse = 5*hBase + 2*hAdv
 
-	e.MetalCap = StorageCapacity(lvl("iron_storage"))
-	e.LutinumCap = StorageCapacity(lvl("lutinum_storage"))
-	e.WaterCap = StorageCapacity(lvl("water_storage"))
-	e.HydrogenCap = StorageCapacity(lvl("hydrogen_storage"))
+	e.MetalCap = StorageCapacity(lvl("iron_storage"), speed)
+	e.LutinumCap = StorageCapacity(lvl("lutinum_storage"), speed)
+	e.WaterCap = StorageCapacity(lvl("water_storage"), speed)
+	e.HydrogenCap = StorageCapacity(lvl("hydrogen_storage"), speed)
 
 	e.ProtectedMetal = int64(float64(e.MetalCap) * ProtectedFraction)
 	e.ProtectedLutinum = int64(float64(e.LutinumCap) * ProtectedFraction)

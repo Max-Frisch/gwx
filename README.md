@@ -40,7 +40,7 @@ just editing `.env` and restarting:
 | Variable | Meaning |
 |---|---|
 | `UNIVERSE_CODE` | stable key, e.g. `universe_gwx_1` |
-| `GAME_SPEED` | build + research time **and** resource production multiplier (higher = faster) |
+| `GAME_SPEED` | build + research time, resource production **and** storage capacity multiplier (higher = faster) |
 | `FLEET_SPEED` | fleet travel speed multiplier |
 | `MAX_GALAXIES`, `MAX_SYSTEMS` | universe bounds |
 | `BUILD_QUEUE_SLOTS` | building construction queue length per planet (default 6) |
@@ -80,9 +80,12 @@ universe, or a fast seasonal one.
 1. **Fog of war.** No points, no fleet-strength readout anywhere. The galaxy
    view shows owners only; you learn composition by scouting or by getting hit.
 2. **Protected storage floor.** `loot = min(cargo capacity, max(0, stored −
-   protected))`, where `protected = 2%` of that resource's storage capacity
-   (`Storage(L) = 60_000·L² + 300_000` in the capture). A cushion always
-   survives a raid.
+   protected))`, where `protected = 2%` of that resource's storage capacity.
+   The captured base curve is `Storage(L) = 60_000·L² + 300_000`, scaled
+   **linearly with `GAME_SPEED`** so capacity keeps pace with production (also
+   linear) — fill time and the storage-to-output ratio stay constant at any
+   speed, and the concealed floor follows for free. A cushion always survives a
+   raid.
 
 Combat is a simple aggregate, simultaneous-fire model with **no rapid-fire**
 (the reference has none); shields fully regenerate each round.

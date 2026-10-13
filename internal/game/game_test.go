@@ -80,6 +80,21 @@ func TestProductionMatchesReference(t *testing.T) {
 	}
 }
 
+func TestStorageScalesWithSpeed(t *testing.T) {
+	// Base curve captured exactly, then scaled linearly with the game speed.
+	if got := StorageCapacity(5, 1); got != 1_800_000 {
+		t.Errorf("storage L5 @x1: want 1_800_000, got %d", got)
+	}
+	if got := StorageCapacity(5, 10); got != 18_000_000 {
+		t.Errorf("storage L5 @x10: want 18_000_000, got %d", got)
+	}
+	// The concealed floor is a constant share of capacity, so it scales too.
+	e := Recompute(map[string]int{"iron_storage": 5}, map[string]int{}, 10)
+	if e.MetalCap != 18_000_000 || e.ProtectedMetal != 360_000 {
+		t.Errorf("storage @x10: cap=%d protected=%d, want 18000000/360000", e.MetalCap, e.ProtectedMetal)
+	}
+}
+
 func TestUnitTimeScalesWithFactoryLevel(t *testing.T) {
 	// Captured Jackal times: F1 00:20:00 (1200s), F2 00:10:00, F3 00:05:42,
 	// F4 00:03:38, F11 00:00:32 — from the Uni5 ship calculator.

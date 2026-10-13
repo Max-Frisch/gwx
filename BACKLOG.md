@@ -149,6 +149,14 @@ Read first; one item per session. Keep this file short.
   re-chains the timeline (with a price-difference refund). Slot cap enforced in
   Go under the planet row lock; `uq_queue_building` dropped, `universes
   .build_queue_slots` added (migration `0009`; `06-queue-management.md`).
+- **Speed-scaled storage** — storage capacity now scales **linearly with
+  `GAME_SPEED`**: `StorageCapacity(L, S) = (60_000·L² + 300_000)·S`, so it keeps
+  pace with production (also linear) — fill time and the storage-to-output ratio
+  that governs plunder stay constant at any speed, and the 2% concealed floor
+  follows for free. Previously capacity was fixed, so fast rounds capped
+  resources almost instantly and made raiding meaningless. Test pins the base
+  curve, ×10 scaling and the protected share (`internal/game/economy.go`,
+  `game_test.go`; README signature mechanic updated).
 
 ## Todo (ordered)
 
@@ -192,7 +200,8 @@ Headline facts worth folding into gwx:
 - **Speed of the source data:** Uni5 ran at **2× game speed / 1× fleet speed**.
   The captured production tables are treated as the **x1 base** (Uni5's 2× is
   context only). gwx has exactly **two** runtime modifiers — `GAME_SPEED`
-  (build/research time **and** production) and `FLEET_SPEED` (`internal/config`),
+  (build/research time, production **and** storage capacity) and `FLEET_SPEED`
+  (`internal/config`),
   so the multiplier stays a clean knob rather than being baked in.
 - **Defense (now captured — `03-combat.md`):** all five units have costs/stats.
   `lightLaserTower` 600 Iron (Atk 350/Def 150, ckk 0.06); `laserTower` 2.000
