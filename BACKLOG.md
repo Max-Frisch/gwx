@@ -263,6 +263,10 @@ scheduler's universe lifecycle.
 - [ ] **Seasonal lifecycle** — automatic archive/reset at `ENDS_AT`; round seeding.
 - [ ] **JSON API** — thin `/api/v1` surface for tooling/bots.
 - [ ] **Anti-farm / noob protection** — optional points-ratio guard.
+- [ ] **NPC realism (`N1`)** — wire the dead profile knobs: phase-aware build
+  trees, `ActiveFrom`/`ActiveTo` offline windows, difficulty via cadence, drop
+  `ProductionMultiplier`, preload per-cycle data, configurable `NPC_BATCH`.
+  Plan: `info/sessions/N1-npc-realism.md`.
 
 ## Reference spec (derived from Uni5 HARs — `info/galaxywars-spec/`)
 
