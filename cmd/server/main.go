@@ -96,8 +96,8 @@ func upsertUniverse(ctx context.Context, db *sql.DB, cfg *config.Config) error {
 	_, err := db.ExecContext(ctx, `
 		INSERT INTO universes (
 			code_name, display_name, game_speed, resource_speed, fleet_speed,
-			max_galaxies, max_systems, ends_at, build_queue_slots, is_active
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE)
+			max_galaxies, max_systems, ends_at, build_queue_slots, research_queue_slots, is_active
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE)
 		ON CONFLICT (code_name) DO UPDATE SET
 			display_name = EXCLUDED.display_name,
 			game_speed = EXCLUDED.game_speed,
@@ -107,8 +107,9 @@ func upsertUniverse(ctx context.Context, db *sql.DB, cfg *config.Config) error {
 			max_systems = EXCLUDED.max_systems,
 			ends_at = EXCLUDED.ends_at,
 			build_queue_slots = EXCLUDED.build_queue_slots,
+			research_queue_slots = EXCLUDED.research_queue_slots,
 			is_active = TRUE
 	`, cfg.UniverseCode, cfg.UniverseName, cfg.GameSpeed, cfg.GameSpeed, cfg.FleetSpeed,
-		cfg.MaxGalaxies, cfg.MaxSystems, endsAt, cfg.BuildQueueSlots)
+		cfg.MaxGalaxies, cfg.MaxSystems, endsAt, cfg.BuildQueueSlots, cfg.ResearchQueueSlots)
 	return err
 }

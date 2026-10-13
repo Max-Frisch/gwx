@@ -8,7 +8,7 @@
 {{template "banners" .}}
 <h1>Research <span class="muted">(account-wide)</span></h1>
 
-{{template "queue-panel" .}}
+{{template "research-queue-panel" .}}
 
 {{range .Sections}}
 <h2 class="section-head">{{.Name}}</h2>
@@ -16,7 +16,7 @@
 <div class="bcard{{if not .Unlocked}} locked{{end}}">
   <div class="bcard-img">{{if .Art}}<img src="{{.Art}}" alt="{{.Name}}" loading="lazy">{{else}}<svg class="ic-lg"><use href="#{{.Icon}}"/></svg>{{end}}</div>
   <div class="bcard-body">
-    <div class="bcard-title">{{.Name}} <span class="bcard-level">Level {{.Level}}</span>{{if .Queued}} <span class="tag busy">researching</span>{{end}}</div>
+    <div class="bcard-title">{{.Name}} <span class="bcard-level">Level {{.Level}}{{if .QueuedCount}} (+{{.QueuedCount}}){{end}}</span>{{if .Queued}} <span class="tag busy">researching</span>{{end}}</div>
     <p class="bcard-desc">{{.Desc}}</p>
     {{if .Unlocked}}
     <div class="bcard-meta">
@@ -30,8 +30,8 @@
   <div class="bcard-action">
     {{if not .Unlocked}}
       <button class="ghost" disabled>Locked</button>
-    {{else if .Queued}}
-      <span class="muted">queued</span>
+    {{else if $.QueueFull}}
+      <span class="muted">queue full</span>
     {{else}}
       <form method="post" action="/research/{{$.ActivePlanetID}}/start"
             hx-post="/research/{{$.ActivePlanetID}}/start" hx-target="#page-content" hx-swap="innerHTML" hx-disabled-elt="find button">

@@ -517,8 +517,11 @@ type resourcesData struct {
 
 type researchData struct {
 	baseData
-	Sections []buildingSection
-	Queue    *queueView
+	Sections      []buildingSection
+	ResearchQueue []buildQueueRow
+	QueueUsed     int
+	QueueSlots    int
+	QueueFull     bool
 }
 
 type shipyardData struct {

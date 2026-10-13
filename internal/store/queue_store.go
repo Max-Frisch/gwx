@@ -20,16 +20,17 @@ type QueueStore struct {
 func NewQueueStore(db *sql.DB) *QueueStore { return &QueueStore{db: db} }
 
 type universeInfo struct {
-	uuid      string
-	gameSpeed float64
-	slots     int
+	uuid          string
+	gameSpeed     float64
+	slots         int
+	researchSlots int
 }
 
 func (s *QueueStore) universeTx(ctx context.Context, tx *sql.Tx, code string) (universeInfo, error) {
 	var u universeInfo
 	err := tx.QueryRowContext(ctx,
-		`SELECT id::text, game_speed, build_queue_slots FROM universes WHERE code_name = $1`, code).
-		Scan(&u.uuid, &u.gameSpeed, &u.slots)
+		`SELECT id::text, game_speed, build_queue_slots, research_queue_slots FROM universes WHERE code_name = $1`, code).
+		Scan(&u.uuid, &u.gameSpeed, &u.slots, &u.researchSlots)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, ErrNotFound
 	}
@@ -171,6 +172,44 @@ func nextBuildStartTx(ctx context.Context, tx *sql.Tx, planetID int64) (time.Tim
 	return start, err
 }
 
+// lockUserTx row-locks the account so concurrent research enqueues (which may
+// come from different planets of the same player) serialize.
+func lockUserTx(ctx context.Context, tx *sql.Tx, userID int64) error {
+	var id int64
+	return tx.QueryRowContext(ctx, `SELECT id FROM users WHERE id = $1 FOR UPDATE`, userID).Scan(&id)
+}
+
+// countResearchQueueTx returns how many research orders are active for a user.
+func countResearchQueueTx(ctx context.Context, tx *sql.Tx, userID int64) (int, error) {
+	var n int
+	err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM queues
+		WHERE user_id = $1 AND kind = 'research' AND status = 'IN_PROGRESS'
+	`, userID).Scan(&n)
+	return n, err
+}
+
+// countResearchQueueCodeTx returns how many active orders target one tech.
+func countResearchQueueCodeTx(ctx context.Context, tx *sql.Tx, userID int64, code string) (int, error) {
+	var n int
+	err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM queues
+		WHERE user_id = $1 AND kind = 'research' AND status = 'IN_PROGRESS' AND code = $2
+	`, userID, code).Scan(&n)
+	return n, err
+}
+
+// nextResearchStartTx returns when a new research order should begin: right
+// after the last queued research order (or now when the queue is empty).
+func nextResearchStartTx(ctx context.Context, tx *sql.Tx, userID int64) (time.Time, error) {
+	var start time.Time
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(MAX(finish_at), NOW()) FROM queues
+		WHERE user_id = $1 AND kind = 'research' AND status = 'IN_PROGRESS'
+	`, userID).Scan(&start)
+	return start, err
+}
+
 // StartBuilding queues the next level of a building. A planet may chain up to
 // the universe's build_queue_slots orders; each new order is scheduled to start
 // when the previous one finishes and targets the level after any already queued.
@@ -272,7 +311,10 @@ func (s *QueueStore) StartBuilding(ctx context.Context, universeCode string, use
 	return tx.Commit()
 }
 
-// StartResearch queues the next level of a technology.
+// StartResearch queues the next level of a technology. An account may chain up
+// to the universe's research_queue_slots orders; each new order is scheduled to
+// start when the previous one finishes and targets the level after any already
+// queued.
 func (s *QueueStore) StartResearch(ctx context.Context, universeCode string, userID, planetID int64, code string) error {
 	def, ok := game.Get(code)
 	if !ok || def.Kind != game.KindResearch {
@@ -291,6 +333,9 @@ func (s *QueueStore) StartResearch(ctx context.Context, universeCode string, use
 	if err := ensureQueueingAllowedTx(ctx, tx, userID); err != nil {
 		return err
 	}
+	if err := lockUserTx(ctx, tx, userID); err != nil {
+		return err
+	}
 	structs, err := loadStructuresTx(ctx, tx, planetID)
 	if err != nil {
 		return err
@@ -302,7 +347,24 @@ func (s *QueueStore) StartResearch(ctx context.Context, universeCode string, use
 	if !game.PrereqsMet(def, structs, techs) {
 		return ErrPrerequisites
 	}
-	next := techs[code] + 1
+
+	// Cap concurrent research orders for the account. lockUserTx above serializes
+	// concurrent enqueues from any of the player's planets.
+	queuedTotal, err := countResearchQueueTx(ctx, tx, userID)
+	if err != nil {
+		return err
+	}
+	if u.researchSlots > 0 && queuedTotal >= u.researchSlots {
+		return ErrResearchQueueFull
+	}
+
+	// Each queued order advances the tech one level: the target is the current
+	// level plus however many levels of it are already queued.
+	queuedCode, err := countResearchQueueCodeTx(ctx, tx, userID, code)
+	if err != nil {
+		return err
+	}
+	next := techs[code] + queuedCode + 1
 	cost := def.LevelCost(next)
 
 	have, err := accrueTx(ctx, tx, planetID)
@@ -316,11 +378,19 @@ func (s *QueueStore) StartResearch(ctx context.Context, universeCode string, use
 		return err
 	}
 
+	startAt, err := nextResearchStartTx(ctx, tx, userID)
+	if err != nil {
+		return err
+	}
 	dur := def.LevelTime(next) / u.gameSpeed
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO queues (universe_id, user_id, planet_id, kind, code, target_level, start_at, finish_at)
-		VALUES ($1, $2, $3, 'research', $4, $5, NOW(), NOW() + ($6 * INTERVAL '1 second'))
-	`, u.uuid, userID, planetID, code, next, dur); err != nil {
+		VALUES (
+			$1, $2, $3, 'research', $4, $5,
+			GREATEST($6, NOW()),
+			GREATEST($6, NOW()) + ($7 * INTERVAL '1 second')
+		)
+	`, u.uuid, userID, planetID, code, next, startAt, dur); err != nil {
 		return mapQueueBusy(err)
 	}
 	return tx.Commit()
@@ -503,6 +573,12 @@ func (s *QueueStore) Cancel(ctx context.Context, queueID, userID int64) error {
 			return err
 		}
 	}
+	// Research chains the same way, but is account-scoped rather than per planet.
+	if kind == "research" {
+		if err := renumberResearchTx(ctx, tx, owner, universeID, queueID, code, startAt); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
@@ -598,6 +674,103 @@ func renumberBuildingsTx(ctx context.Context, tx *sql.Tx, planetID int64, univer
 					return err
 				}
 				dur = time.Duration(d.LevelTime(next) * game.BuildTimeMultiplier(cmdLevel) / gameSpeed * float64(time.Second))
+			}
+		}
+		start := cursor
+		finish := start.Add(dur)
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE queues SET target_level = $2, start_at = $3, finish_at = $4 WHERE id = $1
+		`, o.id, o.target, start, finish); err != nil {
+			return err
+		}
+		cursor = finish
+	}
+	return nil
+}
+
+// renumberResearchTx repairs an account's research queue after one order is
+// cancelled: every later order is pulled forward to start right after the (now
+// shorter) chain, and later orders of the cancelled tech are shifted down one
+// level, the price difference being refunded to the planet that paid for it.
+func renumberResearchTx(ctx context.Context, tx *sql.Tx, userID int64, universeID string, cancelledID int64, code string, cancelledStart time.Time) error {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, code, target_level, start_at, finish_at, planet_id
+		FROM queues
+		WHERE user_id = $1 AND kind = 'research' AND status = 'IN_PROGRESS' AND id > $2
+		ORDER BY id
+	`, userID, cancelledID)
+	if err != nil {
+		return err
+	}
+	type order struct {
+		id       int64
+		code     string
+		target   int
+		start    time.Time
+		finish   time.Time
+		planetID int64
+	}
+	var tail []order
+	for rows.Next() {
+		var o order
+		if err := rows.Scan(&o.id, &o.code, &o.target, &o.start, &o.finish, &o.planetID); err != nil {
+			rows.Close()
+			return err
+		}
+		tail = append(tail, o)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	var gameSpeed float64
+	factorsX := false
+	loadSpeed := func() error {
+		if factorsX {
+			return nil
+		}
+		if err := tx.QueryRowContext(ctx,
+			`SELECT game_speed FROM universes WHERE id = $1`, universeID).Scan(&gameSpeed); err != nil {
+			return err
+		}
+		factorsX = true
+		return nil
+	}
+
+	cursor := cancelledStart
+	if cursor.Before(time.Now()) {
+		cursor = time.Now()
+	}
+	for i := range tail {
+		o := &tail[i]
+		dur := o.finish.Sub(o.start)
+		if o.code == code {
+			next := o.target - 1
+			if next < 1 {
+				next = 1
+			}
+			if next != o.target {
+				d, ok := game.Get(o.code)
+				if !ok {
+					return ErrUnknownCode
+				}
+				oldCost := d.LevelCost(o.target)
+				newCost := d.LevelCost(next)
+				if err := creditTx(ctx, tx, o.planetID, game.Resources{
+					Metal:    oldCost.Metal - newCost.Metal,
+					Lutinum:  oldCost.Lutinum - newCost.Lutinum,
+					Water:    oldCost.Water - newCost.Water,
+					Hydrogen: oldCost.Hydrogen - newCost.Hydrogen,
+				}); err != nil {
+					return err
+				}
+				o.target = next
+				if err := loadSpeed(); err != nil {
+					return err
+				}
+				dur = time.Duration(d.LevelTime(next) / gameSpeed * float64(time.Second))
 			}
 		}
 		start := cursor

@@ -301,6 +301,8 @@ func msg(err error) string {
 		return "That queue is already busy."
 	case errors.Is(err, store.ErrQueueFull):
 		return "The construction queue is full."
+	case errors.Is(err, store.ErrResearchQueueFull):
+		return "The research queue is full."
 	case errors.Is(err, store.ErrPrerequisites):
 		return "Prerequisites not met."
 	case errors.Is(err, store.ErrNoFields):
@@ -659,24 +661,47 @@ func (h *Handler) researchView(ctx context.Context, r *http.Request, userID, id 
 	gameSpeed, _ := h.gameSpeed(ctx)
 
 	d := researchData{baseData: h.base(ctx, r, userID, "Research", id)}
-	if q, ok := h.activeQueue(ctx, id, userID, "research"); ok {
-		v := newQueueView(q)
-		d.Queue = &v
+	d.QueueSlots = h.researchQueueSlots(ctx)
+	orders, _ := h.researchQueue(ctx, userID)
+	queuedByCode := map[string]int{}
+	for i, q := range orders {
+		var level int64
+		if q.TargetLevel.Valid {
+			level = q.TargetLevel.Int64
+		}
+		name := q.Code
+		if def, ok := game.Get(q.Code); ok {
+			name = fmt.Sprintf("%s Level %d", def.Name, level)
+		}
+		d.ResearchQueue = append(d.ResearchQueue, buildQueueRow{
+			Ordinal:    i + 1,
+			ID:         q.ID,
+			Name:       name,
+			Duration:   untilDur(q.StartAt, q.FinishAt),
+			Remaining:  until(q.FinishAt),
+			FinishUnix: q.FinishAt.Unix(),
+		})
+		queuedByCode[q.Code]++
 	}
+	d.QueueUsed = len(d.ResearchQueue)
+	d.QueueFull = d.QueueSlots > 0 && d.QueueUsed >= d.QueueSlots
+
 	byGroup := map[string][]buildRow{}
 	for _, def := range sortedDefs(game.KindResearch) {
-		next := techs[def.Code] + 1
+		queued := queuedByCode[def.Code]
+		next := techs[def.Code] + queued + 1
 		cost := def.LevelCost(next)
 		row := buildRow{
 			Code: def.Code, Name: def.Name, Level: techs[def.Code], NextLevel: next,
-			Unlocked:   game.PrereqsMet(def, structs, techs),
-			Queued:     d.Queue != nil && strings.HasPrefix(d.Queue.Name, def.Name),
-			CostStr:    costString(cost),
-			Costs:      costParts(cost, p),
-			TimeStr:    humanDur(int64(def.LevelTime(next) / gameSpeed)),
-			Affordable: p.Metal >= cost.Metal && p.Lutinum >= cost.Lutinum && p.Water >= cost.Water && p.Hydrogen >= cost.Hydrogen,
-			Desc:       def.Desc,
-			Icon:       def.Icon,
+			Queued:      queued > 0,
+			QueuedCount: queued,
+			Unlocked:    game.PrereqsMet(def, structs, techs),
+			CostStr:     costString(cost),
+			Costs:       costParts(cost, p),
+			TimeStr:     humanDur(int64(def.LevelTime(next) / gameSpeed)),
+			Affordable:  p.Metal >= cost.Metal && p.Lutinum >= cost.Lutinum && p.Water >= cost.Water && p.Hydrogen >= cost.Hydrogen,
+			Desc:        def.Desc,
+			Icon:        def.Icon,
 		}
 		if row.Icon == "" {
 			row.Icon = "i-flask"
@@ -2610,6 +2635,32 @@ func (h *Handler) QueuePartial(w http.ResponseWriter, r *http.Request) {
 		h.render(w, "build-queue-panel", http.StatusOK, bd)
 		return
 	}
+	if kind == "research" {
+		orders, _ := h.researchQueue(r.Context(), userID)
+		rd := researchData{baseData: baseData{ActivePlanetID: id}, QueueSlots: h.researchQueueSlots(r.Context())}
+		for i, q := range orders {
+			var level int64
+			if q.TargetLevel.Valid {
+				level = q.TargetLevel.Int64
+			}
+			name := q.Code
+			if def, ok := game.Get(q.Code); ok {
+				name = fmt.Sprintf("%s Level %d", def.Name, level)
+			}
+			rd.ResearchQueue = append(rd.ResearchQueue, buildQueueRow{
+				Ordinal:    i + 1,
+				ID:         q.ID,
+				Name:       name,
+				Duration:   untilDur(q.StartAt, q.FinishAt),
+				Remaining:  until(q.FinishAt),
+				FinishUnix: q.FinishAt.Unix(),
+			})
+		}
+		rd.QueueUsed = len(rd.ResearchQueue)
+		rd.QueueFull = rd.QueueSlots > 0 && rd.QueueUsed >= rd.QueueSlots
+		h.render(w, "research-queue-panel", http.StatusOK, rd)
+		return
+	}
 	d := queuePartialData{ActivePlanetID: id}
 	if q, ok := h.activeQueue(r.Context(), id, userID, kind); ok {
 		v := newQueueView(q)
@@ -2654,6 +2705,30 @@ func (h *Handler) buildQueueSlots(ctx context.Context) int {
 	var v int
 	_ = h.db.QueryRowContext(ctx,
 		`SELECT build_queue_slots FROM universes WHERE code_name = $1`, h.universeCode).Scan(&v)
+	return v
+}
+
+// researchQueue returns an account's active research orders in the order they
+// will run (earliest finish first).
+func (h *Handler) researchQueue(ctx context.Context, userID int64) ([]store.Queue, error) {
+	qs, err := h.queues.ActiveForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	var out []store.Queue
+	for _, q := range qs {
+		if q.Kind == "research" {
+			out = append(out, q)
+		}
+	}
+	return out, nil
+}
+
+// researchQueueSlots returns the universe's research-queue capacity (0 when unset).
+func (h *Handler) researchQueueSlots(ctx context.Context) int {
+	var v int
+	_ = h.db.QueryRowContext(ctx,
+		`SELECT research_queue_slots FROM universes WHERE code_name = $1`, h.universeCode).Scan(&v)
 	return v
 }
 

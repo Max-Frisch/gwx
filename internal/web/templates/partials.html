@@ -87,3 +87,39 @@
 </div>
 {{end}}
 {{end}}
+
+{{/* research-queue-panel is the multi-slot research queue (account-wide). It
+     self-polls every 5s like the construction queue so the cumulative "time
+     remaining" column resyncs with the server. */}}
+{{define "research-queue-panel"}}
+{{if .ResearchQueue}}
+<div id="research-queue" hx-get="/partials/queue/{{.ActivePlanetID}}?kind=research" hx-trigger="every 5s" hx-swap="outerHTML">
+  <h2 class="section-head">Research queue <span class="muted">({{.QueueUsed}}/{{.QueueSlots}})</span></h2>
+  <div class="panel">
+    <table>
+      <tr>
+        <th style="width:40px">#</th>
+        <th>Research</th>
+        <th style="width:160px">Research time</th>
+        <th style="width:160px">Time remaining</th>
+        <th style="width:40px"></th>
+      </tr>
+      {{range .ResearchQueue}}
+      <tr>
+        <td class="muted">{{.Ordinal}}</td>
+        <td>{{.Name}}</td>
+        <td>{{.Duration}}</td>
+        <td><span data-countdown="{{.FinishUnix}}">{{.Remaining}}</span></td>
+        <td>
+          <form method="post" action="/queue/{{.ID}}/cancel"
+                hx-post="/queue/{{.ID}}/cancel" hx-target="#page-content" hx-swap="innerHTML">
+            <button class="bad" type="submit" title="Cancel (refund)">✕</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </table>
+  </div>
+</div>
+{{end}}
+{{end}}

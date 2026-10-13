@@ -216,6 +216,21 @@ Read first; one item per session. Keep this file short.
   `internal/store/alliance_store_test.go`, `internal/web/alliance_test.go`,
   `internal/integration/diplomacy_test.go`.
 
+- **Research queue** — account research now chains like the construction queue
+  (I10): a player may hold up to `RESEARCH_QUEUE_SLOTS` (default **4**) active
+  research orders, each scheduled to start when the previous finishes and
+  targeting the level after any already queued. Migration `0012` adds
+  `universes.research_queue_slots` and drops the single-order `uq_queue_research`
+  index; `QueueStore.StartResearch` enforces the cap under a per-account row
+  lock and `Cancel` renumbers the surviving chain (refunding the price
+  difference). The Research page gained a multi-slot **Research queue** panel
+  (self-polling, mirroring the construction queue) and per-card `(+n)` / "queue
+  full" states. `RESEARCH_QUEUE_SLOTS` is wired through `internal/config`, the
+  Makefile and `.env`. Also pins the reference **Space Folding Drive** gate at
+  Space Curvature Drive **10** (was 1). Tests:
+  `internal/web/research_test.go`, `internal/integration/research_queue_test.go`,
+  `internal/game/game_test.go`.
+
 ## Todo (ordered)
 
 **Next up — start here:** build **Seasonal lifecycle** — automatic archive/reset

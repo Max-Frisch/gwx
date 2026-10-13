@@ -152,6 +152,19 @@ func TestPrereqsMet(t *testing.T) {
 	}
 }
 
+// TestSpaceFoldingDrivePrereq pins the deep drive gate: Space Folding Drive
+// needs Space Curvature Drive 10.
+func TestSpaceFoldingDrivePrereq(t *testing.T) {
+	def := Catalog["space_folding_drive"]
+	buildings := map[string]int{"research_center": 1}
+	if PrereqsMet(def, buildings, map[string]int{"space_curvature_drive": 9}) {
+		t.Error("expected Space Folding Drive to stay locked below Space Curvature Drive 10")
+	}
+	if !PrereqsMet(def, buildings, map[string]int{"space_curvature_drive": 10}) {
+		t.Error("expected Space Folding Drive to unlock at Space Curvature Drive 10")
+	}
+}
+
 // TestDefenseRoster pins the GalaxyWars-aligned defense units (real costs and
 // stats from 03-combat.md), the dropped placeholders, and the prereqs.
 func TestDefenseRoster(t *testing.T) {

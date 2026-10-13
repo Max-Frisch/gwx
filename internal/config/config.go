@@ -29,6 +29,10 @@ type Config struct {
 	// queue at once (the reference construction queue holds 6).
 	BuildQueueSlots int
 
+	// ResearchQueueSlots is how many research orders an account may queue at
+	// once (the reference research queue holds 4).
+	ResearchQueueSlots int
+
 	// NPCCount is how many self-playing NPC accounts the universe should hold.
 	// The server seeds up to this many on start (it only ever adds). 0 disables
 	// NPCs entirely.
@@ -71,24 +75,29 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	researchSlots, err := intEnv("RESEARCH_QUEUE_SLOTS", 4)
+	if err != nil {
+		return nil, err
+	}
 	npcCount, err := countEnv("NPC_COUNT", 0)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Config{
-		Env:             getenv("APP_ENV", "development"),
-		HTTPAddr:        getenv("HTTP_ADDR", ":8090"),
-		DatabaseURL:     dbURL,
-		UniverseCode:    getenv("UNIVERSE_CODE", "universe_gwx_1"),
-		UniverseName:    getenv("UNIVERSE_NAME", "Classic Universe"),
-		GameSpeed:       gameSpeed,
-		FleetSpeed:      fleetSpeed,
-		MaxGalaxies:     maxGal,
-		MaxSystems:      maxSys,
-		EndsAt:          endsAt,
-		BuildQueueSlots: queueSlots,
-		NPCCount:        npcCount,
+		Env:                getenv("APP_ENV", "development"),
+		HTTPAddr:           getenv("HTTP_ADDR", ":8090"),
+		DatabaseURL:        dbURL,
+		UniverseCode:       getenv("UNIVERSE_CODE", "universe_gwx_1"),
+		UniverseName:       getenv("UNIVERSE_NAME", "Classic Universe"),
+		GameSpeed:          gameSpeed,
+		FleetSpeed:         fleetSpeed,
+		MaxGalaxies:        maxGal,
+		MaxSystems:         maxSys,
+		EndsAt:             endsAt,
+		BuildQueueSlots:    queueSlots,
+		ResearchQueueSlots: researchSlots,
+		NPCCount:           npcCount,
 	}, nil
 }
 
