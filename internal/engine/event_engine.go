@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
 
 	"gwx/internal/game"
@@ -21,10 +22,15 @@ import (
 // EventEngine is the durable scheduler.
 type EventEngine struct {
 	db *sql.DB
+	// rng drives every NPC decision. Tick runs on a single goroutine, so the
+	// generator needs no locking.
+	rng *rand.Rand
 }
 
 // NewEventEngine constructs an EventEngine.
-func NewEventEngine(db *sql.DB) *EventEngine { return &EventEngine{db: db} }
+func NewEventEngine(db *sql.DB) *EventEngine {
+	return &EventEngine{db: db, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
+}
 
 // A newly colonized planet is seeded with this flat grant on top of whatever the
 // colony ship carried (hydrogen is cargo-only; there is no base hydrogen).
@@ -106,6 +112,7 @@ func (e *EventEngine) processDue(ctx context.Context) {
 	e.processVacations(ctx)
 	e.processQueues(ctx)
 	e.processFleets(ctx)
+	e.processNPCs(ctx)
 }
 
 // processVacations auto-ends any vacation whose 21-day window has elapsed. The

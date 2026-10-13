@@ -72,6 +72,7 @@ type ScanRow struct {
 	OwnerID     sql.NullInt64
 	OwnerName   sql.NullString
 	IsHomeworld bool
+	IsNPC       bool
 }
 
 // Queue is a row in the generic queues table.

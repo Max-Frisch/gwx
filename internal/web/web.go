@@ -885,6 +885,7 @@ func (h *Handler) GalaxyPage(w http.ResponseWriter, r *http.Request) {
 			gr.Name = row.Name.String
 			gr.OwnerName = row.OwnerName.String
 			gr.IsHomeworld = row.IsHomeworld
+			gr.IsNPC = row.IsNPC
 		}
 		d.Rows = append(d.Rows, gr)
 	}
@@ -1114,13 +1115,14 @@ func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
 		for i := start; i < end; i++ {
 			p := rows[i]
 			d.PlanetRows = append(d.PlanetRows, planetScoreRow{
-				Rank:      i + 1,
-				Name:      p.Name,
-				Coords:    coords(p.Galaxy, p.System, p.Position),
-				OwnerID:   p.OwnerID,
-				OwnerName: p.OwnerName,
-				OwnerTag:  tags[p.OwnerID],
-				Points:    int64(p.Points + 0.5),
+				Rank:       i + 1,
+				Name:       p.Name,
+				Coords:     coords(p.Galaxy, p.System, p.Position),
+				OwnerID:    p.OwnerID,
+				OwnerName:  p.OwnerName,
+				OwnerTag:   tags[p.OwnerID],
+				OwnerIsNPC: p.OwnerIsNPC,
+				Points:     int64(p.Points + 0.5),
 			})
 		}
 	case "alliances":
@@ -1184,6 +1186,7 @@ func (h *Handler) HighscorePage(w http.ResponseWriter, r *http.Request) {
 				Total:          int64(p.Total() + 0.5),
 				Planets:        p.Planets,
 				IsMe:           p.UserID == userID,
+				IsNPC:          p.IsNPC,
 			})
 		}
 	}
@@ -1416,6 +1419,7 @@ func (h *Handler) SearchPage(w http.ResponseWriter, r *http.Request) {
 				Total:          int64(p.Total() + 0.5),
 				Planets:        p.Planets,
 				IsMe:           p.UserID == userID,
+				IsNPC:          p.IsNPC,
 			})
 		}
 	}

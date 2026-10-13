@@ -28,6 +28,11 @@ type Config struct {
 	// BuildQueueSlots is how many building construction orders a planet may
 	// queue at once (the reference construction queue holds 6).
 	BuildQueueSlots int
+
+	// NPCCount is how many self-playing NPC accounts the universe should hold.
+	// The server seeds up to this many on start (it only ever adds). 0 disables
+	// NPCs entirely.
+	NPCCount int
 }
 
 // Load reads and validates configuration. DATABASE_URL is the only required
@@ -66,6 +71,10 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	npcCount, err := countEnv("NPC_COUNT", 0)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		Env:             getenv("APP_ENV", "development"),
@@ -79,6 +88,7 @@ func Load() (*Config, error) {
 		MaxSystems:      maxSys,
 		EndsAt:          endsAt,
 		BuildQueueSlots: queueSlots,
+		NPCCount:        npcCount,
 	}, nil
 }
 
@@ -121,6 +131,19 @@ func intEnv(key string, fallback int) (int, error) {
 	v, err := strconv.Atoi(raw)
 	if err != nil || v <= 0 {
 		return 0, fmt.Errorf("invalid %s: must be a positive integer", key)
+	}
+	return v, nil
+}
+
+// countEnv is like intEnv but permits zero (used for optional counts).
+func countEnv(key string, fallback int) (int, error) {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback, nil
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v < 0 {
+		return 0, fmt.Errorf("invalid %s: must be zero or a positive integer", key)
 	}
 	return v, nil
 }

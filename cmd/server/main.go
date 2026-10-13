@@ -47,6 +47,15 @@ func main() {
 	log.Printf("[INIT] universe %q ready (game x%.2f, fleet x%.2f)",
 		cfg.UniverseCode, cfg.GameSpeed, cfg.FleetSpeed)
 
+	if cfg.NPCCount > 0 {
+		created, err := store.NewNPCStore(db).EnsureCount(ctx, cfg.UniverseCode, cfg.NPCCount)
+		if err != nil {
+			log.Printf("[INIT] npc seeding: %v", err)
+		} else if created > 0 {
+			log.Printf("[INIT] seeded %d NPC player(s) (target %d)", created, cfg.NPCCount)
+		}
+	}
+
 	eventEngine := engine.NewEventEngine(db)
 	go eventEngine.StartScheduler(ctx)
 

@@ -45,6 +45,7 @@ just editing `.env` and restarting:
 | `MAX_GALAXIES`, `MAX_SYSTEMS` | universe bounds |
 | `BUILD_QUEUE_SLOTS` | building construction queue length per planet (default 6) |
 | `ENDS_AT` | optional RFC3339 seasonal end (empty = long-term universe) |
+| `NPC_COUNT` | self-playing NPC accounts seeded on start (0 = disabled) |
 
 GalaxyWars has exactly **two** speed modifiers — game speed and fleet speed.
 Two flavours of round therefore come from the same binary: a slow long-term

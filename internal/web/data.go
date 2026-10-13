@@ -166,6 +166,7 @@ type galaxyRow struct {
 	OwnerName   string
 	OwnerTag    string
 	IsHomeworld bool
+	IsNPC       bool
 }
 
 type reportRow struct {
@@ -186,16 +187,18 @@ type playerScoreRow struct {
 	Total          int64
 	Planets        int
 	IsMe           bool
+	IsNPC          bool
 }
 
 type planetScoreRow struct {
-	Rank      int
-	Name      string
-	Coords    string
-	OwnerID   int64
-	OwnerName string
-	OwnerTag  string
-	Points    int64
+	Rank       int
+	Name       string
+	Coords     string
+	OwnerID    int64
+	OwnerName  string
+	OwnerTag   string
+	OwnerIsNPC bool
+	Points     int64
 }
 
 type allianceScoreRow struct {

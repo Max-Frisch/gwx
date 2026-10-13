@@ -28,6 +28,7 @@ type PlayerScore struct {
 	PlanetPoints   float64
 	ResearchPoints float64
 	Planets        int
+	IsNPC          bool
 }
 
 // Total is the combined economy score.
@@ -35,14 +36,15 @@ func (p PlayerScore) Total() float64 { return p.PlanetPoints + p.ResearchPoints 
 
 // PlanetScore is one row of the planets leaderboard.
 type PlanetScore struct {
-	PlanetID  int64
-	Name      string
-	Galaxy    int
-	System    int
-	Position  int
-	OwnerID   int64
-	OwnerName string
-	Points    float64
+	PlanetID   int64
+	Name       string
+	Galaxy     int
+	System     int
+	Position   int
+	OwnerID    int64
+	OwnerName  string
+	OwnerIsNPC bool
+	Points     float64
 }
 
 // Players returns economy points for every account in the universe.
@@ -58,7 +60,7 @@ func (s *ScoreStore) Players(ctx context.Context, universeCode string) ([]Player
 	}
 
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, username FROM users
+		SELECT id, username, is_npc FROM users
 		WHERE universe_id = (SELECT id FROM universes WHERE code_name = $1)`, universeCode)
 	if err != nil {
 		return nil, err
@@ -66,11 +68,14 @@ func (s *ScoreStore) Players(ctx context.Context, universeCode string) ([]Player
 	for rows.Next() {
 		var id int64
 		var name string
-		if err := rows.Scan(&id, &name); err != nil {
+		var isNPC bool
+		if err := rows.Scan(&id, &name, &isNPC); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		get(id).Username = name
+		ps := get(id)
+		ps.Username = name
+		ps.IsNPC = isNPC
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
@@ -171,7 +176,7 @@ func (s *ScoreStore) Planets(ctx context.Context, universeCode string) ([]Planet
 
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT p.id, p.name, p.galaxy, p.system, p.position,
-		       COALESCE(p.user_id, 0), COALESCE(u.username, '')
+		       COALESCE(p.user_id, 0), COALESCE(u.username, ''), COALESCE(u.is_npc, FALSE)
 		FROM planets p
 		LEFT JOIN users u ON u.id = p.user_id
 		WHERE p.universe_id = (SELECT id FROM universes WHERE code_name = $1)`, universeCode)
@@ -181,14 +186,15 @@ func (s *ScoreStore) Planets(ctx context.Context, universeCode string) ([]Planet
 	for rows.Next() {
 		var id, ownerID int64
 		var name, ownerName string
+		var ownerIsNPC bool
 		var g, sys, pos int
-		if err := rows.Scan(&id, &name, &g, &sys, &pos, &ownerID, &ownerName); err != nil {
+		if err := rows.Scan(&id, &name, &g, &sys, &pos, &ownerID, &ownerName, &ownerIsNPC); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		ps := get(id)
 		ps.Name, ps.Galaxy, ps.System, ps.Position = name, g, sys, pos
-		ps.OwnerID, ps.OwnerName = ownerID, ownerName
+		ps.OwnerID, ps.OwnerName, ps.OwnerIsNPC = ownerID, ownerName, ownerIsNPC
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {

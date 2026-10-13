@@ -133,11 +133,14 @@ func createHomeworld(ctx context.Context, tx *sql.Tx, universeUUID string, userI
 }
 
 // UserAuth returns the id and password hash for a login (username OR email).
+// NPC accounts are never authenticatable even if their name were guessed.
 func (s *AuthStore) UserAuth(ctx context.Context, login string) (int64, string, error) {
 	var id int64
 	var hash string
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, password_hash FROM users WHERE username = $1 OR email = $1 LIMIT 1
+		SELECT id, password_hash FROM users
+		WHERE (username = $1 OR email = $1) AND NOT is_npc
+		LIMIT 1
 	`, login).Scan(&id, &hash)
 	if err == sql.ErrNoRows {
 		return 0, "", ErrInvalidCredentials

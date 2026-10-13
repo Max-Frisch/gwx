@@ -21,7 +21,7 @@
   <tr>
     <td class="muted">{{.Rank}}</td>
     <td>{{.Name}} <span class="muted">{{.Coords}}</span></td>
-    <td>{{if .OwnerName}}<a href="/player/{{.OwnerID}}">{{.OwnerName}}</a>{{if .OwnerTag}} <a class="tag" href="/alliance?q={{.OwnerTag}}">[{{.OwnerTag}}]</a>{{end}}{{else}}<span class="muted">Uncolonized</span>{{end}}</td>
+    <td>{{if .OwnerName}}<a href="/player/{{.OwnerID}}">{{.OwnerName}}</a>{{if .OwnerIsNPC}} <span class="tag" title="NPC">&#129302;</span>{{end}}{{if .OwnerTag}} <a class="tag" href="/alliance?q={{.OwnerTag}}">[{{.OwnerTag}}]</a>{{end}}{{else}}<span class="muted">Uncolonized</span>{{end}}</td>
     <td>{{n .Points}}</td>
   </tr>
   {{else}}
@@ -103,7 +103,7 @@
   {{range .Players}}
   <tr>
     <td class="muted">{{.Rank}}</td>
-    <td><a href="/player/{{.UserID}}">{{.Username}}</a>{{if .Tag}} <a class="tag" href="/alliance?q={{.Tag}}">[{{.Tag}}]</a>{{end}}{{if .IsMe}} <span class="tag ok">you</span>{{end}}</td>
+    <td><a href="/player/{{.UserID}}">{{.Username}}</a>{{if .IsNPC}} <span class="tag" title="NPC">&#129302;</span>{{end}}{{if .Tag}} <a class="tag" href="/alliance?q={{.Tag}}">[{{.Tag}}]</a>{{end}}{{if .IsMe}} <span class="tag ok">you</span>{{end}}</td>
     <td>{{n .PlanetPoints}}</td>
     <td>{{n .ResearchPoints}}</td>
     <td><b>{{n .Total}}</b></td>

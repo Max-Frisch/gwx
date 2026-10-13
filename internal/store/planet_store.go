@@ -201,7 +201,7 @@ func (s *PlanetStore) resourceSpeed(ctx context.Context, universeUUID string) fl
 // Scan returns the slots of one system. universeCode is the universes.code_name.
 func (s *PlanetStore) Scan(ctx context.Context, universeCode string, galaxy, system int) ([]ScanRow, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT p.position, p.id, p.name, u.id, u.username, p.is_homeworld
+		SELECT p.position, p.id, p.name, u.id, u.username, p.is_homeworld, COALESCE(u.is_npc, FALSE)
 		FROM planets p
 		LEFT JOIN users u ON u.id = p.user_id
 		WHERE p.universe_id = (SELECT id FROM universes WHERE code_name = $1)
@@ -215,7 +215,7 @@ func (s *PlanetStore) Scan(ctx context.Context, universeCode string, galaxy, sys
 	var out []ScanRow
 	for rows.Next() {
 		var r ScanRow
-		if err := rows.Scan(&r.Position, &r.PlanetID, &r.Name, &r.OwnerID, &r.OwnerName, &r.IsHomeworld); err != nil {
+		if err := rows.Scan(&r.Position, &r.PlanetID, &r.Name, &r.OwnerID, &r.OwnerName, &r.IsHomeworld, &r.IsNPC); err != nil {
 			return nil, err
 		}
 		out = append(out, r)

@@ -157,6 +157,17 @@ Read first; one item per session. Keep this file short.
   resources almost instantly and made raiding meaningless. Test pins the base
   curve, ×10 scaling and the protected share (`internal/game/economy.go`,
   `game_test.go`; README signature mechanic updated).
+- **NPCs (skeleton)** — self-playing accounts, inspired by GigraWars'
+  *Operation Genesis*. `users.is_npc` + `npc_profile` JSONB + `npc_next_decision_at`
+  (migration `0010`); pure `game.NPCProfile` (strategy/difficulty/phase/activity),
+  a weighted-random `RankedBuildings` probability tree and human-ish
+  `NextDecisionDelay`; `store.NPCStore` (create homeworld, lease due NPCs with
+  `FOR UPDATE SKIP LOCKED`, reschedule, `EnsureCount`); durable
+  `engine.processNPCs` phase (25/tick) that queues building levels through the
+  same `QueueStore` a player uses. `NPC_COUNT` seeds up to N on start. NPCs are
+  ordinary `users` rows (so queues/fleets/reports/highscore/galaxy all work) but
+  can never authenticate and carry a 🤖 marker in highscore + galaxy.
+  `internal/game/npc_test.go` + `internal/integration/npc_test.go`.
 
 ## Todo (ordered)
 
@@ -178,6 +189,12 @@ page exists, its view model.
 - [ ] **Seasonal lifecycle** — automatic archive/reset at `ENDS_AT`; round seeding.
 - [ ] **JSON API** — thin `/api/v1` surface for tooling/bots.
 - [ ] **Anti-farm / noob protection** — optional points-ratio guard.
+- [ ] **NPC actions** — extend the brain past buildings: unit/defense production,
+      colonizing, reacting to being attacked with the odd espionage, and the
+      sloppy random "fleet in the air" fleet-save (deliberate saves only rarely,
+      on an incoming attack). Hooks are in `engine.runNPC`; every action reuses
+      `QueueStore`/`FleetStore`. Profile knobs (strategy/difficulty/activity) are
+      already stored — they just need to influence more than building choice.
 
 ## Reference spec (derived from Uni5 HARs — `info/galaxywars-spec/`)
 
