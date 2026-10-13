@@ -382,7 +382,7 @@ func (s *QueueStore) StartResearch(ctx context.Context, universeCode string, use
 	if err != nil {
 		return err
 	}
-	dur := def.LevelTime(next) / u.gameSpeed
+	dur := def.ResearchTime(next, structs["research_center"]) / u.gameSpeed
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO queues (universe_id, user_id, planet_id, kind, code, target_level, start_at, finish_at)
 		VALUES (
@@ -725,18 +725,35 @@ func renumberResearchTx(ctx context.Context, tx *sql.Tx, userID int64, universeI
 	}
 	rows.Close()
 
-	var gameSpeed float64
-	factorsX := false
-	loadSpeed := func() error {
-		if factorsX {
+	var (
+		gameSpeed   float64
+		gameSpeedOK bool
+		rcByPlanet  = map[int64]int{}
+	)
+	loadGameSpeed := func() error {
+		if gameSpeedOK {
 			return nil
 		}
 		if err := tx.QueryRowContext(ctx,
 			`SELECT game_speed FROM universes WHERE id = $1`, universeID).Scan(&gameSpeed); err != nil {
 			return err
 		}
-		factorsX = true
+		gameSpeedOK = true
 		return nil
+	}
+	// The enqueue-time Research Center level is per planet and must be reloaded
+	// to reproduce each order's shortened duration.
+	loadRC := func(planetID int64) (int, error) {
+		if lvl, ok := rcByPlanet[planetID]; ok {
+			return lvl, nil
+		}
+		structs, err := loadStructuresTx(ctx, tx, planetID)
+		if err != nil {
+			return 0, err
+		}
+		lvl := structs["research_center"]
+		rcByPlanet[planetID] = lvl
+		return lvl, nil
 	}
 
 	cursor := cancelledStart
@@ -767,10 +784,14 @@ func renumberResearchTx(ctx context.Context, tx *sql.Tx, userID int64, universeI
 					return err
 				}
 				o.target = next
-				if err := loadSpeed(); err != nil {
+				if err := loadGameSpeed(); err != nil {
 					return err
 				}
-				dur = time.Duration(d.LevelTime(next) / gameSpeed * float64(time.Second))
+				rc, err := loadRC(o.planetID)
+				if err != nil {
+					return err
+				}
+				dur = time.Duration(d.ResearchTime(next, rc) / gameSpeed * float64(time.Second))
 			}
 		}
 		start := cursor

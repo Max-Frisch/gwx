@@ -120,6 +120,49 @@ func TestUnitTimeScalesWithFactoryLevel(t *testing.T) {
 	}
 }
 
+// TestResearchTimeUsesCostCurveAndCenterDivisor pins the research duration
+// against the Uni5 calculator captures. Research uses the level cost curve as
+// its base time, divided by the shared factory divisor series keyed by the
+// Research Center level (not an exponential TimeFactor).
+func TestResearchTimeUsesCostCurveAndCenterDivisor(t *testing.T) {
+	cases := []struct {
+		code      string
+		level     int
+		rcLevel   int
+		wantSecs  int64 // floor of the captured "Construction time"
+		reference string
+	}{
+		{"combustion_drive", 13, 10, 18114, "05:01:54"}, // capture 00844 (x1 base)
+		{"ion_drive", 5, 10, 4590, "01:16:30"},          // capture 00914
+		{"ion_drive", 6, 10, 7540, "02:05:40"},          // capture 00914
+		{"ion_drive", 5, 22, 958, "00:15:58"},           // gigrawars x2 screenshot
+		{"ion_drive", 6, 22, 1575, "00:26:15"},          // gigrawars x2 screenshot
+		{"spy_technology", 7, 10, 30688, "08:31:28"},    // capture 01113
+		{"space_folding_drive", 1, 10, 983, "00:16:23"}, // capture 00980
+	}
+	for _, c := range cases {
+		def, ok := Get(c.code)
+		if !ok {
+			t.Fatalf("%s missing from catalog", c.code)
+		}
+		if got := int64(def.ResearchTime(c.level, c.rcLevel)); got != c.wantSecs {
+			t.Errorf("%s L%d @RC%d = %ds, want %ds (%s)", c.code, c.level, c.rcLevel, got, c.wantSecs, c.reference)
+		}
+	}
+	// The catalog already treats the captured (Uni5 x2) values as the x1 base,
+	// so GAME_SPEED divides from there: x1000 must be ~1000x faster than x1,
+	// not a token speed-up. Ion Drive 6 @RC22 = 1575s at x1 (and x2 reference),
+	// collapsing to ~1s at x1000.
+	ion := Catalog["ion_drive"]
+	const gameSpeed = 1000.0
+	if got := int64(ion.ResearchTime(6, 22)); got != 1575 {
+		t.Fatalf("x1 base drift: ion L6 @RC22 = %ds, want 1575", got)
+	}
+	if got := int64(ion.ResearchTime(6, 22) / gameSpeed); got != 1 {
+		t.Errorf("x1000 ion L6 @RC22 = %ds, want 1", got)
+	}
+}
+
 func TestCargoCapacityScalesWithResearch(t *testing.T) {
 	units := map[string]int64{"small_trader": 2}
 	if got := CargoCapacity(units, 0); got != 18000 {

@@ -127,14 +127,16 @@ func UnitFactoryCode(kind Kind) string {
 }
 
 // unitTimeDivisors is the exact shared per-factory-level divisor captured from
-// the Uni5 ship and defense calculators: a unit's build time is
-// TimeSecs / unitTimeDivisors[factoryLevel], where the factory is the Ship
-// Factory (ships) or the Orbital Defense Station (defense). Level 1 leaves the
-// captured per-unit duration unchanged; higher factory levels speed production
-// up faster than linearly. All ships and all defense units share the identical
-// series (verified against Jackal, Falcon, Longeagle X and every defense unit).
-// Captured for factory levels 1..29; beyond the captured range it extrapolates
-// with the closed form that reproduces every captured value exactly.
+// the Uni5 calculators: a unit's build time is TimeSecs / unitTimeDivisors
+// [factoryLevel], where the factory is the Ship Factory (ships) or the Orbital
+// Defense Station (defense); research time uses the identical series keyed by
+// the Research Center level. Level 1 leaves the captured duration unchanged;
+// higher levels speed production/research up faster than linearly. All ships,
+// all defense units and all research share the identical series (verified
+// against Jackal, Falcon, Longeagle X, every defense unit, and the Ion/Spy/etc.
+// research calculators). Captured for levels 1..29; beyond the captured range
+// it extrapolates with the closed form that reproduces every captured value
+// exactly.
 var unitTimeDivisors = []float64{
 	0, // index 0 unused
 	1, 2, 3.5, 5.5, 8, 11.5, 15.5, 20, 25, 30.5,
@@ -166,4 +168,18 @@ func unitTimeDivisor(factoryLevel int) float64 {
 // the reference's exact curve.
 func UnitTimeMultiplier(factoryLevel int) float64 {
 	return 1 / unitTimeDivisor(factoryLevel)
+}
+
+// ResearchTime returns the duration in seconds to research a def to nextLevel
+// at the given Research Center level. Unlike unit time (which scales with the
+// captured per-unit duration), research uses the shared level cost curve
+// (1, 1, 2, 4, 7, 11.5, …) as its base time, divided by the same divisor series
+// units use, keyed by the Research Center level. This reproduces the Uni5
+// research calculator exactly (e.g. Ion Drive 6 at Research Center 10 =
+// 00:26:15·(30.5/146) → 02:05:40).
+func (d Def) ResearchTime(nextLevel, researchCenterLevel int) float64 {
+	if nextLevel <= 0 {
+		return 0
+	}
+	return d.TimeSecs * costMultiplier(nextLevel) / unitTimeDivisor(researchCenterLevel)
 }

@@ -698,7 +698,7 @@ func (h *Handler) researchView(ctx context.Context, r *http.Request, userID, id 
 			Unlocked:    game.PrereqsMet(def, structs, techs),
 			CostStr:     costString(cost),
 			Costs:       costParts(cost, p),
-			TimeStr:     humanDur(int64(def.LevelTime(next) / gameSpeed)),
+			TimeStr:     humanDur(int64(def.ResearchTime(next, structs["research_center"]) / gameSpeed)),
 			Affordable:  p.Metal >= cost.Metal && p.Lutinum >= cost.Lutinum && p.Water >= cost.Water && p.Hydrogen >= cost.Hydrogen,
 			Desc:        def.Desc,
 			Icon:        def.Icon,
