@@ -60,6 +60,14 @@ func main() {
 
 	eventEngine := engine.NewEventEngine(db)
 	eventEngine.SetNPCBatch(cfg.NPCBatch)
+	eventEngine.SetNPCRaid(engine.NPCRaidConfig{
+		Enabled:     cfg.NPCRaid,
+		ChanceScale: cfg.NPCRaidChance,
+		MaxPerTick:  cfg.NPCRaidMax,
+	})
+	if cfg.NPCRaid {
+		log.Printf("[INIT] NPC raiding enabled (chance x%.2f, max %d/tick)", cfg.NPCRaidChance, cfg.NPCRaidMax)
+	}
 	go eventEngine.StartScheduler(ctx)
 
 	mux := http.NewServeMux()

@@ -272,6 +272,41 @@ func (s *NPCStore) RandomTarget(ctx context.Context, universeCode string, exclud
 	return g, sys, pos, true, nil
 }
 
+// RandomRaidTarget returns a random eligible planet in the universe — any
+// account that is not the caller, is not sanctioned and is not on vacation —
+// with its coordinates. It reports ok=false when no planet qualifies. The
+// random ordering is done by Postgres so a large universe is not pulled into
+// the process.
+func (s *NPCStore) RandomRaidTarget(ctx context.Context, universeCode string, excludeUser int64) (planetID int64, g, sys, pos int, ok bool, err error) {
+	err = s.db.QueryRowContext(ctx, `
+		SELECT p.id, p.galaxy, p.system, p.position
+		FROM planets p JOIN users u ON u.id = p.user_id
+		WHERE p.universe_id = (SELECT id FROM universes WHERE code_name = $1)
+		  AND p.user_id <> $2
+		  AND NOT u.sanctioned
+		  AND NOT (u.vacation_since IS NOT NULL AND u.vacation_until IS NOT NULL AND NOW() < u.vacation_until)
+		ORDER BY random() LIMIT 1
+	`, universeCode, excludeUser).Scan(&planetID, &g, &sys, &pos)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, 0, 0, false, nil
+	}
+	if err != nil {
+		return 0, 0, 0, 0, false, err
+	}
+	return planetID, g, sys, pos, true, nil
+}
+
+// HasOutboundAttack reports whether a user already has an ATTACK fleet in
+// flight (anti-hammering guard for the raid decision).
+func (s *NPCStore) HasOutboundAttack(ctx context.Context, userID int64) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM fleets
+		WHERE user_id = $1 AND mission = 'ATTACK' AND phase = 'OUTBOUND'
+	`, userID).Scan(&n)
+	return n > 0, err
+}
+
 // itoa64 renders a non-negative int64 without importing strconv (kept local so
 // the store package's tiny helper surface stays consistent).
 func itoa64(n int64) string {

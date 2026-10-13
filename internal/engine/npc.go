@@ -37,6 +37,7 @@ func (e *EventEngine) processNPCs(ctx context.Context) {
 		log.Printf("[ENGINE] npc scan: %v", err)
 		return
 	}
+	e.npcRaidLeft = e.npcRaid.MaxPerTick
 	for _, n := range due {
 		if err := e.runNPC(ctx, n); err != nil {
 			log.Printf("[ENGINE] npc %d: %v", n.UserID, err)
@@ -80,6 +81,15 @@ func (e *EventEngine) runNPC(ctx context.Context, n store.NPC) error {
 			e.npcResearchDecide(ctx, n, planets, techs, structsByPlanet)
 			e.npcUnitDecide(ctx, n, planets, techs, structsByPlanet)
 			e.npcColonizeDecide(ctx, n, planets)
+			// Offense is opt-in: skip the extra ships query entirely when
+			// raiding is off, so the default brain stays byte-for-byte.
+			if e.npcRaid.Enabled {
+				shipsByPlanet, err := planetsStore.ShipsByPlanet(ctx, n.UserID)
+				if err != nil {
+					return err
+				}
+				e.npcRaidDecide(ctx, n, planets, techs, shipsByPlanet)
+			}
 		}
 	}
 
@@ -212,6 +222,121 @@ func (e *EventEngine) npcColonizeDecide(ctx context.Context, n store.NPC, owned 
 	return false
 }
 
+// npcRaidDecide is the opt-in offense. If the NPC already holds an espionage
+// report it consumes the intel (attack or not); otherwise it scouts a fresh
+// target. It returns whether it acted. It is only called when raiding is
+// enabled, inside the growth window.
+func (e *EventEngine) npcRaidDecide(ctx context.Context, n store.NPC, owned []store.OwnedPlanet, techs map[string]int, shipsByPlanet map[int64]map[string]int64) bool {
+	if !e.npcRaid.Enabled || e.npcRaidLeft <= 0 {
+		return false
+	}
+	reports := store.NewReportStore(e.db)
+	report, err := reports.LatestByKind(ctx, n.UserID, "espionage")
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return false
+	}
+	if report != nil {
+		return e.npcRaidFromReport(ctx, n, owned, techs, shipsByPlanet, report)
+	}
+	return e.npcScout(ctx, n, owned, shipsByPlanet)
+}
+
+// npcRaidFromReport is Phase A: read the pending espionage report, decide
+// whether a raid is worth it and dispatch ATTACK, then consume the report
+// either way so stale intel never piles up.
+func (e *EventEngine) npcRaidFromReport(ctx context.Context, n store.NPC, owned []store.OwnedPlanet, techs map[string]int, shipsByPlanet map[int64]map[string]int64, report *store.Report) bool {
+	defer func() {
+		if err := store.NewReportStore(e.db).Consume(ctx, n.UserID, report.ID); err != nil {
+			log.Printf("[ENGINE] npc %d: consume report %d: %v", n.UserID, report.ID, err)
+		}
+	}()
+
+	esp, err := game.ParseEspionage(report.Payload)
+	if err != nil {
+		return false
+	}
+	tg, ts, tp, ok := esp.Coords()
+	if !ok {
+		return false
+	}
+	defender := make(map[string]int64, len(esp.Ships)+len(esp.Defense))
+	for code, qty := range esp.Ships {
+		defender[code] += qty
+	}
+	for code, qty := range esp.Defense {
+		defender[code] += qty
+	}
+	atkTechs := game.CombatTechsFromLevels(techs)
+	fleets := store.NewFleetStore(e.db)
+	for _, p := range owned {
+		force := game.NPCRaidForce(shipsByPlanet[p.ID], e.rng)
+		if force == nil {
+			continue
+		}
+		// The report carries no defender techs, so NPCRaidWorthIt fights the
+		// defender with zero tech — deliberately conservative.
+		if !game.NPCRaidWorthIt(force, defender, atkTechs) {
+			continue
+		}
+		if _, err := fleets.Dispatch(ctx, store.DispatchParams{
+			UniverseCode: n.Universe, UserID: n.UserID, OriginID: p.ID,
+			Mission: "ATTACK", TargetG: tg, TargetS: ts, TargetP: tp,
+			SpeedPct: 1, Ships: force,
+		}); err == nil {
+			e.npcRaidLeft--
+			return true
+		} else if !npcSoftFailure(err) {
+			return false
+		}
+	}
+	return false
+}
+
+// npcScout is Phase B: with a probe and some warships, gate on the raid chance
+// and send one probe at a random eligible target. The next decision finds the
+// report and runs Phase A.
+func (e *EventEngine) npcScout(ctx context.Context, n store.NPC, owned []store.OwnedPlanet, shipsByPlanet map[int64]map[string]int64) bool {
+	npcs := store.NewNPCStore(e.db)
+	if has, err := npcs.HasOutboundAttack(ctx, n.UserID); err != nil || has {
+		return false
+	}
+	hasProbe, hasWarships := false, false
+	for _, ships := range shipsByPlanet {
+		if ships["spy_probe"] > 0 {
+			hasProbe = true
+		}
+		for code, qty := range ships {
+			if qty > 0 && game.IsWarship(code) {
+				hasWarships = true
+				break
+			}
+		}
+	}
+	if !hasProbe || !hasWarships {
+		return false
+	}
+	if e.rng.Float64() >= game.NPCRaidChance(n.Profile)*e.npcRaid.ChanceScale {
+		return false
+	}
+	_, g, s, pos, ok, err := npcs.RandomRaidTarget(ctx, n.Universe, n.UserID)
+	if err != nil || !ok {
+		return false
+	}
+	fleets := store.NewFleetStore(e.db)
+	for _, p := range owned {
+		if shipsByPlanet[p.ID]["spy_probe"] <= 0 {
+			continue
+		}
+		_, err := fleets.Dispatch(ctx, store.DispatchParams{
+			UniverseCode: n.Universe, UserID: n.UserID, OriginID: p.ID,
+			Mission: "ESPIONAGE", TargetG: g, TargetS: s, TargetP: pos,
+			SpeedPct: 1, Ships: map[string]int64{"spy_probe": 1},
+		})
+		return err == nil
+	}
+	return false
+}
+
 // npcReactDecide handles an inbound attack. With a profile-weighted chance it
 // scouts the attacker with a probe, and (rarely) deliberately lifts its fleet
 // off an attacked planet so the attack lands on the ground defenses alone.
@@ -316,5 +441,6 @@ func npcSoftFailure(err error) bool {
 		errors.Is(err, store.ErrResearchQueueFull) ||
 		errors.Is(err, store.ErrPrerequisites) ||
 		errors.Is(err, store.ErrOnVacation) ||
-		errors.Is(err, store.ErrSanctioned)
+		errors.Is(err, store.ErrSanctioned) ||
+		errors.Is(err, store.ErrTargetOnVacation)
 }

@@ -8,11 +8,14 @@ MAX_GALAXIES   ?= 3
 MAX_SYSTEMS    ?= 199
 BUILD_QUEUE_SLOTS ?= 6
 RESEARCH_QUEUE_SLOTS ?= 4
-NPC_BATCH      ?= 25
 ENDS_AT        ?=
 DATABASE_URL   ?= postgres://postgres:password@localhost:5433/gwx?sslmode=disable
 
-export APP_ENV HTTP_ADDR UNIVERSE_CODE UNIVERSE_NAME GAME_SPEED FLEET_SPEED MAX_GALAXIES MAX_SYSTEMS BUILD_QUEUE_SLOTS RESEARCH_QUEUE_SLOTS NPC_BATCH ENDS_AT DATABASE_URL
+# Note: NPC_COUNT and NPC_BATCH are intentionally NOT exported here — exporting
+# them (even with `?=`) would place them in the process environment and shadow
+# any value set in `.env`, because godotenv does not override real env vars.
+# Set them in `.env` (see `.env.example`) instead.
+export APP_ENV HTTP_ADDR UNIVERSE_CODE UNIVERSE_NAME GAME_SPEED FLEET_SPEED MAX_GALAXIES MAX_SYSTEMS BUILD_QUEUE_SLOTS RESEARCH_QUEUE_SLOTS ENDS_AT DATABASE_URL
 
 .PHONY: run build test lint migrate up down
 

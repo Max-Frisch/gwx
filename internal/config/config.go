@@ -41,6 +41,14 @@ type Config struct {
 	// NPCBatch caps how many NPCs one scheduler tick may let think, so a large
 	// universe cannot starve the queue/fleet resolvers. Default 25.
 	NPCBatch int
+
+	// NPCRaid enables the opt-in NPC offense: scout a target and attack when
+	// favorable. Off (default) is the defensive-only brain. NPCRaidChance
+	// multiplies the profile's scout probability (default 0.15), and NPCRaidMax
+	// caps ATTACK dispatches per tick (default 5).
+	NPCRaid       bool
+	NPCRaidChance float64
+	NPCRaidMax    int
 }
 
 // Load reads and validates configuration. DATABASE_URL is the only required
@@ -91,6 +99,18 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	npcRaid, err := boolEnv("NPC_RAID", false)
+	if err != nil {
+		return nil, err
+	}
+	npcRaidChance, err := unitFloatEnv("NPC_RAID_CHANCE", 0.15)
+	if err != nil {
+		return nil, err
+	}
+	npcRaidMax, err := intEnv("NPC_RAID_MAX", 5)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		Env:                getenv("APP_ENV", "development"),
@@ -107,6 +127,9 @@ func Load() (*Config, error) {
 		ResearchQueueSlots: researchSlots,
 		NPCCount:           npcCount,
 		NPCBatch:           npcBatch,
+		NPCRaid:            npcRaid,
+		NPCRaidChance:      npcRaidChance,
+		NPCRaidMax:         npcRaidMax,
 	}, nil
 }
 
@@ -162,6 +185,35 @@ func countEnv(key string, fallback int) (int, error) {
 	v, err := strconv.Atoi(raw)
 	if err != nil || v < 0 {
 		return 0, fmt.Errorf("invalid %s: must be zero or a positive integer", key)
+	}
+	return v, nil
+}
+
+// boolEnv reads an optional boolean, accepting 1/0/true/false (case-insensitive).
+func boolEnv(key string, fallback bool) (bool, error) {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback, nil
+	}
+	switch strings.ToLower(raw) {
+	case "1", "true":
+		return true, nil
+	case "0", "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid %s: must be one of 1/0/true/false", key)
+	}
+}
+
+// unitFloatEnv reads an optional number in (0,1] (used for probability scales).
+func unitFloatEnv(key string, fallback float64) (float64, error) {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback, nil
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil || v <= 0 || v > 1 {
+		return 0, fmt.Errorf("invalid %s: must be a number in (0,1]", key)
 	}
 	return v, nil
 }

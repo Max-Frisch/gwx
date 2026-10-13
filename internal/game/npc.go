@@ -1,7 +1,10 @@
 package game
 
 import (
+	"encoding/json"
 	"math/rand"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -618,6 +621,124 @@ func (p NPCProfile) ColonizeChance() float64 {
 		base = 0.10
 	}
 	return clamp01(base * p.difficultyScale())
+}
+
+// npcRaidCommitFraction is how much of each warship type an NPC commits to a
+// raid. Committing everything would leave its own planets naked, so a fraction
+// always stays home. npcRaidSurvivorMargin is the share of the committed force
+// that must survive the simulated battle for the raid to be judged worthwhile.
+const (
+	npcRaidCommitFraction   = 0.6
+	npcRaidSurvivorMargin   = 0.5
+	npcRaidChanceBalanced   = 0.15
+	npcRaidChanceAggressive = 0.30
+	npcRaidChancePassive    = 0.12
+	npcRaidChanceBuilder    = 0.06
+)
+
+// IsWarship reports whether a ship code is a combat hull (not a trader or a
+// utility craft like a probe, recycler or colony ship).
+func IsWarship(code string) bool { return npcWarships[code] }
+
+// NPCRaidChance is the per-decision probability that an NPC scouts a target.
+// Aggressive NPCs raid most eagerly, builders least; difficulty scales the
+// whole thing the same way it scales every other reaction.
+func NPCRaidChance(profile NPCProfile) float64 {
+	base := npcRaidChanceBalanced
+	switch profile.Normalized().Strategy {
+	case NPCAggressive:
+		base = npcRaidChanceAggressive
+	case NPCPassive:
+		base = npcRaidChancePassive
+	case NPCBuilder:
+		base = npcRaidChanceBuilder
+	}
+	return clamp01(base * profile.difficultyScale())
+}
+
+// NPCRaidForce chooses the ships to send on a raid from one planet's roster. It
+// commits a fraction of every warship type (never below one) and leaves probes,
+// traders, recyclers, colony ships and all defense behind. Returns nil when the
+// planet holds no warships.
+func NPCRaidForce(ships map[string]int64, rng *rand.Rand) map[string]int64 {
+	frac := npcRaidCommitFraction
+	if rng != nil {
+		frac += (rng.Float64() - 0.5) * 0.2 // jitter 0.5..0.7
+	}
+	out := map[string]int64{}
+	for code, n := range ships {
+		if n <= 0 || !npcWarships[code] {
+			continue
+		}
+		qty := int64(float64(n) * frac)
+		if qty < 1 {
+			qty = 1
+		}
+		if qty > n {
+			qty = n
+		}
+		out[code] = qty
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// EspionageReport is the subset of a stored espionage payload the raid decision
+// needs: the target coordinates and the defender's observed assets.
+type EspionageReport struct {
+	Target    string           `json:"target"`
+	Ships     map[string]int64 `json:"ships"`
+	Defense   map[string]int64 `json:"defense"`
+	Resources map[string]int64 `json:"resources"`
+}
+
+// ParseEspionage decodes a stored espionage report payload. Unknown fields are
+// ignored; a malformed payload is an error.
+func ParseEspionage(payload []byte) (EspionageReport, error) {
+	var r EspionageReport
+	if err := json.Unmarshal(payload, &r); err != nil {
+		return EspionageReport{}, err
+	}
+	return r, nil
+}
+
+// Coords parses the report's "g:s:p" target into its integer parts. ok is false
+// for an absent or malformed target.
+func (r EspionageReport) Coords() (g, s, pos int, ok bool) {
+	parts := strings.Split(r.Target, ":")
+	if len(parts) != 3 {
+		return 0, 0, 0, false
+	}
+	var err error
+	if g, err = strconv.Atoi(parts[0]); err != nil {
+		return 0, 0, 0, false
+	}
+	if s, err = strconv.Atoi(parts[1]); err != nil {
+		return 0, 0, 0, false
+	}
+	if pos, err = strconv.Atoi(parts[2]); err != nil {
+		return 0, 0, 0, false
+	}
+	return g, s, pos, true
+}
+
+// NPCRaidWorthIt simulates a raid deterministically and reports whether the
+// attacker keeps at least npcRaidSurvivorMargin of the committed force. The
+// defender is fought with zero combat tech (the espionage payload carries no
+// defender techs — fog of war), which biases the estimate conservative. Pure.
+func NPCRaidWorthIt(force, defender map[string]int64, atkTechs CombatTechs) bool {
+	committed := total(force)
+	if committed == 0 {
+		return false
+	}
+	res := Simulate(force, defender, atkTechs, CombatTechs{}, 6)
+	want := int64(float64(committed) * npcRaidSurvivorMargin)
+	if want < 1 {
+		want = 1
+	}
+	return total(res.AttackerSurvivors) >= want
 }
 
 // npcDecisionFloor is the shortest real-time gap between two NPC decisions. A

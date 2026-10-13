@@ -27,7 +27,25 @@ type EventEngine struct {
 	rng *rand.Rand
 	// npcBatch caps how many NPCs one tick lets think (see SetNPCBatch).
 	npcBatch int
+	// npcRaid is the opt-in offensive configuration (see SetNPCRaid).
+	npcRaid NPCRaidConfig
+	// npcRaidLeft is the remaining ATTACK dispatches this tick may spend.
+	npcRaidLeft int
 }
+
+// NPCRaidConfig is the opt-in NPC offense configuration. Enabled=false (the
+// default) is byte-for-byte the defensive-only brain. ChanceScale multiplies
+// the profile's per-decision scout probability and MaxPerTick caps ATTACK
+// dispatches per scheduler tick.
+type NPCRaidConfig struct {
+	Enabled     bool
+	ChanceScale float64
+	MaxPerTick  int
+}
+
+// defaultNPCRaidMax caps how many ATTACKs one tick may launch when raiding is
+// enabled but MaxPerTick is left unset.
+const defaultNPCRaidMax = 5
 
 // NewEventEngine constructs an EventEngine.
 func NewEventEngine(db *sql.DB) *EventEngine {
@@ -35,6 +53,7 @@ func NewEventEngine(db *sql.DB) *EventEngine {
 		db:       db,
 		rng:      rand.New(rand.NewSource(time.Now().UnixNano())),
 		npcBatch: defaultNPCBbatch,
+		npcRaid:  NPCRaidConfig{ChanceScale: 1, MaxPerTick: defaultNPCRaidMax},
 	}
 }
 
@@ -44,6 +63,18 @@ func (e *EventEngine) SetNPCBatch(n int) {
 	if n > 0 {
 		e.npcBatch = n
 	}
+}
+
+// SetNPCRaid configures the opt-in NPC offense. A zero ChanceScale or
+// MaxPerTick falls back to 1 / defaultNPCRaidMax.
+func (e *EventEngine) SetNPCRaid(cfg NPCRaidConfig) {
+	if cfg.ChanceScale <= 0 {
+		cfg.ChanceScale = 1
+	}
+	if cfg.MaxPerTick <= 0 {
+		cfg.MaxPerTick = defaultNPCRaidMax
+	}
+	e.npcRaid = cfg
 }
 
 // A newly colonized planet is seeded with this flat grant on top of whatever the

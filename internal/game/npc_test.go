@@ -410,3 +410,114 @@ func TestNPCReactionChancesInRange(t *testing.T) {
 		t.Error("builder ColonizeChance should exceed aggressive")
 	}
 }
+
+func TestNPCRaidChance(t *testing.T) {
+	strategies := []NPCStrategy{NPCBalanced, NPCBuilder, NPCAggressive, NPCPassive}
+	difficulties := []string{"easy", "normal", "hard", ""}
+	for _, s := range strategies {
+		for _, d := range difficulties {
+			v := NPCRaidChance(NPCProfile{Strategy: s, Difficulty: d})
+			if v < 0 || v > 1 {
+				t.Errorf("NPCRaidChance(%s,%s) = %v, want in [0,1]", s, d, v)
+			}
+		}
+	}
+	aggressive := NPCRaidChance(NPCProfile{Strategy: NPCAggressive, Difficulty: "normal"})
+	balanced := NPCRaidChance(NPCProfile{Strategy: NPCBalanced, Difficulty: "normal"})
+	builder := NPCRaidChance(NPCProfile{Strategy: NPCBuilder, Difficulty: "normal"})
+	if !(aggressive > balanced && balanced > builder) {
+		t.Errorf("raid chance aggressive=%v balanced=%v builder=%v; want aggressive > balanced > builder",
+			aggressive, balanced, builder)
+	}
+}
+
+func TestNPCRaidForce(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	ships := map[string]int64{
+		"jackal":       10,
+		"renegade":     4,
+		"spy_probe":    5,
+		"small_trader": 4,
+		"recycler":     2,
+		"colony_ship":  1,
+		"noah":         1,
+	}
+	force := NPCRaidForce(ships, rng)
+	if force == nil {
+		t.Fatal("expected a raid force from a planet holding warships")
+	}
+	// Utilities, traders and colony ships stay home.
+	for _, home := range []string{"spy_probe", "small_trader", "recycler", "colony_ship", "noah"} {
+		if _, ok := force[home]; ok {
+			t.Errorf("raid force should not include %q (got %v)", home, force)
+		}
+	}
+	// A fraction of each warship type is committed, at least one if present.
+	for code, have := range map[string]int64{"jackal": 10, "renegade": 4} {
+		got := force[code]
+		if got < 1 || got > have {
+			t.Errorf("force[%s] = %d, want in [1,%d]", code, got, have)
+		}
+	}
+	// No warships: no force.
+	if got := NPCRaidForce(map[string]int64{"spy_probe": 3, "small_trader": 2}, rng); got != nil {
+		t.Errorf("NPCRaidForce without warships = %v, want nil", got)
+	}
+	if got := NPCRaidForce(nil, rng); got != nil {
+		t.Errorf("NPCRaidForce(nil) = %v, want nil", got)
+	}
+}
+
+func TestParseEspionage(t *testing.T) {
+	// Mirrors the payload resolveEspionageTx writes.
+	payload := []byte(`{
+		"target": "2:34:7",
+		"owner": "Scout Target",
+		"resources": {"metal": 1000, "lutinum": 500, "water": 250, "hydrogen": 100},
+		"ships": {"jackal": 4, "spy_probe": 2},
+		"defense": {"light_laser": 6},
+		"yourEspionageTech": 3
+	}`)
+	esp, err := ParseEspionage(payload)
+	if err != nil {
+		t.Fatalf("ParseEspionage: %v", err)
+	}
+	if esp.Target != "2:34:7" {
+		t.Errorf("target = %q, want 2:34:7", esp.Target)
+	}
+	if esp.Ships["jackal"] != 4 || esp.Ships["spy_probe"] != 2 {
+		t.Errorf("ships = %v", esp.Ships)
+	}
+	if esp.Defense["light_laser"] != 6 {
+		t.Errorf("defense = %v", esp.Defense)
+	}
+	if esp.Resources["metal"] != 1000 {
+		t.Errorf("resources = %v", esp.Resources)
+	}
+	g, s, pos, ok := esp.Coords()
+	if !ok || g != 2 || s != 34 || pos != 7 {
+		t.Errorf("Coords() = %d,%d,%d,%v; want 2,34,7,true", g, s, pos, ok)
+	}
+	if _, _, _, ok := (EspionageReport{Target: "nope"}).Coords(); ok {
+		t.Error("malformed target should not parse")
+	}
+	if _, err := ParseEspionage([]byte("{")); err == nil {
+		t.Error("invalid JSON should error")
+	}
+}
+
+func TestNPCRaidWorthIt(t *testing.T) {
+	techs := CombatTechs{}
+	// Clearly winnable: a large force against almost nothing.
+	if !NPCRaidWorthIt(map[string]int64{"longeagle_x": 100}, map[string]int64{"spy_probe": 1}, techs) {
+		t.Error("overwhelming force should be judged worthwhile")
+	}
+	// Hopeless: a token force against a wall.
+	if NPCRaidWorthIt(map[string]int64{"jackal": 5}, map[string]int64{"longeagle_x": 500}, techs) {
+		t.Error("hopeless force should not be judged worthwhile")
+	}
+	// No force never raids.
+	if NPCRaidWorthIt(nil, nil, techs) {
+		t.Error("empty force should not be worthwhile")
+	}
+}

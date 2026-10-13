@@ -125,6 +125,35 @@ func (s *PlanetStore) Units(ctx context.Context, planetID int64, kind string) (m
 	return out, rows.Err()
 }
 
+// ShipsByPlanet returns ship code -> count grouped by planet for one account,
+// in a single query (rather than one per planet). Planets with no ships are
+// absent from the map.
+func (s *PlanetStore) ShipsByPlanet(ctx context.Context, userID int64) (map[int64]map[string]int64, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT pi.planet_id, pi.code, pi.amount
+		FROM planet_items pi
+		JOIN planets p ON p.id = pi.planet_id
+		WHERE p.user_id = $1 AND pi.kind = 'ship' AND pi.amount > 0
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]map[string]int64{}
+	for rows.Next() {
+		var planetID, amount int64
+		var code string
+		if err := rows.Scan(&planetID, &code, &amount); err != nil {
+			return nil, err
+		}
+		if out[planetID] == nil {
+			out[planetID] = map[string]int64{}
+		}
+		out[planetID][code] = amount
+	}
+	return out, rows.Err()
+}
+
 // Techs returns research code -> level for an account.
 func (s *PlanetStore) Techs(ctx context.Context, userID int64) (map[string]int, error) {
 	return s.intMap(ctx, `SELECT code, level FROM user_techs WHERE user_id = $1`, userID)
