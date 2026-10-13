@@ -110,12 +110,6 @@ func CargoCapacity(units map[string]int64, cargoTech int) int64 {
 	return int64(math.Round(total * (1 + 0.1*float64(cargoTech))))
 }
 
-// BuildTimeMultiplier returns the building duration factor from the command
-// center level (higher = faster).
-func BuildTimeMultiplier(cmdLevel int) float64 {
-	return 1.0 / (1.0 + 0.05*float64(cmdLevel))
-}
-
 // UnitFactoryCode returns the building whose level speeds up production of a
 // unit kind: the Ship Factory for ships, the Orbital Defense Station for
 // defense.
@@ -168,6 +162,19 @@ func unitTimeDivisor(factoryLevel int) float64 {
 // the reference's exact curve.
 func UnitTimeMultiplier(factoryLevel int) float64 {
 	return 1 / unitTimeDivisor(factoryLevel)
+}
+
+// BuildTime returns the duration in seconds to build a def to nextLevel at the
+// given Command Center level. Buildings use the shared level cost curve as their
+// base time divided by the factory divisor series keyed by the Command Center
+// level — the same series units and research use. Note the Command Center
+// reduces its own build time: to build level N the reducer is the Command Center
+// level N-1 (which is simply the planet's current CC level at build time).
+func (d Def) BuildTime(nextLevel, commandCenterLevel int) float64 {
+	if nextLevel <= 0 {
+		return 0
+	}
+	return d.TimeSecs * costMultiplier(nextLevel) / unitTimeDivisor(commandCenterLevel)
 }
 
 // ResearchTime returns the duration in seconds to research a def to nextLevel

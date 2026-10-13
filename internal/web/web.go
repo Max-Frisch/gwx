@@ -534,6 +534,11 @@ func (h *Handler) buildingsView(ctx context.Context, r *http.Request, userID, id
 	d.QueueUsed = len(d.BuildQueue)
 	d.QueueFull = d.QueueSlots > 0 && d.QueueUsed >= d.QueueSlots
 
+	// A queued Command Center upgrade speeds up every later build, so the
+	// preview uses the Command Center level that will exist when the new order
+	// starts: the planet's current level plus any CC upgrades already queued.
+	ccLevel := structs["command_center"] + queuedByCode["command_center"]
+
 	byGroup := map[string][]buildRow{}
 	for _, def := range sortedDefs(game.KindBuilding) {
 		queued := queuedByCode[def.Code]
@@ -546,7 +551,7 @@ func (h *Handler) buildingsView(ctx context.Context, r *http.Request, userID, id
 			Unlocked:    game.PrereqsMet(def, structs, techs),
 			CostStr:     costString(cost),
 			Costs:       costParts(cost, p),
-			TimeStr:     humanDur(int64(def.LevelTime(next) * game.BuildTimeMultiplier(structs["command_center"]) / gameSpeed)),
+			TimeStr:     humanDur(int64(def.BuildTime(next, ccLevel) / gameSpeed)),
 			Affordable:  p.Metal >= cost.Metal && p.Lutinum >= cost.Lutinum && p.Water >= cost.Water && p.Hydrogen >= cost.Hydrogen,
 			Desc:        def.Desc,
 			Icon:        def.Icon,

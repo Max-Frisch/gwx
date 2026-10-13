@@ -165,6 +165,58 @@ func TestBuildingQueueCancelRenumbers(t *testing.T) {
 	})
 }
 
+// TestCommandCenterQueueRecomputesItsOwnBuilds queues several Command Center
+// levels and checks each order's duration is computed from the Command Center
+// level that will exist when it starts (its own self-reduction), not the level
+// at enqueue time for all of them.
+func TestCommandCenterQueueRecomputesItsOwnBuilds(t *testing.T) {
+	h := newHarness(t)
+	p := h.register(t, "cc-chain")
+	h.topUp(t, p)
+	// Run at 1x so stored durations are the raw captured seconds.
+	if _, err := h.db.Exec(`UPDATE universes SET game_speed = 1 WHERE code_name = $1`, h.universe); err != nil {
+		t.Fatalf("set 1x speed: %v", err)
+	}
+
+	path := fmt.Sprintf("/buildings/%d/build", p.home)
+	for i := 0; i < 3; i++ {
+		h.action(t, p.client, path, url.Values{"code": {"command_center"}})
+	}
+
+	rows, err := h.db.Query(`
+		SELECT start_at, finish_at FROM queues
+		WHERE planet_id = $1 AND kind = 'building' AND status = 'IN_PROGRESS'
+		ORDER BY id
+	`, p.home)
+	if err != nil {
+		t.Fatalf("read build queue: %v", err)
+	}
+	defer rows.Close()
+	var got []float64
+	for rows.Next() {
+		var start, finish time.Time
+		if err := rows.Scan(&start, &finish); err != nil {
+			t.Fatalf("scan queue row: %v", err)
+		}
+		got = append(got, finish.Sub(start).Seconds())
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate queue rows: %v", err)
+	}
+
+	// Command Center starts at level 1, so level 2 uses CC1, level 3 uses CC2
+	// and level 4 uses CC3: 10000·cost(2)/D(1), ·cost(3)/D(2), ·cost(4)/D(3).
+	want := []float64{10000, 10000, 11428.6}
+	if len(got) != len(want) {
+		t.Fatalf("queued %d orders, want %d (%v)", len(got), len(want), got)
+	}
+	for i := range want {
+		if diff := got[i] - want[i]; diff > 1 || diff < -1 {
+			t.Errorf("order %d duration = %.1fs, want ~%.1fs", i+1, got[i], want[i])
+		}
+	}
+}
+
 // postFlash POSTs a form and returns the redirect's flash query values without
 // treating an "err" as a test failure (for negative-path checks).
 func (h *harness) postFlash(t *testing.T, c *http.Client, path string, form url.Values) (okMsg, errMsg string) {

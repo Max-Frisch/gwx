@@ -120,10 +120,49 @@ func TestUnitTimeScalesWithFactoryLevel(t *testing.T) {
 	}
 }
 
+// TestBuildTimeUsesCostCurveAndCenterDivisor pins the building duration against
+// the Uni5 calculator captures. Like research, a building's base time is the
+// shared level cost curve times TimeSecs, divided by the factory divisor series
+// keyed by the Command Center level (not an exponential base × linear factor).
+func TestBuildTimeUsesCostCurveAndCenterDivisor(t *testing.T) {
+	cases := []struct {
+		code      string
+		level     int
+		ccLevel   int
+		wantSecs  int64 // floor of the captured "Construction time"
+		reference string
+	}{
+		{"command_center", 23, 22, 41712, "11:35:12"}, // capture 00033
+		{"research_center", 10, 22, 3842, "01:04:02"}, // capture 00099
+		{"trading_post", 7, 22, 1726, "00:28:46"},     // capture 00150
+		{"iron_mine", 41, 22, 54302, "15:05:02"},      // capture 00200
+		{"iron_storage", 19, 22, 169397, "1d 23:03:17"},
+		{"orbital_defense", 5, 22, 215, "00:03:35"}, // capture 00708
+	}
+	for _, c := range cases {
+		def, ok := Get(c.code)
+		if !ok {
+			t.Fatalf("%s missing from catalog", c.code)
+		}
+		if got := int64(def.BuildTime(c.level, c.ccLevel)); got != c.wantSecs {
+			t.Errorf("%s L%d @CC%d = %ds, want %ds (%s)", c.code, c.level, c.ccLevel, got, c.wantSecs, c.reference)
+		}
+	}
+	// The Command Center shortens its own build: level 23 is faster at CC22
+	// (its own level before the upgrade) than at CC21.
+	cc := Catalog["command_center"]
+	if got := int64(cc.BuildTime(23, 22)); got != 41712 {
+		t.Errorf("CC L23 @CC22 = %ds, want 41712", got)
+	}
+	if got := int64(cc.BuildTime(23, 21)); got != 45789 {
+		t.Errorf("CC L23 @CC21 = %ds, want 45789", got)
+	}
+}
+
 // TestResearchTimeUsesCostCurveAndCenterDivisor pins the research duration
 // against the Uni5 calculator captures. Research uses the level cost curve as
 // its base time, divided by the shared factory divisor series keyed by the
-// Research Center level (not an exponential TimeFactor).
+// Research Center level.
 func TestResearchTimeUsesCostCurveAndCenterDivisor(t *testing.T) {
 	cases := []struct {
 		code      string

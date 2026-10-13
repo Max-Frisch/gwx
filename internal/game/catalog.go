@@ -47,16 +47,17 @@ type Resources struct {
 }
 
 // Def is a single catalog definition. For buildings/research Cost is the level-1
-// price and TimeSeconds the level-1 duration; higher levels scale by the shared
-// cost multiplier series and TimeFactor. For ships/defense Cost and TimeSeconds
+// price and TimeSecs the base duration constant: a level's duration is
+// TimeSecs × the shared cost multiplier series, optionally divided by a
+// captured reducer (Command Center for buildings, Research Center for research)
+// — see Def.BuildTime and Def.ResearchTime. For ships/defense Cost and TimeSecs
 // are per unit.
 type Def struct {
-	Code       string
-	Name       string
-	Kind       Kind
-	Cost       Resources
-	TimeSecs   float64
-	TimeFactor float64
+	Code     string
+	Name     string
+	Kind     Kind
+	Cost     Resources
+	TimeSecs float64
 
 	// Combat stats (ships/defense).
 	Attack float64
@@ -87,45 +88,45 @@ type Def struct {
 var Catalog = func() map[string]Def {
 	defs := []Def{
 		// ---- Buildings: main ----
-		{Code: "command_center", Name: "Command Center", Kind: KindBuilding, Cost: Resources{Metal: 500, Lutinum: 200}, TimeSecs: 10000, TimeFactor: 1.25, Group: "Main buildings", Icon: "i-home", Desc: "The center of your planetary complex. Everything comes together here: resource distribution, planning, and administration. Upgrading this building reduces the construction time of all buildings."},
-		{Code: "research_center", Name: "Research Center", Kind: KindBuilding, Cost: Resources{Metal: 300, Lutinum: 100}, TimeSecs: 75, TimeFactor: 1.3, Group: "Main buildings", Icon: "i-flask", Desc: "The technological center of your planet. New and improved technologies are researched here. The higher its level, the faster research completes."},
-		{Code: "trading_post", Name: "Trading Post", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 2000}, TimeSecs: 95, TimeFactor: 1.3, Prereqs: map[string]int{"shipyard": 1}, Group: "Main buildings", Icon: "i-fleet", Desc: "Your connection to the intergalactic trade network. Trade with other imperators; each level opens one offer slot."},
+		{Code: "command_center", Name: "Command Center", Kind: KindBuilding, Cost: Resources{Metal: 500, Lutinum: 200}, TimeSecs: 10000, Group: "Main buildings", Icon: "i-home", Desc: "The center of your planetary complex. Everything comes together here: resource distribution, planning, and administration. Upgrading this building reduces the construction time of all buildings."},
+		{Code: "research_center", Name: "Research Center", Kind: KindBuilding, Cost: Resources{Metal: 300, Lutinum: 100}, TimeSecs: 11000, Group: "Main buildings", Icon: "i-flask", Desc: "The technological center of your planet. New and improved technologies are researched here. The higher its level, the faster research completes."},
+		{Code: "trading_post", Name: "Trading Post", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 2000}, TimeSecs: 14000, Prereqs: map[string]int{"shipyard": 1}, Group: "Main buildings", Icon: "i-fleet", Desc: "Your connection to the intergalactic trade network. Trade with other imperators; each level opens one offer slot."},
 
 		// ---- Buildings: resource production ----
-		{Code: "iron_mine", Name: "Iron Mine", Kind: KindBuilding, Cost: Resources{Metal: 250, Lutinum: 20}, TimeSecs: 70, TimeFactor: 1.25, Produces: "metal", Group: "Resource buildings", Icon: "i-mine", Desc: "Extracts the basic material iron. The further it is upgraded, the more iron is mined."},
-		{Code: "lutinum_mine", Name: "Lutinum Refinery", Kind: KindBuilding, Cost: Resources{Metal: 130, Lutinum: 20}, TimeSecs: 70, TimeFactor: 1.25, Produces: "lutinum", Group: "Resource buildings", Icon: "i-mine", Desc: "Extracts lutinum, a basic material for many fundamental and advanced technologies."},
-		{Code: "water_extractor", Name: "Drilling Tower", Kind: KindBuilding, Cost: Resources{Metal: 100, Lutinum: 20}, TimeSecs: 70, TimeFactor: 1.25, Produces: "water", Group: "Resource buildings", Icon: "i-drill", Desc: "Extracts water using laser cutters and tractor beams to draw it from the depths of the planet."},
-		{Code: "chemical_factory", Name: "Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 350, Lutinum: 20}, TimeSecs: 70, TimeFactor: 1.25, Produces: "hydrogen", Prereqs: map[string]int{"water_extractor": 1}, Group: "Resource buildings", Icon: "i-factory", Desc: "Converts water into hydrogen at a ratio of 5:1. The further it is upgraded, the more water can be converted."},
-		{Code: "advanced_chemical_factory", Name: "Advanced Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 20000, Lutinum: 15000, Hydrogen: 1000}, TimeSecs: 9000, TimeFactor: 1.3, Produces: "hydrogen", Prereqs: map[string]int{"water_extractor": 10, "command_center": 6}, Group: "Resource buildings", Icon: "i-factory", Desc: "The evolution of the chemical factory. Converts water into hydrogen at a ratio of 2:1 through more efficient electrolysis."},
+		{Code: "iron_mine", Name: "Iron Mine", Kind: KindBuilding, Cost: Resources{Metal: 250, Lutinum: 20}, TimeSecs: 2300, Produces: "metal", Group: "Resource buildings", Icon: "i-mine", Desc: "Extracts the basic material iron. The further it is upgraded, the more iron is mined."},
+		{Code: "lutinum_mine", Name: "Lutinum Refinery", Kind: KindBuilding, Cost: Resources{Metal: 130, Lutinum: 20}, TimeSecs: 2300, Produces: "lutinum", Group: "Resource buildings", Icon: "i-mine", Desc: "Extracts lutinum, a basic material for many fundamental and advanced technologies."},
+		{Code: "water_extractor", Name: "Drilling Tower", Kind: KindBuilding, Cost: Resources{Metal: 100, Lutinum: 20}, TimeSecs: 2000, Produces: "water", Group: "Resource buildings", Icon: "i-drill", Desc: "Extracts water using laser cutters and tractor beams to draw it from the depths of the planet."},
+		{Code: "chemical_factory", Name: "Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 350, Lutinum: 20}, TimeSecs: 7000, Produces: "hydrogen", Prereqs: map[string]int{"water_extractor": 1}, Group: "Resource buildings", Icon: "i-factory", Desc: "Converts water into hydrogen at a ratio of 5:1. The further it is upgraded, the more water can be converted."},
+		{Code: "advanced_chemical_factory", Name: "Advanced Chemical Factory", Kind: KindBuilding, Cost: Resources{Metal: 20000, Lutinum: 15000, Hydrogen: 1000}, TimeSecs: 35000, Produces: "hydrogen", Prereqs: map[string]int{"water_extractor": 10, "command_center": 6}, Group: "Resource buildings", Icon: "i-factory", Desc: "The evolution of the chemical factory. Converts water into hydrogen at a ratio of 2:1 through more efficient electrolysis."},
 
 		// ---- Buildings: storages ----
-		{Code: "iron_storage", Name: "Iron Storage", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 2000}, TimeSecs: 72000, TimeFactor: 1.5, Prereqs: map[string]int{"iron_mine": 5}, Group: "Resource buildings", Icon: "i-tank", Desc: "Stores your iron and contains a concealed area that is safe from attacks."},
-		{Code: "lutinum_storage", Name: "Lutinum Storage", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 2000}, TimeSecs: 72000, TimeFactor: 1.5, Prereqs: map[string]int{"lutinum_mine": 5}, Group: "Resource buildings", Icon: "i-tank", Desc: "Stores your lutinum and contains a concealed area that is safe from attacks."},
-		{Code: "water_storage", Name: "Water Tanks", Kind: KindBuilding, Cost: Resources{Metal: 2000}, TimeSecs: 72000, TimeFactor: 1.5, Prereqs: map[string]int{"water_extractor": 5}, Group: "Resource buildings", Icon: "i-tank", Desc: "Stores your water and contains a concealed area that is safe from attacks."},
-		{Code: "hydrogen_storage", Name: "Hydrogen Tanks", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 2000}, TimeSecs: 72000, TimeFactor: 1.5, Prereqs: map[string]int{"chemical_factory": 5}, Group: "Resource buildings", Icon: "i-tank", Desc: "Stores your hydrogen and contains a concealed area that is safe from attacks."},
+		{Code: "iron_storage", Name: "Iron Storage", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 2000}, TimeSecs: 72000, Prereqs: map[string]int{"iron_mine": 5}, Group: "Resource buildings", Icon: "i-tank", Desc: "Stores your iron and contains a concealed area that is safe from attacks."},
+		{Code: "lutinum_storage", Name: "Lutinum Storage", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 2000}, TimeSecs: 72000, Prereqs: map[string]int{"lutinum_mine": 5}, Group: "Resource buildings", Icon: "i-tank", Desc: "Stores your lutinum and contains a concealed area that is safe from attacks."},
+		{Code: "water_storage", Name: "Water Tanks", Kind: KindBuilding, Cost: Resources{Metal: 2000}, TimeSecs: 72000, Prereqs: map[string]int{"water_extractor": 5}, Group: "Resource buildings", Icon: "i-tank", Desc: "Stores your water and contains a concealed area that is safe from attacks."},
+		{Code: "hydrogen_storage", Name: "Hydrogen Tanks", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 2000}, TimeSecs: 72000, Prereqs: map[string]int{"chemical_factory": 5}, Group: "Resource buildings", Icon: "i-tank", Desc: "Stores your hydrogen and contains a concealed area that is safe from attacks."},
 
 		// ---- Buildings: attack / defense ----
-		{Code: "shipyard", Name: "Ship Factory", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 4000, Hydrogen: 20}, TimeSecs: 37000, TimeFactor: 1.3, Group: "Military buildings", Icon: "i-ship", Desc: "The heart of your space program. Higher levels shorten ship construction times."},
-		{Code: "orbital_defense", Name: "Orbital Defense Station", Kind: KindBuilding, Cost: Resources{Metal: 400, Lutinum: 400, Hydrogen: 20}, TimeSecs: 4500, TimeFactor: 1.3, Group: "Military buildings", Icon: "i-shield", Desc: "A massive orbital defense post that hosts your planetary defense turrets."},
-		{Code: "fusion_reactor", Name: "Fusion Reactor", Kind: KindBuilding, Cost: Resources{Metal: 10000, Water: 2000, Hydrogen: 10000}, TimeSecs: 11000, TimeFactor: 1.3, Prereqs: map[string]int{"chemical_factory": 5}, Group: "Military buildings", Icon: "i-atom", Desc: "Required to operate the planetary shield, providing the energy needed to maintain the sphere."},
-		{Code: "planetary_shield", Name: "Planetary Shield", Kind: KindBuilding, Cost: Resources{Metal: 10000, Water: 2000, Hydrogen: 10000}, TimeSecs: 11000, TimeFactor: 1.3, Prereqs: map[string]int{"shipyard": 1, "orbital_defense": 1, "fusion_reactor": 1}, Group: "Military buildings", Icon: "i-shield", Desc: "The pinnacle of defense technology: a high-energy shield that protects the whole planet."},
+		{Code: "shipyard", Name: "Ship Factory", Kind: KindBuilding, Cost: Resources{Metal: 2000, Lutinum: 4000, Hydrogen: 20}, TimeSecs: 37000, Group: "Military buildings", Icon: "i-ship", Desc: "The heart of your space program. Higher levels shorten ship construction times."},
+		{Code: "orbital_defense", Name: "Orbital Defense Station", Kind: KindBuilding, Cost: Resources{Metal: 400, Lutinum: 400, Hydrogen: 20}, TimeSecs: 4500, Group: "Military buildings", Icon: "i-shield", Desc: "A massive orbital defense post that hosts your planetary defense turrets."},
+		{Code: "fusion_reactor", Name: "Fusion Reactor", Kind: KindBuilding, Cost: Resources{Metal: 10000, Water: 2000, Hydrogen: 10000}, TimeSecs: 11000, Prereqs: map[string]int{"chemical_factory": 5}, Group: "Military buildings", Icon: "i-atom", Desc: "Required to operate the planetary shield, providing the energy needed to maintain the sphere."},
+		{Code: "planetary_shield", Name: "Planetary Shield", Kind: KindBuilding, Cost: Resources{Metal: 10000, Water: 2000, Hydrogen: 10000}, TimeSecs: 11000, Prereqs: map[string]int{"shipyard": 1, "orbital_defense": 1, "fusion_reactor": 1}, Group: "Military buildings", Icon: "i-shield", Desc: "The pinnacle of defense technology: a high-energy shield that protects the whole planet."},
 
 		// ---- Research: drive research ----
-		{Code: "combustion_drive", Name: "Combustion Drive", Kind: KindResearch, Cost: Resources{Metal: 1000}, TimeSecs: 5000, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1}, Group: "Drive research", Icon: "i-galaxy", Desc: "Mainly used in smaller ships. Each research level reduces flight costs by 0.5%."},
-		{Code: "ion_drive", Name: "Ion Drive", Kind: KindResearch, Cost: Resources{Metal: 4000, Lutinum: 4000, Hydrogen: 2000}, TimeSecs: 20000, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1, "combustion_drive": 1}, Group: "Drive research", Icon: "i-galaxy", Desc: "Accelerates particles to high speeds, increasing speed and reducing flight costs by 0.5% per level."},
-		{Code: "space_curvature_drive", Name: "Space Curvature Drive", Kind: KindResearch, Cost: Resources{Hydrogen: 30000}, TimeSecs: 5000, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1, "combustion_drive": 5, "ion_drive": 5}, Group: "Drive research", Icon: "i-galaxy", Desc: "Curves space itself to cover great distances very quickly. Each research level reduces flight costs by 0.5%."},
-		{Code: "space_folding_drive", Name: "Space Folding Drive", Kind: KindResearch, Cost: Resources{Water: 20000, Hydrogen: 100000}, TimeSecs: 30000, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1, "space_curvature_drive": 10}, Group: "Drive research", Icon: "i-galaxy", Desc: "Folds gravitational fields until space overlaps at a singular point. Each research level reduces flight costs by 0.5%."},
+		{Code: "combustion_drive", Name: "Combustion Drive", Kind: KindResearch, Cost: Resources{Metal: 1000}, TimeSecs: 5000, Prereqs: map[string]int{"research_center": 1}, Group: "Drive research", Icon: "i-galaxy", Desc: "Mainly used in smaller ships. Each research level reduces flight costs by 0.5%."},
+		{Code: "ion_drive", Name: "Ion Drive", Kind: KindResearch, Cost: Resources{Metal: 4000, Lutinum: 4000, Hydrogen: 2000}, TimeSecs: 20000, Prereqs: map[string]int{"research_center": 1, "combustion_drive": 1}, Group: "Drive research", Icon: "i-galaxy", Desc: "Accelerates particles to high speeds, increasing speed and reducing flight costs by 0.5% per level."},
+		{Code: "space_curvature_drive", Name: "Space Curvature Drive", Kind: KindResearch, Cost: Resources{Hydrogen: 30000}, TimeSecs: 5000, Prereqs: map[string]int{"research_center": 1, "combustion_drive": 5, "ion_drive": 5}, Group: "Drive research", Icon: "i-galaxy", Desc: "Curves space itself to cover great distances very quickly. Each research level reduces flight costs by 0.5%."},
+		{Code: "space_folding_drive", Name: "Space Folding Drive", Kind: KindResearch, Cost: Resources{Water: 20000, Hydrogen: 100000}, TimeSecs: 30000, Prereqs: map[string]int{"research_center": 1, "space_curvature_drive": 10}, Group: "Drive research", Icon: "i-galaxy", Desc: "Folds gravitational fields until space overlaps at a singular point. Each research level reduces flight costs by 0.5%."},
 
 		// ---- Research: weapons research ----
-		{Code: "ionization", Name: "Ionization", Kind: KindResearch, Cost: Resources{Metal: 9500, Lutinum: 5750, Hydrogen: 450}, TimeSecs: 52000, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1}, Group: "Weapons research", Icon: "i-atom", Desc: "The foundation of many energy-based weapons. Gives even smaller ships considerable firepower."},
-		{Code: "energy_focusing", Name: "Energy Focusing", Kind: KindResearch, Cost: Resources{Metal: 17000, Lutinum: 13250, Hydrogen: 1240}, TimeSecs: 52000, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1, "ionization": 1}, Group: "Weapons research", Icon: "i-atom", Desc: "Prism and particle guidance systems increase range and penetrating power, giving your fleet an advantage."},
-		{Code: "explosive_projectiles", Name: "Explosive Projectiles", Kind: KindResearch, Cost: Resources{Metal: 4000}, TimeSecs: 5000, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1, "ionization": 2, "energy_focusing": 1}, Group: "Weapons research", Icon: "i-atom", Desc: "New explosives and improved targeting allow explosive weapons to inflict devastating damage."},
+		{Code: "ionization", Name: "Ionization", Kind: KindResearch, Cost: Resources{Metal: 9500, Lutinum: 5750, Hydrogen: 450}, TimeSecs: 52000, Prereqs: map[string]int{"research_center": 1}, Group: "Weapons research", Icon: "i-atom", Desc: "The foundation of many energy-based weapons. Gives even smaller ships considerable firepower."},
+		{Code: "energy_focusing", Name: "Energy Focusing", Kind: KindResearch, Cost: Resources{Metal: 17000, Lutinum: 13250, Hydrogen: 1240}, TimeSecs: 52000, Prereqs: map[string]int{"research_center": 1, "ionization": 1}, Group: "Weapons research", Icon: "i-atom", Desc: "Prism and particle guidance systems increase range and penetrating power, giving your fleet an advantage."},
+		{Code: "explosive_projectiles", Name: "Explosive Projectiles", Kind: KindResearch, Cost: Resources{Metal: 4000}, TimeSecs: 5000, Prereqs: map[string]int{"research_center": 1, "ionization": 2, "energy_focusing": 1}, Group: "Weapons research", Icon: "i-atom", Desc: "New explosives and improved targeting allow explosive weapons to inflict devastating damage."},
 
 		// ---- Research: ship research ----
-		{Code: "spy_technology", Name: "Spy Technology", Kind: KindResearch, Cost: Resources{Metal: 400, Lutinum: 100}, TimeSecs: 52000, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1}, Group: "Ship research", Icon: "i-search", Desc: "Sensor and stealth technology, important for gathering information about the enemy."},
-		{Code: "advanced_ship_armor", Name: "Advanced Ship Armor", Kind: KindResearch, Cost: Resources{Metal: 4000, Lutinum: 4000, Water: 4000, Hydrogen: 4000}, TimeSecs: 150000, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1}, Group: "Ship research", Icon: "i-shield", Desc: "New ship armor improves protection from enemy weapon systems without making the hull too massive."},
-		{Code: "increased_cargo_capacity", Name: "Increased Cargo Capacity", Kind: KindResearch, Cost: Resources{Lutinum: 10000, Hydrogen: 200}, TimeSecs: 5000, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1}, Group: "Ship research", Icon: "i-tank", Desc: "Subspace technology stores more resources in the same space, increasing your ships' transport capacity."},
-		{Code: "recycling_technology", Name: "Recycling Technology", Kind: KindResearch, Cost: Resources{Metal: 10000, Lutinum: 8000, Water: 8000, Hydrogen: 3000}, TimeSecs: 9990, TimeFactor: 2.0, Prereqs: map[string]int{"research_center": 1}, Group: "Ship research", Icon: "i-drill", Desc: "Recyclers collect and process battle debris. Also unlocks the Recycler ship."},
+		{Code: "spy_technology", Name: "Spy Technology", Kind: KindResearch, Cost: Resources{Metal: 400, Lutinum: 100}, TimeSecs: 52000, Prereqs: map[string]int{"research_center": 1}, Group: "Ship research", Icon: "i-search", Desc: "Sensor and stealth technology, important for gathering information about the enemy."},
+		{Code: "advanced_ship_armor", Name: "Advanced Ship Armor", Kind: KindResearch, Cost: Resources{Metal: 4000, Lutinum: 4000, Water: 4000, Hydrogen: 4000}, TimeSecs: 150000, Prereqs: map[string]int{"research_center": 1}, Group: "Ship research", Icon: "i-shield", Desc: "New ship armor improves protection from enemy weapon systems without making the hull too massive."},
+		{Code: "increased_cargo_capacity", Name: "Increased Cargo Capacity", Kind: KindResearch, Cost: Resources{Lutinum: 10000, Hydrogen: 200}, TimeSecs: 5000, Prereqs: map[string]int{"research_center": 1}, Group: "Ship research", Icon: "i-tank", Desc: "Subspace technology stores more resources in the same space, increasing your ships' transport capacity."},
+		{Code: "recycling_technology", Name: "Recycling Technology", Kind: KindResearch, Cost: Resources{Metal: 10000, Lutinum: 8000, Water: 8000, Hydrogen: 3000}, TimeSecs: 9990, Prereqs: map[string]int{"research_center": 1}, Group: "Ship research", Icon: "i-drill", Desc: "Recyclers collect and process battle debris. Also unlocks the Recycler ship."},
 
 		// ---- Ships (GalaxyWars Uni5 roster; see 03-combat.md) ----
 		{Code: "spy_probe", Name: "Spy Probe", Kind: KindShip, Cost: Resources{Lutinum: 150}, TimeSecs: 50, Attack: 1, Shield: 1, Hull: 1, Cargo: 15, Speed: 9000000, Fuel: 1, Prereqs: map[string]int{"shipyard": 1}, Icon: "i-search", Desc: "Equipped with highly advanced spy technology, this probe serves as your eyes and ears in conflicts with other players."},
@@ -208,13 +209,4 @@ func (d Def) LevelCost(nextLevel int) Resources {
 		Water:    d.Cost.Water * m,
 		Hydrogen: d.Cost.Hydrogen * m,
 	}
-}
-
-// LevelTime returns the base (unmultiplied) duration in seconds for the next
-// level of a building/research.
-func (d Def) LevelTime(nextLevel int) float64 {
-	if nextLevel <= 0 {
-		return 0
-	}
-	return d.TimeSecs * math.Pow(d.TimeFactor, float64(nextLevel-1))
 }

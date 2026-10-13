@@ -267,6 +267,18 @@ func (s *QueueStore) StartBuilding(ctx context.Context, universeCode string, use
 	next := cur + queuedCode + 1
 	cost := def.LevelCost(next)
 
+	// The Command Center shortens every build, so use the level it will have
+	// when this order starts: the planet's current level plus any CC upgrades
+	// already queued (all of which precede this new order). For a CC order
+	// itself this equals next-1, its own level before the upgrade.
+	queuedCC := queuedCode
+	if code != "command_center" {
+		if queuedCC, err = countBuildQueueCodeTx(ctx, tx, planetID, "command_center"); err != nil {
+			return err
+		}
+	}
+	cmdLevel := structs["command_center"] + queuedCC
+
 	var fieldsMax, fieldsUsed int
 	if err := tx.QueryRowContext(ctx,
 		`SELECT fields_max, fields_used FROM planets WHERE id = $1`, planetID).Scan(&fieldsMax, &fieldsUsed); err != nil {
@@ -297,7 +309,7 @@ func (s *QueueStore) StartBuilding(ctx context.Context, universeCode string, use
 	if err != nil {
 		return err
 	}
-	dur := def.LevelTime(next) * game.BuildTimeMultiplier(structs["command_center"]) / u.gameSpeed
+	dur := def.BuildTime(next, cmdLevel) / u.gameSpeed
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO queues (universe_id, user_id, planet_id, kind, code, target_level, start_at, finish_at)
 		VALUES (
@@ -618,28 +630,27 @@ func renumberBuildingsTx(ctx context.Context, tx *sql.Tx, planetID int64, univer
 	}
 	rows.Close()
 
-	// Enqueue-time factors, loaded lazily only when an order is renumbered (its
-	// duration must match its new, lower level).
-	var (
-		cmdLevel  int
-		gameSpeed float64
-		factorsX  bool
-	)
-	loadFactors := func() error {
-		if factorsX {
-			return nil
-		}
-		structs, err := loadStructuresTx(ctx, tx, planetID)
-		if err != nil {
-			return err
-		}
-		cmdLevel = structs["command_center"]
-		if err := tx.QueryRowContext(ctx,
-			`SELECT game_speed FROM universes WHERE id = $1`, universeID).Scan(&gameSpeed); err != nil {
-			return err
-		}
-		factorsX = true
-		return nil
+	// The Command Center reduces every build (and is itself shortened by the
+	// level it will be at when it starts), so each tail order's duration depends
+	// on how many surviving CC upgrades are queued ahead of it. Count those, then
+	// walk the tail tracking the running Command Center level.
+	structs, err := loadStructuresTx(ctx, tx, planetID)
+	if err != nil {
+		return err
+	}
+	baseCC := structs["command_center"]
+	var gameSpeed float64
+	if err := tx.QueryRowContext(ctx,
+		`SELECT game_speed FROM universes WHERE id = $1`, universeID).Scan(&gameSpeed); err != nil {
+		return err
+	}
+	var ccSeen int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM queues
+		WHERE planet_id = $1 AND kind = 'building' AND status = 'IN_PROGRESS'
+		  AND code = 'command_center' AND id < $2
+	`, planetID, cancelledID).Scan(&ccSeen); err != nil {
+		return err
 	}
 
 	cursor := cancelledStart
@@ -648,17 +659,16 @@ func renumberBuildingsTx(ctx context.Context, tx *sql.Tx, planetID int64, univer
 	}
 	for i := range tail {
 		o := &tail[i]
-		dur := o.finish.Sub(o.start)
+		d, ok := game.Get(o.code)
+		if !ok {
+			return ErrUnknownCode
+		}
 		if o.code == code {
 			next := o.target - 1
 			if next < 1 {
 				next = 1
 			}
 			if next != o.target {
-				d, ok := game.Get(o.code)
-				if !ok {
-					return ErrUnknownCode
-				}
 				oldCost := d.LevelCost(o.target)
 				newCost := d.LevelCost(next)
 				if err := creditTx(ctx, tx, planetID, game.Resources{
@@ -670,11 +680,11 @@ func renumberBuildingsTx(ctx context.Context, tx *sql.Tx, planetID int64, univer
 					return err
 				}
 				o.target = next
-				if err := loadFactors(); err != nil {
-					return err
-				}
-				dur = time.Duration(d.LevelTime(next) * game.BuildTimeMultiplier(cmdLevel) / gameSpeed * float64(time.Second))
 			}
+		}
+		dur := time.Duration(d.BuildTime(o.target, baseCC+ccSeen) / gameSpeed * float64(time.Second))
+		if o.code == "command_center" {
+			ccSeen++
 		}
 		start := cursor
 		finish := start.Add(dur)
