@@ -75,9 +75,96 @@ func TestNextDecisionDelayRange(t *testing.T) {
 	rng := rand.New(rand.NewSource(3))
 	p := DefaultNPCProfile()
 	for i := 0; i < 2000; i++ {
-		d := NextDecisionDelay(p, rng)
-		if d < 4*time.Minute || d > 150*time.Minute {
-			t.Fatalf("NextDecisionDelay = %v, want within 4..150m", d)
+		d := NextDecisionDelay(p, 1, rng)
+		if d < 4*time.Minute || d > 60*time.Minute {
+			t.Fatalf("NextDecisionDelay(speed 1) = %v, want within 4..60m", d)
+		}
+	}
+}
+
+func TestNextDecisionDelayScalesWithGameSpeed(t *testing.T) {
+	p := DefaultNPCProfile()
+	// At 10x every game-time pause compresses 10x, so the raw shape sits within
+	// 24s..6m (before the real-time floor).
+	rng := rand.New(rand.NewSource(30))
+	for i := 0; i < 2000; i++ {
+		d := NextDecisionDelay(p, 10, rng)
+		if d < npcDecisionFloor || d > 6*time.Minute {
+			t.Fatalf("NextDecisionDelay(speed 10) = %v, want within 30s..6m", d)
+		}
+	}
+	// At 1000x everything is pinned to the floor.
+	rng = rand.New(rand.NewSource(31))
+	for i := 0; i < 2000; i++ {
+		if d := NextDecisionDelay(p, 1000, rng); d != npcDecisionFloor {
+			t.Fatalf("NextDecisionDelay(speed 1000) = %v, want the %v floor", d, npcDecisionFloor)
+		}
+	}
+}
+
+func TestNextDecisionDelayFloorsInvalidSpeed(t *testing.T) {
+	rng := rand.New(rand.NewSource(32))
+	if d := NextDecisionDelay(DefaultNPCProfile(), 0, rng); d < 4*time.Minute || d > 60*time.Minute {
+		t.Fatalf("NextDecisionDelay(speed 0) = %v, want treated as 1x", d)
+	}
+}
+
+func TestRankedResearchRespectPrereqs(t *testing.T) {
+	rng := rand.New(rand.NewSource(8))
+	// No Research Center: nothing is legal yet.
+	got := RankedResearch(map[string]int{}, map[string]int{}, DefaultNPCProfile(), rng)
+	if len(got) != 0 {
+		t.Fatalf("fresh planet offered research without a Research Center: %v", got)
+	}
+
+	// A Research Center admits the root techs only.
+	structs := map[string]int{"research_center": 1}
+	got = RankedResearch(structs, map[string]int{}, DefaultNPCProfile(), rng)
+	set := map[string]bool{}
+	for _, code := range got {
+		set[code] = true
+	}
+	for _, want := range []string{"combustion_drive", "spy_technology", "ionization"} {
+		if !set[want] {
+			t.Errorf("root research candidates missing %q (got %v)", want, got)
+		}
+	}
+	for _, blocked := range []string{"ion_drive", "energy_focusing", "explosive_projectiles", "space_folding_drive"} {
+		if set[blocked] {
+			t.Errorf("candidate %q offered without prerequisites", blocked)
+		}
+	}
+
+	// Combustion 1 unlocks the Ion Drive.
+	got = RankedResearch(structs, map[string]int{"combustion_drive": 1}, DefaultNPCProfile(), rng)
+	set = map[string]bool{}
+	for _, code := range got {
+		set[code] = true
+	}
+	if !set["ion_drive"] {
+		t.Errorf("ion_drive missing after combustion_drive 1: %v", got)
+	}
+}
+
+func TestRankedResearchIsAPermutation(t *testing.T) {
+	rng := rand.New(rand.NewSource(9))
+	structs := map[string]int{"research_center": 3}
+	techs := map[string]int{"combustion_drive": 4, "ionization": 2}
+	first := RankedResearch(structs, techs, DefaultNPCProfile(), rng)
+	second := RankedResearch(structs, techs, DefaultNPCProfile(), rng)
+	if len(first) != len(second) {
+		t.Fatalf("candidate count drifted: %d vs %d", len(first), len(second))
+	}
+	seen := map[string]int{}
+	for _, code := range first {
+		seen[code]++
+	}
+	for _, code := range second {
+		seen[code]--
+	}
+	for code, n := range seen {
+		if n != 0 {
+			t.Errorf("candidate %q appears %d extra time(s) across runs", code, n)
 		}
 	}
 }

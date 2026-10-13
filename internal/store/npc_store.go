@@ -28,9 +28,10 @@ func NewNPCStore(db *sql.DB) *NPCStore {
 
 // NPC is one due NPC: its account id, the universe code and its profile.
 type NPC struct {
-	UserID   int64
-	Universe string
-	Profile  game.NPCProfile
+	UserID    int64
+	Universe  string
+	Profile   game.NPCProfile
+	GameSpeed float64
 }
 
 // npcLease is how long a claimed NPC is parked while the brain is working. If
@@ -143,14 +144,14 @@ func (s *NPCStore) claimOne(ctx context.Context) (NPC, bool, error) {
 		raw []byte
 	)
 	err = tx.QueryRowContext(ctx, `
-		SELECT u.id, un.code_name, u.npc_profile
+		SELECT u.id, un.code_name, u.npc_profile, un.game_speed
 		FROM users u
 		JOIN universes un ON un.id = u.universe_id
 		WHERE u.is_npc AND (u.npc_next_decision_at IS NULL OR u.npc_next_decision_at <= NOW())
 		ORDER BY u.npc_next_decision_at NULLS FIRST
 		FOR UPDATE OF u SKIP LOCKED
 		LIMIT 1
-	`).Scan(&n.UserID, &n.Universe, &raw)
+	`).Scan(&n.UserID, &n.Universe, &raw, &n.GameSpeed)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NPC{}, false, nil
 	}

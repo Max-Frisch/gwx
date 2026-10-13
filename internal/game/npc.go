@@ -320,6 +320,91 @@ func RankedUnits(structs, techs map[string]int, profile NPCProfile, rng *rand.Ra
 	return weightedShuffle(pool, rng)
 }
 
+// npcBaseResearchWeight is the base desirability of researching each tech. Like
+// the building and unit trees it is a hand-authored probability tree: which
+// routes an NPC favours, not a fixed research order. It is what lets an NPC
+// progress past the tech gates that otherwise pin it to probes and light guns.
+var npcBaseResearchWeight = map[string]float64{
+	"combustion_drive":         10,
+	"ion_drive":                9,
+	"space_curvature_drive":    5,
+	"space_folding_drive":      2,
+	"spy_technology":           5,
+	"ionization":               6,
+	"energy_focusing":          5,
+	"explosive_projectiles":    4,
+	"advanced_ship_armor":      4,
+	"increased_cargo_capacity": 3,
+	"recycling_technology":     3,
+}
+
+// npcResearchStrategyWeight reweights a tech by the NPC's strategy.
+func npcResearchStrategyWeight(code string, strategy NPCStrategy) float64 {
+	drives := map[string]bool{
+		"combustion_drive": true, "ion_drive": true,
+		"space_curvature_drive": true, "space_folding_drive": true,
+	}
+	weapons := map[string]bool{
+		"ionization": true, "energy_focusing": true, "explosive_projectiles": true,
+	}
+	switch strategy {
+	case NPCBuilder:
+		if drives[code] || code == "increased_cargo_capacity" || code == "recycling_technology" {
+			return 1.5
+		}
+		if weapons[code] {
+			return 0.7
+		}
+	case NPCAggressive:
+		if weapons[code] {
+			return 1.6
+		}
+		if code == "increased_cargo_capacity" || code == "recycling_technology" {
+			return 0.8
+		}
+	case NPCPassive:
+		if code == "advanced_ship_armor" {
+			return 1.6
+		}
+		if code == "spy_technology" {
+			return 1.3
+		}
+		if weapons[code] {
+			return 0.9
+		}
+	}
+	return 1
+}
+
+// RankedResearch returns every tech the NPC may legally start now, ordered by a
+// weighted shuffle. The same attempt-in-order-until-success contract as
+// RankedBuildings applies: soft failures fall through to the next candidate.
+// Techs are account-wide but gated on a planet's Research Center, so the caller
+// evaluates them against one planet's structures at a time.
+func RankedResearch(structs, techs map[string]int, profile NPCProfile, rng *rand.Rand) []string {
+	profile = profile.Normalized()
+	pool := make([]npcCandidate, 0, len(Catalog))
+	for code, d := range Catalog {
+		if d.Kind != KindResearch {
+			continue
+		}
+		if !PrereqsMet(d, structs, techs) {
+			continue
+		}
+		w := npcBaseResearchWeight[code]
+		if w <= 0 {
+			w = 1
+		}
+		w *= npcResearchStrategyWeight(code, profile.Strategy)
+		w *= 1.0 / (1.0 + 0.12*float64(techs[code]))
+		if w <= 0 {
+			continue
+		}
+		pool = append(pool, npcCandidate{code: code, weight: w})
+	}
+	return weightedShuffle(pool, rng)
+}
+
 // NPCUnitBatch picks how many of one unit to produce in a single order. Cheap
 // hulls are built in handfuls, capitals one or two at a time, so a batch is
 // always something the NPC might plausibly afford. Aggressive NPCs push a
@@ -415,15 +500,37 @@ func (p NPCProfile) ColonizeChance() float64 {
 	return clamp01(base * p.difficultyScale())
 }
 
+// npcDecisionFloor is the shortest real-time gap between two NPC decisions. A
+// whole population sharing a floor this long stays well inside one tick's
+// npcBatch, even after the game-speed scaling below compresses every delay
+// onto it.
+const npcDecisionFloor = 30 * time.Second
+
+// npcDecisionCapMinutes caps the jittered, game-time delay so an NPC never
+// idles for an unbounded stretch (the old tail ran to ~2h30m).
+const npcDecisionCapMinutes = 60
+
 // NextDecisionDelay returns how long until the NPC's next decision. The cadence
 // is deliberately uneven ("here and there"): usually a handful of minutes, now
-// and then a long pause — never a tight 24/7 loop.
-func NextDecisionDelay(profile NPCProfile, rng *rand.Rand) time.Duration {
-	mins := 4 + rng.Intn(26) // 4..29 minutes
-	if rng.Float64() < 0.25 {
-		mins += 30 + rng.Intn(90) // occasionally an hour or two
+// and then a longer pause — never a tight 24/7 loop. The shape is measured in
+// game-time and divided by gameSpeed, so NPCs keep pace in fast universes; a
+// real-time floor keeps a large population from flooding the scheduler.
+func NextDecisionDelay(profile NPCProfile, gameSpeed float64, rng *rand.Rand) time.Duration {
+	if gameSpeed <= 0 {
+		gameSpeed = 1
 	}
-	return time.Duration(mins) * time.Minute
+	mins := float64(4 + rng.Intn(26)) // 4..29 game-minutes
+	if rng.Float64() < 0.25 {
+		mins += float64(30 + rng.Intn(90)) // occasionally a longer pause
+	}
+	if mins > npcDecisionCapMinutes {
+		mins = npcDecisionCapMinutes
+	}
+	d := time.Duration(mins / gameSpeed * float64(time.Minute))
+	if d < npcDecisionFloor {
+		d = npcDecisionFloor
+	}
+	return d
 }
 
 // npcNameAdjectives and npcNameNouns are combined into readable NPC handles.

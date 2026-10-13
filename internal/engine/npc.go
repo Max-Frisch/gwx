@@ -21,9 +21,9 @@ const npcBatch = 25
 //
 // A cycle runs a handful of best-effort actions through the same
 // QueueStore/FleetStore calls a player uses: react to an inbound attack, then
-// grow (buildings), arm (ships/defense) and expand (colonize). Every step is
-// probabilistic so NPCs vary; the profile's strategy/difficulty knobs steer
-// them.
+// grow (buildings), advance (research), arm (ships/defense) and expand
+// (colonize). Every step is probabilistic so NPCs vary; the profile's
+// strategy/difficulty knobs steer them.
 func (e *EventEngine) processNPCs(ctx context.Context) {
 	npcs := store.NewNPCStore(e.db)
 	due, err := npcs.ClaimDue(ctx, npcBatch)
@@ -51,11 +51,12 @@ func (e *EventEngine) runNPC(ctx context.Context, n store.NPC) error {
 		// simply falls through to the next.
 		e.npcReactDecide(ctx, n, planets)
 		e.npcBuildDecide(ctx, n, planets)
+		e.npcResearchDecide(ctx, n, planets)
 		e.npcUnitDecide(ctx, n, planets)
 		e.npcColonizeDecide(ctx, n, planets)
 	}
 
-	return store.NewNPCStore(e.db).Schedule(ctx, n.UserID, time.Now().Add(game.NextDecisionDelay(n.Profile, e.rng)))
+	return store.NewNPCStore(e.db).Schedule(ctx, n.UserID, time.Now().Add(game.NextDecisionDelay(n.Profile, n.GameSpeed, e.rng)))
 }
 
 // npcBuildDecide tries to queue the next building level somewhere. It walks the
@@ -76,6 +77,35 @@ func (e *EventEngine) npcBuildDecide(ctx context.Context, n store.NPC, owned []s
 		}
 		for _, code := range game.RankedBuildings(structs, techs, n.Profile, e.rng) {
 			err := queues.StartBuilding(ctx, n.Universe, n.UserID, p.ID, code)
+			if err == nil {
+				return true
+			}
+			if !npcSoftFailure(err) {
+				return false
+			}
+		}
+	}
+	return false
+}
+
+// npcResearchDecide tries to queue the next tech level. It walks the NPC's
+// planets (research is account-wide but gated on a planet's Research Center and
+// paid from its treasury) and, on each, attempts research candidates in
+// weighted-random order until one is accepted; soft failures fall through.
+func (e *EventEngine) npcResearchDecide(ctx context.Context, n store.NPC, owned []store.OwnedPlanet) bool {
+	planets := store.NewPlanetStore(e.db)
+	queues := store.NewQueueStore(e.db)
+	techs, err := planets.Techs(ctx, n.UserID)
+	if err != nil {
+		return false
+	}
+	for _, p := range owned {
+		structs, err := planets.Structures(ctx, p.ID)
+		if err != nil {
+			continue
+		}
+		for _, code := range game.RankedResearch(structs, techs, n.Profile, e.rng) {
+			err := queues.StartResearch(ctx, n.Universe, n.UserID, p.ID, code)
 			if err == nil {
 				return true
 			}
@@ -250,6 +280,7 @@ func npcSoftFailure(err error) bool {
 		errors.Is(err, store.ErrNoFields) ||
 		errors.Is(err, store.ErrQueueFull) ||
 		errors.Is(err, store.ErrQueueBusy) ||
+		errors.Is(err, store.ErrResearchQueueFull) ||
 		errors.Is(err, store.ErrPrerequisites) ||
 		errors.Is(err, store.ErrOnVacation) ||
 		errors.Is(err, store.ErrSanctioned)

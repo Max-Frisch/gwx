@@ -119,6 +119,30 @@ func TestNPCBrainFleetSaves(t *testing.T) {
 	})
 }
 
+// TestNPCBrainResearches checks the brain techs up: with a Research Center
+// standing, a decision cycle queues a research order the same way a player's
+// form does. This is what lets an NPC escape being pinned to probes and light
+// guns by the tech gates.
+func TestNPCBrainResearches(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+
+	npcs := store.NewNPCStore(h.db)
+	userID, homeID, err := npcs.Create(ctx, h.universe, game.DefaultNPCProfile())
+	if err != nil {
+		t.Fatalf("create npc: %v", err)
+	}
+	h.seed(t, homeID, seedAmount, seedAmount, seedAmount, seedAmount)
+	h.setBuilding(t, homeID, "research_center", 1)
+
+	waitFor(t, "npc research order", func() bool {
+		h.forceNPCDecision(t, userID)
+		return h.queryInt(t, `
+			SELECT COUNT(*) FROM queues WHERE user_id = $1 AND kind = 'research'
+		`, userID) > 0
+	})
+}
+
 // TestNPCBrainColonizes checks expansion: an NPC sitting on a colony ship
 // eventually plants a second planet.
 func TestNPCBrainColonizes(t *testing.T) {
