@@ -47,6 +47,143 @@ func TestNPCBrainBuilds(t *testing.T) {
 	}
 }
 
+// TestNPCBrainProducesUnits checks the brain arms itself: with a shipyard and
+// orbital defense standing, a decision cycle queues a ship/defense batch the
+// same way a player's form does.
+func TestNPCBrainProducesUnits(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+
+	npcs := store.NewNPCStore(h.db)
+	userID, homeID, err := npcs.Create(ctx, h.universe, game.DefaultNPCProfile())
+	if err != nil {
+		t.Fatalf("create npc: %v", err)
+	}
+	h.seed(t, homeID, seedAmount, seedAmount, seedAmount, seedAmount)
+	h.setBuilding(t, homeID, "shipyard", 1)
+	h.setBuilding(t, homeID, "orbital_defense", 1)
+
+	waitFor(t, "npc unit production", func() bool {
+		h.forceNPCDecision(t, userID)
+		return h.queryInt(t, `
+			SELECT COUNT(*) FROM queues WHERE user_id = $1 AND kind IN ('ship','defense')
+		`, userID) > 0
+	})
+}
+
+// TestNPCBrainReactsWithEspionage checks the attack reaction: an inbound ATTACK
+// eventually prompts the NPC to send a probe at the attacker.
+func TestNPCBrainReactsWithEspionage(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+
+	attacker := h.register(t, "npc-scout-target")
+	npcs := store.NewNPCStore(h.db)
+	userID, homeID, err := npcs.Create(ctx, h.universe, game.DefaultNPCProfile())
+	if err != nil {
+		t.Fatalf("create npc: %v", err)
+	}
+	h.seed(t, homeID, seedAmount, seedAmount, seedAmount, seedAmount)
+	h.giveUnit(t, homeID, "ship", "spy_probe", 3)
+	h.injectAttack(t, attacker, homeID)
+
+	waitFor(t, "npc espionage reaction", func() bool {
+		h.forceNPCDecision(t, userID)
+		return h.queryInt(t, `
+			SELECT COUNT(*) FROM fleets WHERE user_id = $1 AND mission = 'ESPIONAGE'
+		`, userID) > 0
+	})
+}
+
+// TestNPCBrainFleetSaves checks the sloppy "fleet in the air" save: on an
+// inbound attack the NPC eventually lifts its ships off the planet.
+func TestNPCBrainFleetSaves(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+
+	attacker := h.register(t, "npc-save-target")
+	npcs := store.NewNPCStore(h.db)
+	userID, homeID, err := npcs.Create(ctx, h.universe, game.DefaultNPCProfile())
+	if err != nil {
+		t.Fatalf("create npc: %v", err)
+	}
+	h.seed(t, homeID, seedAmount, seedAmount, seedAmount, seedAmount)
+	h.giveUnit(t, homeID, "ship", "jackal", 3)
+	h.injectAttack(t, attacker, homeID)
+
+	waitFor(t, "npc fleet-save", func() bool {
+		h.forceNPCDecision(t, userID)
+		return h.queryInt(t, `
+			SELECT COUNT(*) FROM fleets WHERE user_id = $1 AND mission = 'TRANSPORT'
+		`, userID) > 0
+	})
+}
+
+// TestNPCBrainColonizes checks expansion: an NPC sitting on a colony ship
+// eventually plants a second planet.
+func TestNPCBrainColonizes(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+
+	npcs := store.NewNPCStore(h.db)
+	userID, homeID, err := npcs.Create(ctx, h.universe, game.DefaultNPCProfile())
+	if err != nil {
+		t.Fatalf("create npc: %v", err)
+	}
+	h.seed(t, homeID, seedAmount, seedAmount, seedAmount, seedAmount)
+	h.giveUnit(t, homeID, "ship", "colony_ship", 1)
+
+	waitFor(t, "npc colony", func() bool {
+		h.forceNPCDecision(t, userID)
+		return h.queryInt(t, `SELECT COUNT(*) FROM planets WHERE user_id = $1`, userID) > 1
+	})
+}
+
+// forceNPCDecision makes an NPC due again so the fast test scheduler gives it
+// another decision cycle without waiting the human-ish 4..30 minutes.
+func (h *harness) forceNPCDecision(t *testing.T, userID int64) {
+	t.Helper()
+	if _, err := h.db.Exec(`UPDATE users SET npc_next_decision_at = NOW() WHERE id = $1`, userID); err != nil {
+		t.Fatalf("force npc decision: %v", err)
+	}
+}
+
+// giveUnit plants a ship/defense batch directly on a planet (test shortcut).
+func (h *harness) giveUnit(t *testing.T, planetID int64, kind, code string, amount int64) {
+	t.Helper()
+	if _, err := h.db.Exec(`
+		INSERT INTO planet_items (planet_id, kind, code, amount) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (planet_id, kind, code) DO UPDATE SET amount = EXCLUDED.amount
+	`, planetID, kind, code, amount); err != nil {
+		t.Fatalf("give unit %s: %v", code, err)
+	}
+}
+
+// injectAttack plants an inbound ATTACK fleet from attacker's homeworld to the
+// target, arriving far enough out that it only ever reads as "incoming".
+func (h *harness) injectAttack(t *testing.T, attacker *player, targetID int64) {
+	t.Helper()
+	oc := h.at(t, attacker.home)
+	tc := h.at(t, targetID)
+	if _, err := h.db.Exec(`
+		INSERT INTO fleets (
+			universe_id, user_id, mission, phase, origin_id, target_id,
+			origin_galaxy, origin_system, origin_pos,
+			target_galaxy, target_system, target_pos,
+			start_at, arrival_at, speed_pct, hydrogen_cost,
+			cargo_metal, cargo_lutinum, cargo_water, cargo_hydrogen
+		) VALUES (
+			(SELECT id FROM universes WHERE code_name = $1), $2, 'ATTACK', 'OUTBOUND', $3, $4,
+			$5, $6, $7, $8, $9, $10,
+			NOW() - INTERVAL '1 hour', NOW() + INTERVAL '1 day', 1.00, 0,
+			0, 0, 0, 0
+		)
+	`, h.universe, attacker.id, attacker.home, targetID,
+		oc.g, oc.s, oc.pos, tc.g, tc.s, tc.pos); err != nil {
+		t.Fatalf("inject attack: %v", err)
+	}
+}
+
 // TestNPCShowsRobotMarker checks the highscore and galaxy views flag NPCs so
 // players can tell them apart from humans.
 func TestNPCShowsRobotMarker(t *testing.T) {

@@ -159,37 +159,16 @@ func npcStrategyWeight(code string, strategy NPCStrategy) float64 {
 	return 1
 }
 
-// RankedBuildings returns every building the NPC may legally start on now,
-// ordered by a weighted shuffle. The caller attempts them in order until one
-// succeeds, so soft failures (no fields, not enough resources) simply fall
-// through to the next candidate. Buildings already at a higher level are
-// damped, which spreads levels out instead of over-upgrading a favourite.
-func RankedBuildings(structs, techs map[string]int, profile NPCProfile, rng *rand.Rand) []string {
-	profile = profile.Normalized()
-	type candidate struct {
-		code   string
-		weight float64
-	}
-	pool := make([]candidate, 0, len(Catalog))
-	for code, d := range Catalog {
-		if d.Kind != KindBuilding {
-			continue
-		}
-		if !PrereqsMet(d, structs, techs) {
-			continue
-		}
-		w := npcBaseBuildingWeight[code]
-		if w <= 0 {
-			w = 1
-		}
-		w *= npcStrategyWeight(code, profile.Strategy)
-		w *= 1.0 / (1.0 + 0.12*float64(structs[code]))
-		if w <= 0 {
-			continue
-		}
-		pool = append(pool, candidate{code: code, weight: w})
-	}
+// npcCandidate is one weighted choice in an NPC probability tree.
+type npcCandidate struct {
+	code   string
+	weight float64
+}
 
+// weightedShuffle orders candidates by repeated weighted picks, so every legal
+// option can come up first but likelier ones usually do. It is the one shuffle
+// behind both the building and the unit probability trees.
+func weightedShuffle(pool []npcCandidate, rng *rand.Rand) []string {
 	out := make([]string, 0, len(pool))
 	for len(pool) > 0 {
 		total := 0.0
@@ -209,6 +188,231 @@ func RankedBuildings(structs, techs map[string]int, profile NPCProfile, rng *ran
 		pool = append(pool[:idx], pool[idx+1:]...)
 	}
 	return out
+}
+
+// RankedBuildings returns every building the NPC may legally start on now,
+// ordered by a weighted shuffle. The caller attempts them in order until one
+// succeeds, so soft failures (no fields, not enough resources) simply fall
+// through to the next candidate. Buildings already at a higher level are
+// damped, which spreads levels out instead of over-upgrading a favourite.
+func RankedBuildings(structs, techs map[string]int, profile NPCProfile, rng *rand.Rand) []string {
+	profile = profile.Normalized()
+	pool := make([]npcCandidate, 0, len(Catalog))
+	for code, d := range Catalog {
+		if d.Kind != KindBuilding {
+			continue
+		}
+		if !PrereqsMet(d, structs, techs) {
+			continue
+		}
+		w := npcBaseBuildingWeight[code]
+		if w <= 0 {
+			w = 1
+		}
+		w *= npcStrategyWeight(code, profile.Strategy)
+		w *= 1.0 / (1.0 + 0.12*float64(structs[code]))
+		if w <= 0 {
+			continue
+		}
+		pool = append(pool, npcCandidate{code: code, weight: w})
+	}
+	return weightedShuffle(pool, rng)
+}
+
+// npcBaseUnitWeight is the base desirability of producing each ship/defense
+// unit. Like the building tree it is a hand-authored probability tree: which
+// hulls an NPC favours, not a fixed production order. Utilities (probes,
+// recyclers, colony ships) are cheap-but-niche; combat hulls vary.
+var npcBaseUnitWeight = map[string]float64{
+	"spy_probe":    4,
+	"jackal":       5,
+	"small_trader": 3,
+	"renegade":     5,
+	"raider":       4,
+	"recycler":     2,
+	"falcon":       3,
+	"colony_ship":  2,
+	"tjuger":       2,
+	"cougar":       2,
+	"longeagle_v":  1,
+	"large_trader": 1,
+	"noah":         1,
+	"longeagle_x":  1,
+
+	"light_laser":     5,
+	"heavy_laser":     4,
+	"emp_launcher":    3,
+	"plasma_turret":   2,
+	"rocket_launcher": 1,
+}
+
+// npcWarships and npcTraders classify the ship roster so a strategy can favour
+// the hulls it cares about. Everything else (probes, recyclers, colony ships)
+// is utility.
+var (
+	npcWarships = map[string]bool{
+		"jackal": true, "renegade": true, "raider": true, "falcon": true,
+		"tjuger": true, "cougar": true, "longeagle_v": true, "longeagle_x": true,
+	}
+	npcTraders = map[string]bool{
+		"small_trader": true, "large_trader": true, "noah": true,
+	}
+)
+
+// npcUnitStrategyWeight reweights a ship/defense unit by the NPC's strategy.
+func npcUnitStrategyWeight(def Def, strategy NPCStrategy) float64 {
+	switch strategy {
+	case NPCBuilder:
+		if npcTraders[def.Code] || def.Code == "colony_ship" {
+			return 1.7
+		}
+		if npcWarships[def.Code] {
+			return 0.6
+		}
+		if def.Code == "recycler" {
+			return 1.3
+		}
+	case NPCAggressive:
+		if npcWarships[def.Code] {
+			return 1.8
+		}
+		if def.Kind == KindDefense {
+			return 0.6
+		}
+		if def.Code == "spy_probe" {
+			return 1.3
+		}
+	case NPCPassive:
+		if def.Kind == KindDefense {
+			return 1.8
+		}
+		if npcWarships[def.Code] {
+			return 0.6
+		}
+	}
+	return 1
+}
+
+// RankedUnits returns every ship/defense unit the NPC may legally produce now,
+// ordered by a weighted shuffle. The same attempt-in-order-until-success
+// contract as RankedBuildings applies: soft failures fall through to the next
+// candidate.
+func RankedUnits(structs, techs map[string]int, profile NPCProfile, rng *rand.Rand) []string {
+	profile = profile.Normalized()
+	pool := make([]npcCandidate, 0, len(Catalog))
+	for code, d := range Catalog {
+		if d.Kind != KindShip && d.Kind != KindDefense {
+			continue
+		}
+		if !PrereqsMet(d, structs, techs) {
+			continue
+		}
+		w := npcBaseUnitWeight[code]
+		if w <= 0 {
+			w = 1
+		}
+		w *= npcUnitStrategyWeight(d, profile.Strategy)
+		if w <= 0 {
+			continue
+		}
+		pool = append(pool, npcCandidate{code: code, weight: w})
+	}
+	return weightedShuffle(pool, rng)
+}
+
+// NPCUnitBatch picks how many of one unit to produce in a single order. Cheap
+// hulls are built in handfuls, capitals one or two at a time, so a batch is
+// always something the NPC might plausibly afford. Aggressive NPCs push a
+// little harder.
+func NPCUnitBatch(def Def, profile NPCProfile, rng *rand.Rand) int64 {
+	if def.Code == "colony_ship" {
+		return 1
+	}
+	cost := def.Cost.Metal + def.Cost.Lutinum + def.Cost.Water + def.Cost.Hydrogen
+	var qty int64
+	switch {
+	case cost <= 1000:
+		qty = int64(5 + rng.Intn(6)) // 5..10
+	case cost <= 10000:
+		qty = int64(2 + rng.Intn(4)) // 2..5
+	default:
+		qty = 1
+	}
+	if profile.Normalized().Strategy == NPCAggressive {
+		qty++
+	}
+	return qty
+}
+
+// clamp01 clamps a probability-like factor into [0,1].
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
+// difficultyScale nudges every reaction probability: hard NPCs act more
+// decisively, easy ones more sluggishly. It never exceeds a valid probability
+// once multiplied and clamped.
+func (p NPCProfile) difficultyScale() float64 {
+	switch p.Difficulty {
+	case "easy":
+		return 0.7
+	case "hard":
+		return 1.3
+	default:
+		return 1.0
+	}
+}
+
+// SpyChance is the per-inbound-attack probability that the NPC spends a probe
+// to scout the attacker. Aggressive NPCs look; builders usually shrug.
+func (p NPCProfile) SpyChance() float64 {
+	base := 0.35
+	switch p.Strategy {
+	case NPCAggressive:
+		base = 0.55
+	case NPCPassive:
+		base = 0.40
+	case NPCBuilder:
+		base = 0.20
+	}
+	return clamp01(base * p.difficultyScale())
+}
+
+// FleetSaveChance is the probability that, on an inbound attack, the NPC
+// deliberately lifts its fleet off the planet ("fleet in the air"). It is
+// deliberately low: saves are rare and sloppy, not a perfect defence.
+func (p NPCProfile) FleetSaveChance() float64 {
+	base := 0.20
+	switch p.Strategy {
+	case NPCAggressive:
+		base = 0.10
+	case NPCPassive:
+		base = 0.35
+	case NPCBuilder:
+		base = 0.25
+	}
+	return clamp01(base * p.difficultyScale())
+}
+
+// ColonizeChance is the probability that an NPC holding a colony ship commits
+// it on this decision. Builders expand most eagerly.
+func (p NPCProfile) ColonizeChance() float64 {
+	base := 0.25
+	switch p.Strategy {
+	case NPCBuilder:
+		base = 0.40
+	case NPCAggressive:
+		base = 0.20
+	case NPCPassive:
+		base = 0.10
+	}
+	return clamp01(base * p.difficultyScale())
 }
 
 // NextDecisionDelay returns how long until the NPC's next decision. The cadence

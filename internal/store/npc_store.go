@@ -209,6 +209,68 @@ func (s *NPCStore) EnsureCount(ctx context.Context, universeCode string, n int) 
 	return created, nil
 }
 
+// RandomEmptySlot returns a random unoccupied coordinate in the universe, for
+// planting a colony. It samples a bounded number of coordinates and reports
+// ok=false if it cannot find a free one (a full universe).
+func (s *NPCStore) RandomEmptySlot(ctx context.Context, universeCode string) (g, sys, pos int, ok bool, err error) {
+	var (
+		uuid                    string
+		maxGalaxies, maxSystems int
+	)
+	err = s.db.QueryRowContext(ctx, `
+		SELECT id::text, max_galaxies, max_systems FROM universes WHERE code_name = $1
+	`, universeCode).Scan(&uuid, &maxGalaxies, &maxSystems)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, 0, false, ErrNotFound
+	}
+	if err != nil {
+		return 0, 0, 0, false, err
+	}
+	if maxGalaxies < 1 {
+		maxGalaxies = 1
+	}
+	if maxSystems < 1 {
+		maxSystems = 1
+	}
+	for attempt := 0; attempt < 40; attempt++ {
+		g = 1 + s.rng.Intn(maxGalaxies)
+		sys = 1 + s.rng.Intn(maxSystems)
+		pos = 1 + s.rng.Intn(15)
+		var exists bool
+		if err := s.db.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM planets
+				WHERE universe_id = $1 AND galaxy = $2 AND system = $3 AND position = $4
+			)
+		`, uuid, g, sys, pos).Scan(&exists); err != nil {
+			return 0, 0, 0, false, err
+		}
+		if !exists {
+			return g, sys, pos, true, nil
+		}
+	}
+	return 0, 0, 0, false, nil
+}
+
+// RandomTarget returns a random existing coordinate not owned by excludeUser,
+// used for a sloppy "fleet in the air" save. It reports ok=false when the
+// universe holds no other planet to send a fleet toward.
+func (s *NPCStore) RandomTarget(ctx context.Context, universeCode string, excludeUser int64) (g, sys, pos int, ok bool, err error) {
+	err = s.db.QueryRowContext(ctx, `
+		SELECT galaxy, system, position FROM planets
+		WHERE universe_id = (SELECT id FROM universes WHERE code_name = $1)
+		  AND (user_id IS NULL OR user_id <> $2)
+		ORDER BY random() LIMIT 1
+	`, universeCode, excludeUser).Scan(&g, &sys, &pos)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, 0, false, nil
+	}
+	if err != nil {
+		return 0, 0, 0, false, err
+	}
+	return g, sys, pos, true, nil
+}
+
 // itoa64 renders a non-negative int64 without importing strconv (kept local so
 // the store package's tiny helper surface stays consistent).
 func itoa64(n int64) string {
