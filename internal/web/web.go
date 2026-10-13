@@ -127,6 +127,8 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("POST /settings/vacation", h.requireUser(h.SettingsVacationSubmit))
 	mux.HandleFunc("GET /settings/sanction", h.requireUser(h.SettingsSanctionPage))
 	mux.HandleFunc("POST /queue/{qid}/cancel", h.requireUser(h.QueueCancelSubmit))
+	mux.HandleFunc("POST /queue/{id}/cancel-selected", h.requireUser(h.QueueCancelSelectedSubmit))
+	mux.HandleFunc("POST /queue/{id}/cancel-all", h.requireUser(h.QueueCancelAllSubmit))
 
 	mux.HandleFunc("GET /alliance", h.requireUser(h.AlliancePage))
 	mux.HandleFunc("GET /alliance/create", h.requireUser(h.AllianceCreatePage))
@@ -748,10 +750,10 @@ func (h *Handler) shipyardView(ctx context.Context, r *http.Request, userID, id 
 	techs, _ := h.planets.Techs(ctx, userID)
 	gameSpeed, _ := h.gameSpeed(ctx)
 
-	d := shipyardData{baseData: h.base(ctx, r, userID, "Shipyard", id)}
-	if q, ok := h.activeQueue(ctx, id, userID, "ship"); ok {
-		v := newQueueView(q)
-		d.Queue = &v
+	d := shipyardData{
+		baseData:  h.base(ctx, r, userID, "Shipyard", id),
+		UnitQueue: h.unitQueueRows(ctx, id, userID, "ship"),
+		QueueKind: "ship",
 	}
 	d.Ships = h.unitRows(ctx, p, structs, techs, game.KindShip, gameSpeed)
 	return d, true
@@ -777,13 +779,43 @@ func (h *Handler) defenseView(ctx context.Context, r *http.Request, userID, id i
 	techs, _ := h.planets.Techs(ctx, userID)
 	gameSpeed, _ := h.gameSpeed(ctx)
 
-	d := defenseData{baseData: h.base(ctx, r, userID, "Defense", id)}
-	if q, ok := h.activeQueue(ctx, id, userID, "defense"); ok {
-		v := newQueueView(q)
-		d.Queue = &v
+	d := defenseData{
+		baseData:  h.base(ctx, r, userID, "Defense", id),
+		UnitQueue: h.unitQueueRows(ctx, id, userID, "defense"),
+		QueueKind: "defense",
 	}
 	d.Units = h.unitRows(ctx, p, structs, techs, game.KindDefense, gameSpeed)
 	return d, true
+}
+
+// unitQueueRows builds the ordered production queue for one unit kind (ships or
+// defense) on a planet, oldest batch first.
+func (h *Handler) unitQueueRows(ctx context.Context, planetID, userID int64, kind string) []unitQueueRow {
+	qs, _ := h.queues.Active(ctx, planetID, userID)
+	var rows []unitQueueRow
+	for _, q := range qs {
+		if q.Kind != kind {
+			continue
+		}
+		name := q.Code
+		if def, ok := game.Get(q.Code); ok {
+			name = def.Name
+		}
+		var qty int64
+		if q.Quantity.Valid {
+			qty = q.Quantity.Int64
+		}
+		rows = append(rows, unitQueueRow{
+			Ordinal:    len(rows) + 1,
+			ID:         q.ID,
+			Name:       name,
+			Quantity:   qty,
+			Duration:   untilDur(q.StartAt, q.FinishAt),
+			Remaining:  until(q.FinishAt),
+			FinishUnix: q.FinishAt.Unix(),
+		})
+	}
+	return rows
 }
 
 func (h *Handler) unitRows(ctx context.Context, p *store.Planet, structs, techs map[string]int, kind game.Kind, gameSpeed float64) []unitRow {
@@ -2509,6 +2541,81 @@ func (h *Handler) QueueCancelSubmit(w http.ResponseWriter, r *http.Request) {
 	flashRedirect(w, r, to, "Order cancelled.", msg(err))
 }
 
+// QueueCancelSelectedSubmit cancels the ship/defense batches ticked in the
+// production queue panel.
+func (h *Handler) QueueCancelSelectedSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	h.cancelUnitOrders(w, r, userID, pathID(r), r.FormValue("kind"), formIDs(r, "queue"))
+}
+
+// QueueCancelAllSubmit cancels every in-progress batch of one unit kind on a
+// planet. The client asks for confirmation before this fires.
+func (h *Handler) QueueCancelAllSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	planetID := pathID(r)
+	kind := r.FormValue("kind")
+	qs, _ := h.queues.Active(r.Context(), planetID, userID)
+	var ids []int64
+	for _, q := range qs {
+		if q.Kind == kind {
+			ids = append(ids, q.ID)
+		}
+	}
+	h.cancelUnitOrders(w, r, userID, planetID, kind, ids)
+}
+
+// cancelUnitOrders cancels the given queue ids (each ownership-checked by the
+// store), refunding them, then re-renders the shipyard/defense content region
+// for htmx or redirects back for a plain POST.
+func (h *Handler) cancelUnitOrders(w http.ResponseWriter, r *http.Request, userID, planetID int64, kind string, ids []int64) {
+	if kind != "ship" && kind != "defense" {
+		http.Error(w, "Unknown queue kind.", http.StatusBadRequest)
+		return
+	}
+	page := "shipyard"
+	if kind == "defense" {
+		page = "defense"
+	}
+	cancelled := 0
+	var firstErr error
+	for _, qid := range ids {
+		if qid <= 0 {
+			continue
+		}
+		if err := h.queues.Cancel(r.Context(), qid, userID); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		cancelled++
+	}
+	okMsg := ""
+	if cancelled > 0 {
+		okMsg = fmt.Sprintf("%d order(s) cancelled.", cancelled)
+	}
+	errMsg := ""
+	if firstErr != nil {
+		errMsg = msg(firstErr)
+	}
+	back := "/" + page + "/" + strconv.FormatInt(planetID, 10)
+	if h.renderHXContent(w, r, userID, page, planetID, okMsg, errMsg) {
+		return
+	}
+	flashRedirect(w, r, back, okMsg, errMsg)
+}
+
+// formIDs parses every value of a repeated form field into ids.
+func formIDs(r *http.Request, name string) []int64 {
+	var ids []int64
+	for _, v := range r.Form[name] {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // ---- htmx helpers ----
 
 // isHX reports whether the request came from htmx (progressive enhancement).
@@ -2666,28 +2773,21 @@ func (h *Handler) QueuePartial(w http.ResponseWriter, r *http.Request) {
 		h.render(w, "research-queue-panel", http.StatusOK, rd)
 		return
 	}
-	d := queuePartialData{ActivePlanetID: id}
-	if q, ok := h.activeQueue(r.Context(), id, userID, kind); ok {
-		v := newQueueView(q)
-		d.Queue = &v
+	if kind == "ship" || kind == "defense" {
+		ud := unitQueuePartialData{
+			ActivePlanetID: id,
+			UnitQueue:      h.unitQueueRows(r.Context(), id, userID, kind),
+			QueueKind:      kind,
+		}
+		h.render(w, "unit-queue-panel", http.StatusOK, ud)
+		return
 	}
-	h.render(w, "queue-panel", http.StatusOK, d)
+	// The construction and research panels poll this endpoint too; any other
+	// kind is a bad request.
+	http.Error(w, "Unknown queue kind.", http.StatusBadRequest)
 }
 
 // ---- small helpers ----
-
-func (h *Handler) activeQueue(ctx context.Context, planetID, userID int64, kind string) (store.Queue, bool) {
-	qs, err := h.queues.Active(ctx, planetID, userID)
-	if err != nil {
-		return store.Queue{}, false
-	}
-	for _, q := range qs {
-		if q.Kind == kind {
-			return q, true
-		}
-	}
-	return store.Queue{}, false
-}
 
 // buildingQueue returns a planet's active building orders in the order they
 // will run (earliest finish first).

@@ -35,21 +35,53 @@
      out-of-band resource refresh and nothing else. Empty without JS. */}}
 {{define "hx-extras"}}{{if and .HX .Resources}}{{template "res-strip-oob" .}}{{end}}{{end}}
 
-{{/* queue-panel is the active-order banner. It self-polls every 5s (resyncing
-     the "finishes in …" text with the server) and lets the client-side ticker
-     count down smoothly in between. */}}
-{{define "queue-panel"}}
-<div id="queue-panel"{{if .Queue}} hx-get="/partials/queue/{{.ActivePlanetID}}?kind={{.Queue.Kind}}" hx-trigger="every 5s" hx-swap="outerHTML"{{end}}>
-  {{if .Queue}}
-  <div class="panel row">
-    <span>{{if eq .Queue.Kind "building"}}Building{{else if eq .Queue.Kind "research"}}Researching{{else}}Producing{{end}} <b>{{.Queue.Name}}</b> — finishes in <span data-countdown="{{.Queue.FinishUnix}}">{{.Queue.Remaining}}</span></span>
-    <form method="post" action="/queue/{{.Queue.ID}}/cancel" class="spacer"
-          hx-post="/queue/{{.Queue.ID}}/cancel" hx-target="#page-content" hx-swap="innerHTML">
-      <button class="bad" type="submit">Cancel (refund)</button>
-    </form>
+{{/* unit-queue-panel is the ship/defense production queue. The queue is
+     unlimited: every batch runs back-to-back. Rows are ticked to cancel a
+     selection, or "Cancel all" empties the line (behind a confirmation). The
+     checkboxes live in one form; per-row ✕ and Cancel all override its action
+     with formaction so no form is nested inside another. */}}
+{{define "unit-queue-panel"}}
+{{if .UnitQueue}}
+<h2 class="section-head">Production queue <span class="muted">({{len .UnitQueue}})</span></h2>
+<form method="post" action="/queue/{{.ActivePlanetID}}/cancel-selected">
+  <input type="hidden" name="kind" value="{{.QueueKind}}">
+  <div class="panel">
+    <table>
+      <tr>
+        <th style="width:36px"><input type="checkbox" title="Select all"
+            onclick="var on=this.checked;this.closest('table').querySelectorAll('input[name=queue]').forEach(function(c){c.checked=on;});"></th>
+        <th style="width:40px">#</th>
+        <th>Unit</th>
+        <th style="width:110px">Quantity</th>
+        <th style="width:160px">Construction time</th>
+        <th style="width:160px">Time remaining</th>
+        <th style="width:40px"></th>
+      </tr>
+      {{range .UnitQueue}}
+      <tr>
+        <td><input type="checkbox" name="queue" value="{{.ID}}"></td>
+        <td class="muted">{{.Ordinal}}</td>
+        <td>{{.Name}}</td>
+        <td>{{n .Quantity}}</td>
+        <td>{{.Duration}}</td>
+        <td><span data-countdown="{{.FinishUnix}}">{{.Remaining}}</span></td>
+        <td>
+          <button class="bad" type="submit" formaction="/queue/{{.ID}}/cancel"
+                  hx-post="/queue/{{.ID}}/cancel" hx-target="#page-content" hx-swap="innerHTML" hx-include="closest form"
+                  title="Cancel (refund)">✕</button>
+        </td>
+      </tr>
+      {{end}}
+    </table>
   </div>
-  {{end}}
-</div>
+  <div class="row">
+    <button class="bad" type="submit"
+            hx-post="/queue/{{.ActivePlanetID}}/cancel-selected" hx-target="#page-content" hx-swap="innerHTML" hx-include="closest form">Cancel selected</button>
+    <button class="bad spacer" type="submit" formaction="/queue/{{.ActivePlanetID}}/cancel-all"
+            onclick="return confirm('Do you really want to cancel all {{if eq .QueueKind "ship"}}ships{{else}}defenses{{end}}?')">Cancel all</button>
+  </div>
+</form>
+{{end}}
 {{end}}
 
 {{/* build-queue-panel is the multi-slot construction queue (buildings only).

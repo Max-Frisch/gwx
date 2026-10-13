@@ -72,12 +72,6 @@ func newQueueView(q store.Queue) queueView {
 	return queueView{ID: q.ID, Kind: q.Kind, Name: name, Remaining: until(q.FinishAt), FinishUnix: q.FinishAt.Unix()}
 }
 
-// queuePartialData backs the self-polling queue panel fragment.
-type queuePartialData struct {
-	ActivePlanetID int64
-	Queue          *queueView
-}
-
 // buildQueueRow is one line of the construction queue table.
 type buildQueueRow struct {
 	Ordinal    int
@@ -95,6 +89,13 @@ type buildQueuePartialData struct {
 	QueueUsed      int
 	QueueSlots     int
 	QueueFull      bool
+}
+
+// unitQueuePartialData backs the ship/defense production queue fragment.
+type unitQueuePartialData struct {
+	ActivePlanetID int64
+	UnitQueue      []unitQueueRow
+	QueueKind      string
 }
 
 type buildRow struct {
@@ -528,16 +529,31 @@ type researchData struct {
 	QueueFull     bool
 }
 
+// unitQueueRow is one batch in the ship or defense production queue. The
+// checkbox in the queue panel carries its ID so several rows can be cancelled
+// at once.
+type unitQueueRow struct {
+	Ordinal    int
+	ID         int64
+	Name       string
+	Quantity   int64
+	Duration   string
+	Remaining  string
+	FinishUnix int64
+}
+
 type shipyardData struct {
 	baseData
-	Ships []unitRow
-	Queue *queueView
+	Ships     []unitRow
+	UnitQueue []unitQueueRow
+	QueueKind string
 }
 
 type defenseData struct {
 	baseData
-	Units []unitRow
-	Queue *queueView
+	Units     []unitRow
+	UnitQueue []unitQueueRow
+	QueueKind string
 }
 
 type fleetData struct {

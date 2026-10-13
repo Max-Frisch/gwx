@@ -242,6 +242,18 @@ Read first; one item per session. Keep this file short.
   runs it and the integration harness bootstraps through the same runner. Tests:
   `internal/store/migrate_test.go`, `internal/integration/migrate_test.go`.
 
+- **Unlimited unit queue** — ship and defense production are now unlimited,
+  back-to-back chains per planet (one line per kind). `uq_queue_shipyard` (one
+  active ship/defense order per planet) is dropped (migration `0013`) and
+  `QueueStore.StartUnits` schedules each new batch right after the previous one
+  under the planet row lock; cancelling a batch refunds it and pulls the later
+  batches forward (`renumberUnitsTx`). The Shipyard/Defense pages gained the
+  reference **Production queue** table with per-row checkboxes plus **Cancel
+  selected** and **Cancel all** (behind a `Do you really want to cancel all
+  …?` confirmation). Ships and defense keep independent lines. Tests:
+  `internal/web/unit_queue_test.go`,
+  `internal/integration/unit_queue_test.go`.
+
 ## Todo (ordered)
 
 **Next up — start here:** build **Seasonal lifecycle** — automatic archive/reset

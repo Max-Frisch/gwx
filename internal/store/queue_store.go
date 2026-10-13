@@ -172,6 +172,19 @@ func nextBuildStartTx(ctx context.Context, tx *sql.Tx, planetID int64) (time.Tim
 	return start, err
 }
 
+// nextUnitStartTx returns when a new ship/defense batch should begin: right
+// after the last queued batch of the same kind on the planet (or now when the
+// queue is empty). Ships and defense each have their own production line, so a
+// new batch chains behind the previous batch of the same kind.
+func nextUnitStartTx(ctx context.Context, tx *sql.Tx, planetID int64, kind string) (time.Time, error) {
+	var start time.Time
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(MAX(finish_at), NOW()) FROM queues
+		WHERE planet_id = $1 AND kind = $2 AND status = 'IN_PROGRESS'
+	`, planetID, kind).Scan(&start)
+	return start, err
+}
+
 // lockUserTx row-locks the account so concurrent research enqueues (which may
 // come from different planets of the same player) serialize.
 func lockUserTx(ctx context.Context, tx *sql.Tx, userID int64) error {
@@ -459,12 +472,22 @@ func (s *QueueStore) StartUnits(ctx context.Context, universeCode string, userID
 		return err
 	}
 
+	// Chain this batch behind any already queued ones. accrueTx above row-locked
+	// the planet, so concurrent enqueues for it serialize and read a stable tail.
+	startAt, err := nextUnitStartTx(ctx, tx, planetID, kind)
+	if err != nil {
+		return err
+	}
 	factoryLevel := structs[game.UnitFactoryCode(def.Kind)]
 	dur := def.TimeSecs * game.UnitTimeMultiplier(factoryLevel) * float64(qty) / u.gameSpeed
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO queues (universe_id, user_id, planet_id, kind, code, quantity, start_at, finish_at)
-		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW() + ($7 * INTERVAL '1 second'))
-	`, u.uuid, userID, planetID, kind, code, qty, dur); err != nil {
+		VALUES (
+			$1, $2, $3, $4, $5, $6,
+			GREATEST($7, NOW()),
+			GREATEST($7, NOW()) + ($8 * INTERVAL '1 second')
+		)
+	`, u.uuid, userID, planetID, kind, code, qty, startAt, dur); err != nil {
 		return mapQueueBusy(err)
 	}
 	return tx.Commit()
@@ -588,6 +611,13 @@ func (s *QueueStore) Cancel(ctx context.Context, queueID, userID int64) error {
 	// Research chains the same way, but is account-scoped rather than per planet.
 	if kind == "research" {
 		if err := renumberResearchTx(ctx, tx, owner, universeID, queueID, code, startAt); err != nil {
+			return err
+		}
+	}
+	// Unit batches chain back-to-back per planet and kind, so removing one pulls
+	// the later batches forward by its duration.
+	if kind == "ship" || kind == "defense" {
+		if err := renumberUnitsTx(ctx, tx, planetID, kind, queueID, startAt); err != nil {
 			return err
 		}
 	}
@@ -809,6 +839,59 @@ func renumberResearchTx(ctx context.Context, tx *sql.Tx, userID int64, universeI
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE queues SET target_level = $2, start_at = $3, finish_at = $4 WHERE id = $1
 		`, o.id, o.target, start, finish); err != nil {
+			return err
+		}
+		cursor = finish
+	}
+	return nil
+}
+
+// renumberUnitsTx repairs a planet's ship or defense production line after one
+// batch is cancelled: every later batch of the same kind is pulled forward to
+// run right after the (now shorter) chain, keeping their own durations. Order
+// ids grow with the chain, so `id > cancelledID` selects the tail.
+func renumberUnitsTx(ctx context.Context, tx *sql.Tx, planetID int64, kind string, cancelledID int64, cancelledStart time.Time) error {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, start_at, finish_at
+		FROM queues
+		WHERE planet_id = $1 AND kind = $2 AND status = 'IN_PROGRESS' AND id > $3
+		ORDER BY start_at, id
+	`, planetID, kind, cancelledID)
+	if err != nil {
+		return err
+	}
+	type order struct {
+		id     int64
+		start  time.Time
+		finish time.Time
+	}
+	var tail []order
+	for rows.Next() {
+		var o order
+		if err := rows.Scan(&o.id, &o.start, &o.finish); err != nil {
+			rows.Close()
+			return err
+		}
+		tail = append(tail, o)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	cursor := cancelledStart
+	if cursor.Before(time.Now()) {
+		cursor = time.Now()
+	}
+	for i := range tail {
+		o := &tail[i]
+		dur := o.finish.Sub(o.start)
+		start := cursor
+		finish := start.Add(dur)
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE queues SET start_at = $2, finish_at = $3 WHERE id = $1
+		`, o.id, start, finish); err != nil {
 			return err
 		}
 		cursor = finish
