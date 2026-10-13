@@ -19,7 +19,7 @@
     <p class="bcard-desc">{{.Desc}}</p>
     {{if .Unlocked}}
     <div class="bcard-meta">
-      {{range .Costs}}<span class="cost"><span class="{{.Class}}">{{.Label}}</span> <span class="{{if .OK}}v-ok{{else}}v-bad{{end}}">{{.Amount}}</span></span>{{end}}
+      {{range .Costs}}<span class="cost"><span class="{{.Class}}">{{.Label}}</span> <span class="cost-amt {{if .OK}}v-ok{{else}}v-bad{{end}}" data-base="{{.Base}}" data-have="{{.Have}}">{{.Amount}}</span></span>{{end}}
       <span class="dur">Duration {{.PerTimeStr}}</span>
       <span class="dur">{{.Stats}}</span>
     </div>

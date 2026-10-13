@@ -119,11 +119,15 @@ type buildRow struct {
 
 // costPart is one resource of an item's price: its label, the CSS class that
 // tints the label, the formatted amount and whether the planet can cover it.
+// Base and Have carry the raw per-unit price and the planet's stock so a page
+// can rescale the displayed amount client-side (e.g. ship/defense quantity).
 type costPart struct {
 	Label  string
 	Class  string
 	Amount string
 	OK     bool
+	Base   string
+	Have   string
 }
 
 type unitRow struct {
@@ -818,13 +822,22 @@ func costParts(c game.Resources, p *store.Planet) []costPart {
 		if v <= 0 {
 			return
 		}
-		parts = append(parts, costPart{Label: label, Class: class, Amount: fmtFloat(v), OK: have >= v})
+		parts = append(parts, costPart{
+			Label: label, Class: class, Amount: fmtFloat(v), OK: have >= v,
+			Base: rawFloat(v), Have: rawFloat(have),
+		})
 	}
 	add(c.Metal, p.Metal, "Iron", "m")
 	add(c.Lutinum, p.Lutinum, "Lutinum", "l")
 	add(c.Water, p.Water, "Water", "w")
 	add(c.Hydrogen, p.Hydrogen, "Hydrogen", "h")
 	return parts
+}
+
+// rawFloat renders a float without thousands separators so it can be embedded
+// in a data attribute and parsed by client-side JavaScript.
+func rawFloat(f float64) string {
+	return strconv.FormatFloat(f, 'f', -1, 64)
 }
 
 func costString(c game.Resources) string {

@@ -17,6 +17,7 @@ func TestDefenseTemplateRenders(t *testing.T) {
 		Code: "rocket_launcher", Name: "Rocket Launchers", Count: 2, Unlocked: true,
 		CostStr: "15,000 Iron", Stats: "Atk 4,500 · Def 8,100 · Hull 12,600",
 		PerTimeStr: "15m 9s", MaxAffordable: 3,
+		Costs: []costPart{{Label: "Iron", Class: "m", Amount: "15,000", OK: true, Base: "15000", Have: "90000"}},
 	}
 	locked := unitRow{
 		Code: "plasma_turret", Name: "Plasma Turret", Unlocked: false,
@@ -37,5 +38,8 @@ func TestDefenseTemplateRenders(t *testing.T) {
 	}
 	if !strings.Contains(out, "Ionization") {
 		t.Error("defense page did not render missing prereqs")
+	}
+	if !strings.Contains(out, `data-base="15000"`) || !strings.Contains(out, `data-have="90000"`) {
+		t.Error("defense page did not render dynamic cost attributes")
 	}
 }
