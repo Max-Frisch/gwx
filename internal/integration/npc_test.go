@@ -47,6 +47,30 @@ func TestNPCBrainBuilds(t *testing.T) {
 	}
 }
 
+// TestNPCBrainIgnoresWindowAtHighSpeed confirms the online window is a
+// low-speed nicety: the integration universe runs at x10000, so even an NPC
+// whose profile declares a narrow window stays on the clock and builds.
+func TestNPCBrainIgnoresWindowAtHighSpeed(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+
+	npcs := store.NewNPCStore(h.db)
+	profile := game.NPCProfile{
+		Strategy:   game.NPCBalanced,
+		Difficulty: "normal",
+		ActiveFrom: 12,
+		ActiveTo:   13,
+	}
+	userID, _, err := npcs.Create(ctx, h.universe, profile)
+	if err != nil {
+		t.Fatalf("create npc: %v", err)
+	}
+
+	waitFor(t, "npc building order despite window", func() bool {
+		return h.queryInt(t, `SELECT COUNT(*) FROM queues WHERE user_id = $1 AND kind = 'building'`, userID) > 0
+	})
+}
+
 // TestNPCBrainProducesUnits checks the brain arms itself: with a shipyard and
 // orbital defense standing, a decision cycle queues a ship/defense batch the
 // same way a player's form does.

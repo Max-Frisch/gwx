@@ -23,9 +23,9 @@ const (
 type NPCProfile struct {
 	Strategy   NPCStrategy `json:"strategy"`
 	Difficulty string      `json:"difficulty"` // easy | normal | hard
-	Phase      int         `json:"phase"`      // 0..3, coarse round progress
-	ActiveFrom int         `json:"activeFrom"` // 0..23, local "online" hour
-	ActiveTo   int         `json:"activeTo"`   // 1..24, exclusive; 24 = always on
+	Phase      int         `json:"phase"`      // 0..3, development tier derived from structs/techs
+	ActiveFrom int         `json:"activeFrom"` // 0..23, server-clock hour the window opens
+	ActiveTo   int         `json:"activeTo"`   // 1..24 exclusive; may wrap past midnight; == from = always on
 }
 
 // DefaultNPCProfile is a balanced, always-on NPC.
@@ -55,31 +55,21 @@ func (p NPCProfile) Normalized() NPCProfile {
 	if p.Phase < 0 {
 		p.Phase = 0
 	}
+	if p.Phase > 3 {
+		p.Phase = 3
+	}
 	if p.ActiveFrom < 0 || p.ActiveFrom > 23 {
 		p.ActiveFrom = 0
 	}
-	if p.ActiveTo <= 0 || p.ActiveTo > 24 {
+	if p.ActiveTo < 1 || p.ActiveTo > 24 {
 		p.ActiveTo = 24
 	}
-	if p.ActiveTo <= p.ActiveFrom {
+	// Equal endpoints mean "always on"; otherwise 20 -> 3 is a valid overnight
+	// window that wraps past midnight.
+	if p.ActiveFrom == p.ActiveTo {
 		p.ActiveFrom, p.ActiveTo = 0, 24
 	}
 	return p
-}
-
-// ProductionMultiplier is the difficulty's resource-production factor. gwx has
-// no separate "progress points" pool (that is an anti-stall abstraction for the
-// reference's real resource economy); a mild production edge is enough to make
-// difficulty visible while keeping NPCs on the same rules as players.
-func (p NPCProfile) ProductionMultiplier() float64 {
-	switch p.Difficulty {
-	case "easy":
-		return 0.9
-	case "hard":
-		return 1.15
-	default:
-		return 1.0
-	}
 }
 
 // RandomNPCProfile rolls a plausible profile, used when seeding a universe.
@@ -90,8 +80,10 @@ func RandomNPCProfile(rng *rand.Rand) NPCProfile {
 		Strategy:   strategies[rng.Intn(len(strategies))],
 		Difficulty: difficulties[rng.Intn(len(difficulties))],
 	}
-	// Most NPCs are around the clock; some keep shorter, shifted windows.
-	if rng.Float64() < 0.5 {
+	// Most NPCs are around the clock; some keep shorter, shifted windows and a
+	// few keep an overnight window that wraps past midnight.
+	switch {
+	case rng.Float64() < 0.5:
 		from := rng.Intn(18)
 		span := 4 + rng.Intn(8) // 4..11 hours
 		p.ActiveFrom = from
@@ -99,8 +91,120 @@ func RandomNPCProfile(rng *rand.Rand) NPCProfile {
 		if p.ActiveTo > 24 {
 			p.ActiveTo = 24
 		}
+	case rng.Float64() < 0.4:
+		p.ActiveFrom = 18 + rng.Intn(6) // 18..23
+		p.ActiveTo = 4 + rng.Intn(6)    // 4..9
 	}
 	return p.Normalized()
+}
+
+// DevelopmentTier derives an NPC's coarse development tier (0..3) from the
+// buildings and tech it already owns. It is a cheap score, not a database read:
+// the caller passes the structures/techs it has already loaded. Tier 0 is a
+// bare colony, 1 an economy that is online, 2 a military that has come online,
+// 3 an advanced, late-round power.
+func DevelopmentTier(structs, techs map[string]int) int {
+	score := structs["iron_mine"] + structs["lutinum_mine"] + structs["water_extractor"]
+	score += structs["command_center"] + structs["research_center"]
+	score += structs["chemical_factory"] + structs["shipyard"] + structs["orbital_defense"]
+	for _, level := range techs {
+		score += level
+	}
+	switch {
+	case score >= 60:
+		return 3
+	case score >= 30:
+		return 2
+	case score >= 10:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// npcPhaseBuildingWeight biases a building choice by the NPC's development
+// tier: early NPCs build their economy, late ones build military and advanced
+// structures. Multipliers stay modest so strategy still shows through.
+func npcPhaseBuildingWeight(phase int, code string) float64 {
+	d, ok := Catalog[code]
+	if !ok {
+		return 1
+	}
+	early := d.Group == "Resource buildings" || code == "command_center" || code == "research_center"
+	late := d.Group == "Military buildings" || code == "advanced_chemical_factory"
+	switch {
+	case phase <= 1:
+		if late {
+			return 0.8
+		}
+		if early {
+			return 1.3
+		}
+	case phase >= 2:
+		if late {
+			return 1.3
+		}
+		if early {
+			return 0.8
+		}
+	}
+	return 1
+}
+
+// npcPhaseUnitWeight biases unit production by development tier: early NPCs
+// favour probes, recyclers and traders; late ones favour warships/defense.
+func npcPhaseUnitWeight(phase int, def Def) float64 {
+	utility := def.Code == "spy_probe" || def.Code == "recycler" || def.Code == "colony_ship"
+	trader := npcTraders[def.Code]
+	warship := npcWarships[def.Code] || def.Kind == KindDefense
+	switch {
+	case phase <= 1:
+		if utility || trader {
+			return 1.3
+		}
+		if warship {
+			return 0.85
+		}
+	case phase >= 2:
+		if warship {
+			return 1.3
+		}
+		if utility || trader {
+			return 0.85
+		}
+	}
+	return 1
+}
+
+// npcPhaseResearchWeight biases research by development tier: early NPCs chase
+// drives and utility techs, late ones weapons and armour.
+func npcPhaseResearchWeight(phase int, code string) float64 {
+	early := map[string]bool{
+		"combustion_drive": true, "ion_drive": true,
+		"increased_cargo_capacity": true, "recycling_technology": true,
+	}
+	late := map[string]bool{
+		"ionization": true, "energy_focusing": true, "explosive_projectiles": true,
+		"advanced_ship_armor": true, "space_curvature_drive": true,
+		"space_folding_drive": true,
+	}
+	switch {
+	case phase <= 1:
+		if early[code] {
+			return 1.3
+		}
+		if late[code] {
+			return 0.85
+		}
+	case phase >= 2:
+		if late[code] {
+			return 1.3
+		}
+		if early[code] {
+			return 0.85
+		}
+	}
+	return 1
 }
 
 // npcBaseBuildingWeight is the base desirability of building a level of each
@@ -210,6 +314,7 @@ func RankedBuildings(structs, techs map[string]int, profile NPCProfile, rng *ran
 			w = 1
 		}
 		w *= npcStrategyWeight(code, profile.Strategy)
+		w *= npcPhaseBuildingWeight(profile.Phase, code)
 		w *= 1.0 / (1.0 + 0.12*float64(structs[code]))
 		if w <= 0 {
 			continue
@@ -312,6 +417,7 @@ func RankedUnits(structs, techs map[string]int, profile NPCProfile, rng *rand.Ra
 			w = 1
 		}
 		w *= npcUnitStrategyWeight(d, profile.Strategy)
+		w *= npcPhaseUnitWeight(profile.Phase, d)
 		if w <= 0 {
 			continue
 		}
@@ -396,6 +502,7 @@ func RankedResearch(structs, techs map[string]int, profile NPCProfile, rng *rand
 			w = 1
 		}
 		w *= npcResearchStrategyWeight(code, profile.Strategy)
+		w *= npcPhaseResearchWeight(profile.Phase, code)
 		w *= 1.0 / (1.0 + 0.12*float64(techs[code]))
 		if w <= 0 {
 			continue
@@ -440,19 +547,32 @@ func clamp01(v float64) float64 {
 	return v
 }
 
+// Difficulty scales reaction odds and decision cadence. The multipliers are
+// shared so the two stay in lock-step: hard NPCs act more decisively and think a
+// little sooner, easy ones more sluggishly and a little later.
+const (
+	diffScaleEasy = 0.7
+	diffScaleHard = 1.3
+)
+
 // difficultyScale nudges every reaction probability: hard NPCs act more
 // decisively, easy ones more sluggishly. It never exceeds a valid probability
-// once multiplied and clamped.
+// once multiplied and clamped. The same factor also compresses/expands the
+// decision cadence in NextDecisionDelay.
 func (p NPCProfile) difficultyScale() float64 {
 	switch p.Difficulty {
 	case "easy":
-		return 0.7
+		return diffScaleEasy
 	case "hard":
-		return 1.3
+		return diffScaleHard
 	default:
 		return 1.0
 	}
 }
+
+// MinDifficultyScale is the smallest reaction/cadence scale (easy). The startup
+// capacity check uses it to estimate the fastest possible due rate.
+func MinDifficultyScale() float64 { return diffScaleEasy }
 
 // SpyChance is the per-inbound-attack probability that the NPC spends a probe
 // to scout the attacker. Aggressive NPCs look; builders usually shrug.
@@ -506,6 +626,10 @@ func (p NPCProfile) ColonizeChance() float64 {
 // onto it.
 const npcDecisionFloor = 30 * time.Second
 
+// NPCDecisionFloorSeconds exposes the real-time decision floor in seconds so
+// startup code can estimate the worst-case NPC due rate against NPC_BATCH.
+func NPCDecisionFloorSeconds() float64 { return npcDecisionFloor.Seconds() }
+
 // npcDecisionCapMinutes caps the jittered, game-time delay so an NPC never
 // idles for an unbounded stretch (the old tail ran to ~2h30m).
 const npcDecisionCapMinutes = 60
@@ -515,6 +639,10 @@ const npcDecisionCapMinutes = 60
 // and then a longer pause — never a tight 24/7 loop. The shape is measured in
 // game-time and divided by gameSpeed, so NPCs keep pace in fast universes; a
 // real-time floor keeps a large population from flooding the scheduler.
+//
+// Difficulty also shows up here: the game-time pause and the floor are divided
+// by difficultyScale, so hard NPCs decide a little sooner and easy ones later.
+// Normal is unchanged (scale 1).
 func NextDecisionDelay(profile NPCProfile, gameSpeed float64, rng *rand.Rand) time.Duration {
 	if gameSpeed <= 0 {
 		gameSpeed = 1
@@ -523,14 +651,71 @@ func NextDecisionDelay(profile NPCProfile, gameSpeed float64, rng *rand.Rand) ti
 	if rng.Float64() < 0.25 {
 		mins += float64(30 + rng.Intn(90)) // occasionally a longer pause
 	}
+	mins /= profile.difficultyScale()
 	if mins > npcDecisionCapMinutes {
 		mins = npcDecisionCapMinutes
 	}
 	d := time.Duration(mins / gameSpeed * float64(time.Minute))
-	if d < npcDecisionFloor {
-		d = npcDecisionFloor
+	floor := time.Duration(float64(npcDecisionFloor) / profile.difficultyScale())
+	if d < floor {
+		d = floor
 	}
 	return d
+}
+
+// NPCAwake reports whether the NPC is inside its server-clock online window at
+// t. A window whose endpoints are equal (normalized to 0..24) is always on; a
+// window where ActiveFrom > ActiveTo wraps overnight. Pure clock math, no DB.
+func NPCAwake(profile NPCProfile, t time.Time) bool {
+	p := profile.Normalized()
+	if p.ActiveFrom == 0 && p.ActiveTo == 24 {
+		return true
+	}
+	hour := t.Hour()
+	if p.ActiveFrom < p.ActiveTo {
+		return hour >= p.ActiveFrom && hour < p.ActiveTo
+	}
+	return hour >= p.ActiveFrom || hour < p.ActiveTo
+}
+
+// NPCNextWindowOpen returns the next time the NPC's window opens (the
+// closed→open transition) at or after t, plus a small deterministic jitter so a
+// population that shares a window does not all wake in the same second. Pure
+// clock math, no DB. If the window is already open, it returns the following
+// day's opening.
+func NPCNextWindowOpen(profile NPCProfile, t time.Time) time.Time {
+	p := profile.Normalized()
+	if p.ActiveFrom == 0 && p.ActiveTo == 24 {
+		return t.Add(npcWindowJitter(p))
+	}
+	next := t.Truncate(time.Hour).Add(time.Hour)
+	for i := 0; i < 25; i++ {
+		if NPCAwake(p, next) && !NPCAwake(p, next.Add(-time.Hour)) {
+			return next.Add(npcWindowJitter(p))
+		}
+		next = next.Add(time.Hour)
+	}
+	return t.Add(npcWindowJitter(p))
+}
+
+// npcWindowJitter derives a stable 0..119s offset from the profile, so two NPCs
+// on the same window open at slightly different moments.
+func npcWindowJitter(p NPCProfile) time.Duration {
+	h := 2166136261
+	mix := func(s string) {
+		for i := 0; i < len(s); i++ {
+			h ^= int(s[i])
+			h *= 16777619
+		}
+	}
+	mix(string(p.Strategy))
+	mix(p.Difficulty)
+	h ^= p.ActiveFrom*31 + p.ActiveTo
+	h *= 16777619
+	if h < 0 {
+		h = -h
+	}
+	return time.Duration(h%120) * time.Second
 }
 
 // npcNameAdjectives and npcNameNouns are combined into readable NPC handles.

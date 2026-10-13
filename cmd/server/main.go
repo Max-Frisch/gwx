@@ -16,6 +16,7 @@ import (
 
 	"gwx/internal/config"
 	"gwx/internal/engine"
+	"gwx/internal/game"
 	"gwx/internal/store"
 	"gwx/internal/web"
 )
@@ -54,9 +55,11 @@ func main() {
 		} else if created > 0 {
 			log.Printf("[INIT] seeded %d NPC player(s) (target %d)", created, cfg.NPCCount)
 		}
+		warnIfNPCBatchTooSmall(ctx, db, cfg)
 	}
 
 	eventEngine := engine.NewEventEngine(db)
+	eventEngine.SetNPCBatch(cfg.NPCBatch)
 	go eventEngine.StartScheduler(ctx)
 
 	mux := http.NewServeMux()
@@ -84,6 +87,23 @@ func main() {
 	defer shutdownCancel()
 	_ = server.Shutdown(shutdownCtx)
 	log.Println("[SHUTDOWN] done.")
+}
+
+// warnIfNPCBatchTooSmall logs a startup warning when the NPC population's
+// worst-case due rate (every NPC at the real-time decision floor, easy
+// difficulty) could exceed one tick's NPC_BATCH. It never fails the boot; it
+// just makes the ceiling visible so operators can raise NPC_BATCH.
+func warnIfNPCBatchTooSmall(ctx context.Context, db *sql.DB, cfg *config.Config) {
+	count, err := store.NewNPCStore(db).Count(ctx, cfg.UniverseCode)
+	if err != nil {
+		return
+	}
+	batch := cfg.NPCBatch
+	worstPerSecond := float64(count) / (game.NPCDecisionFloorSeconds() * game.MinDifficultyScale())
+	if worstPerSecond > float64(batch) {
+		log.Printf("[WARN] npc load: ~%.1f decisions/s could be due but NPC_BATCH=%d per tick; "+
+			"raise NPC_BATCH or lower NPC_COUNT to avoid starving the brain", worstPerSecond, batch)
+	}
 }
 
 // upsertUniverse applies the operator's env configuration to the universe row on

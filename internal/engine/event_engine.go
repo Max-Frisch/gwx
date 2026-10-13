@@ -25,11 +25,25 @@ type EventEngine struct {
 	// rng drives every NPC decision. Tick runs on a single goroutine, so the
 	// generator needs no locking.
 	rng *rand.Rand
+	// npcBatch caps how many NPCs one tick lets think (see SetNPCBatch).
+	npcBatch int
 }
 
 // NewEventEngine constructs an EventEngine.
 func NewEventEngine(db *sql.DB) *EventEngine {
-	return &EventEngine{db: db, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
+	return &EventEngine{
+		db:       db,
+		rng:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		npcBatch: defaultNPCBbatch,
+	}
+}
+
+// SetNPCBatch overrides the per-tick NPC decision cap (the NPC_BATCH knob).
+// Values <= 0 are ignored, leaving the default in place.
+func (e *EventEngine) SetNPCBatch(n int) {
+	if n > 0 {
+		e.npcBatch = n
+	}
 }
 
 // A newly colonized planet is seeded with this flat grant on top of whatever the

@@ -8,12 +8,135 @@ import (
 
 func TestNPCProfileNormalized(t *testing.T) {
 	got := (NPCProfile{}).Normalized()
-	if got.Strategy != NPCBalanced || got.Difficulty != "normal" || got.ActiveTo != 24 {
+	if got.Strategy != NPCBalanced || got.Difficulty != "normal" || got.ActiveFrom != 0 || got.ActiveTo != 24 {
 		t.Errorf("zero profile normalized = %+v, want balanced/normal/0..24", got)
 	}
-	bad := (NPCProfile{Strategy: "nonsense", Difficulty: "epic", ActiveFrom: 20, ActiveTo: 3}).Normalized()
-	if bad.Strategy != NPCBalanced || bad.Difficulty != "normal" || bad.ActiveFrom != 0 || bad.ActiveTo != 24 {
-		t.Errorf("invalid profile normalized = %+v, want defaults", bad)
+	// Genuinely out-of-range values fall back to defaults (phase clamps to 3).
+	bad := (NPCProfile{Strategy: "nonsense", Difficulty: "epic", Phase: 9, ActiveFrom: 30, ActiveTo: -5}).Normalized()
+	if bad.Strategy != NPCBalanced || bad.Difficulty != "normal" || bad.Phase != 3 || bad.ActiveFrom != 0 || bad.ActiveTo != 24 {
+		t.Errorf("invalid profile normalized = %+v, want defaults with phase 3", bad)
+	}
+	// An overnight window survives: 20 -> 3 wraps past midnight.
+	wrap := (NPCProfile{ActiveFrom: 20, ActiveTo: 3}).Normalized()
+	if wrap.ActiveFrom != 20 || wrap.ActiveTo != 3 {
+		t.Errorf("overnight window normalized = %+v, want 20..3", wrap)
+	}
+	// Equal endpoints mean always on.
+	equal := (NPCProfile{ActiveFrom: 5, ActiveTo: 5}).Normalized()
+	if equal.ActiveFrom != 0 || equal.ActiveTo != 24 {
+		t.Errorf("equal window normalized = %+v, want 0..24", equal)
+	}
+}
+
+func TestDevelopmentTier(t *testing.T) {
+	if got := DevelopmentTier(map[string]int{"command_center": 1}, map[string]int{}); got != 0 {
+		t.Errorf("fresh planet tier = %d, want 0", got)
+	}
+	// Score >= 10 is "economy online".
+	if got := DevelopmentTier(map[string]int{"iron_mine": 5, "command_center": 3, "research_center": 2}, map[string]int{}); got != 1 {
+		t.Errorf("developing planet tier = %d, want 1", got)
+	}
+	// A late-round power reaches the top tier.
+	advancedStructs := map[string]int{
+		"command_center": 8, "research_center": 6,
+		"iron_mine": 12, "lutinum_mine": 11, "water_extractor": 10,
+		"chemical_factory": 6, "shipyard": 4, "orbital_defense": 4,
+	}
+	advancedTechs := map[string]int{
+		"combustion_drive": 6, "ion_drive": 5, "ionization": 4,
+		"energy_focusing": 3, "advanced_ship_armor": 2,
+	}
+	if got := DevelopmentTier(advancedStructs, advancedTechs); got < 2 {
+		t.Errorf("advanced planet tier = %d, want >= 2", got)
+	}
+}
+
+func TestNPCAwake(t *testing.T) {
+	at := func(hour int) time.Time { return time.Date(2026, 1, 1, hour, 30, 0, 0, time.UTC) }
+
+	day := NPCProfile{ActiveFrom: 9, ActiveTo: 17}.Normalized()
+	for _, tc := range []struct {
+		hour int
+		want bool
+	}{{8, false}, {9, true}, {16, true}, {17, false}, {23, false}} {
+		if got := NPCAwake(day, at(tc.hour)); got != tc.want {
+			t.Errorf("NPCAwake(day, %02d:30) = %v, want %v", tc.hour, got, tc.want)
+		}
+	}
+
+	night := NPCProfile{ActiveFrom: 20, ActiveTo: 3}.Normalized()
+	for _, tc := range []struct {
+		hour int
+		want bool
+	}{{19, false}, {20, true}, {23, true}, {0, true}, {2, true}, {3, false}, {12, false}} {
+		if got := NPCAwake(night, at(tc.hour)); got != tc.want {
+			t.Errorf("NPCAwake(night, %02d:30) = %v, want %v", tc.hour, got, tc.want)
+		}
+	}
+
+	if !NPCAwake(DefaultNPCProfile(), at(3)) {
+		t.Error("default profile should always be awake")
+	}
+}
+
+func TestNPCNextWindowOpen(t *testing.T) {
+	night := NPCProfile{ActiveFrom: 20, ActiveTo: 3}.Normalized()
+
+	// From noon, the next opening is 20:00 the same day (plus jitter).
+	from := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	next := NPCNextWindowOpen(night, from)
+	open := time.Date(2026, 1, 1, 20, 0, 0, 0, time.UTC)
+	if next.Before(open) || next.After(open.Add(2*time.Minute)) {
+		t.Errorf("NPCNextWindowOpen(night, noon) = %v, want ~%v", next, open)
+	}
+
+	// From inside the window (22:00) the next opening is the following night.
+	from = time.Date(2026, 1, 1, 22, 0, 0, 0, time.UTC)
+	next = NPCNextWindowOpen(night, from)
+	tomorrow := time.Date(2026, 1, 2, 20, 0, 0, 0, time.UTC)
+	if next.Before(tomorrow) || next.After(tomorrow.Add(2*time.Minute)) {
+		t.Errorf("NPCNextWindowOpen(night, 22:00) = %v, want ~%v", next, tomorrow)
+	}
+}
+
+func TestRankedBuildingsPhaseBias(t *testing.T) {
+	structs := map[string]int{"shipyard": 1, "orbital_defense": 1}
+	resource := map[string]bool{
+		"iron_mine": true, "lutinum_mine": true, "water_extractor": true,
+	}
+	firstIsResource := func(phase int, seed int64) bool {
+		rng := rand.New(rand.NewSource(seed))
+		order := RankedBuildings(structs, map[string]int{}, NPCProfile{Phase: phase, Strategy: NPCBalanced}, rng)
+		return len(order) > 0 && resource[order[0]]
+	}
+	early, late := 0, 0
+	for seed := int64(0); seed < 400; seed++ {
+		if firstIsResource(0, seed) {
+			early++
+		}
+		if firstIsResource(3, seed) {
+			late++
+		}
+	}
+	if early <= late {
+		t.Errorf("phase 0 led with a resource building %d times vs phase 3 %d; want phase 0 > phase 3", early, late)
+	}
+}
+
+func TestNextDecisionDelayDifficulty(t *testing.T) {
+	avg := func(difficulty string, seed int64) time.Duration {
+		p := NPCProfile{Difficulty: difficulty}.Normalized()
+		rng := rand.New(rand.NewSource(seed))
+		var total time.Duration
+		const n = 5000
+		for i := 0; i < n; i++ {
+			total += NextDecisionDelay(p, 1, rng)
+		}
+		return total / n
+	}
+	hard, normal, easy := avg("hard", 1), avg("normal", 1), avg("easy", 1)
+	if !(hard < normal && normal < easy) {
+		t.Errorf("cadence hard=%v normal=%v easy=%v; want hard < normal < easy", hard, normal, easy)
 	}
 }
 

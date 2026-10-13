@@ -37,6 +37,10 @@ type Config struct {
 	// The server seeds up to this many on start (it only ever adds). 0 disables
 	// NPCs entirely.
 	NPCCount int
+
+	// NPCBatch caps how many NPCs one scheduler tick may let think, so a large
+	// universe cannot starve the queue/fleet resolvers. Default 25.
+	NPCBatch int
 }
 
 // Load reads and validates configuration. DATABASE_URL is the only required
@@ -83,6 +87,10 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	npcBatch, err := intEnv("NPC_BATCH", 25)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		Env:                getenv("APP_ENV", "development"),
@@ -98,6 +106,7 @@ func Load() (*Config, error) {
 		BuildQueueSlots:    queueSlots,
 		ResearchQueueSlots: researchSlots,
 		NPCCount:           npcCount,
+		NPCBatch:           npcBatch,
 	}, nil
 }
 

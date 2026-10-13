@@ -10,9 +10,15 @@ import (
 	"gwx/internal/store"
 )
 
-// npcBatch caps how many NPCs one tick will let think, so a large universe
-// never stalls the queue/fleet resolvers behind the brain.
-const npcBatch = 25
+// defaultNPCBbatch caps how many NPCs one tick will let think, so a large
+// universe never stalls the queue/fleet resolvers behind the brain. The actual
+// cap is configurable at startup via EventEngine.SetNPCBatch (NPC_BATCH).
+const defaultNPCBbatch = 25
+
+// npcWindowMaxGameSpeed is the game speed above which online windows are
+// ignored: real-time hours are meaningless in a compressed round, so a fast
+// universe keeps every NPC on the clock.
+const npcWindowMaxGameSpeed = 4
 
 // processNPCs is the NPC brain's durable driver. It leases due NPCs and gives
 // each one a decision cycle, then reschedules it for a human-ish interval
@@ -26,7 +32,7 @@ const npcBatch = 25
 // strategy/difficulty knobs steer them.
 func (e *EventEngine) processNPCs(ctx context.Context) {
 	npcs := store.NewNPCStore(e.db)
-	due, err := npcs.ClaimDue(ctx, npcBatch)
+	due, err := npcs.ClaimDue(ctx, e.npcBatch)
 	if err != nil {
 		log.Printf("[ENGINE] npc scan: %v", err)
 		return
@@ -45,37 +51,76 @@ func (e *EventEngine) runNPC(ctx context.Context, n store.NPC) error {
 		return err
 	}
 
+	now := time.Now()
 	if len(planets) > 0 {
 		// React first — an inbound attack is time-critical — then the growth
 		// actions, each best-effort so a busy queue or a thin treasury on one
 		// simply falls through to the next.
 		e.npcReactDecide(ctx, n, planets)
-		e.npcBuildDecide(ctx, n, planets)
-		e.npcResearchDecide(ctx, n, planets)
-		e.npcUnitDecide(ctx, n, planets)
-		e.npcColonizeDecide(ctx, n, planets)
+
+		// Growth only happens inside the NPC's online window. Reactions above
+		// still fire, so an attacked NPC is never a free farm.
+		if npcGrowthAllowed(n.Profile, n.GameSpeed, now) {
+			// Load the account's techs and each planet's structures once, then
+			// hand them to every growth decide instead of re-querying inside.
+			planetsStore := store.NewPlanetStore(e.db)
+			techs, err := planetsStore.Techs(ctx, n.UserID)
+			if err != nil {
+				return err
+			}
+			structsByPlanet := make(map[int64]map[string]int, len(planets))
+			for _, p := range planets {
+				structs, err := planetsStore.Structures(ctx, p.ID)
+				if err != nil {
+					return err
+				}
+				structsByPlanet[p.ID] = structs
+			}
+			e.npcBuildDecide(ctx, n, planets, techs, structsByPlanet)
+			e.npcResearchDecide(ctx, n, planets, techs, structsByPlanet)
+			e.npcUnitDecide(ctx, n, planets, techs, structsByPlanet)
+			e.npcColonizeDecide(ctx, n, planets)
+		}
 	}
 
-	return store.NewNPCStore(e.db).Schedule(ctx, n.UserID, time.Now().Add(game.NextDecisionDelay(n.Profile, n.GameSpeed, e.rng)))
+	delay := game.NextDecisionDelay(n.Profile, n.GameSpeed, e.rng)
+	return store.NewNPCStore(e.db).Schedule(ctx, n.UserID, npcScheduleAt(n.Profile, n.GameSpeed, now, delay))
+}
+
+// npcGrowthAllowed reports whether the NPC may build/research/expand right now.
+// At gameSpeed > npcWindowMaxGameSpeed the window is ignored entirely (a
+// compressed round has no meaningful real-time hours).
+func npcGrowthAllowed(profile game.NPCProfile, gameSpeed float64, now time.Time) bool {
+	if gameSpeed > npcWindowMaxGameSpeed {
+		return true
+	}
+	return game.NPCAwake(profile, now)
+}
+
+// npcScheduleAt pushes the next decision into the NPC's online window when the
+// raw delay would land outside it. It is a no-op above npcWindowMaxGameSpeed.
+func npcScheduleAt(profile game.NPCProfile, gameSpeed float64, now time.Time, delay time.Duration) time.Time {
+	at := now.Add(delay)
+	if gameSpeed > npcWindowMaxGameSpeed {
+		return at
+	}
+	if !game.NPCAwake(profile, at) {
+		return game.NPCNextWindowOpen(profile, now)
+	}
+	return at
 }
 
 // npcBuildDecide tries to queue the next building level somewhere. It walks the
 // NPC's planets and, on each, attempts building candidates in weighted-random
 // order until one is accepted; soft failures (no fields, too expensive, queue
 // busy/full) just fall through to the next candidate or planet.
-func (e *EventEngine) npcBuildDecide(ctx context.Context, n store.NPC, owned []store.OwnedPlanet) bool {
-	planets := store.NewPlanetStore(e.db)
+func (e *EventEngine) npcBuildDecide(ctx context.Context, n store.NPC, owned []store.OwnedPlanet, techs map[string]int, structsByPlanet map[int64]map[string]int) bool {
 	queues := store.NewQueueStore(e.db)
-	techs, err := planets.Techs(ctx, n.UserID)
-	if err != nil {
-		return false
-	}
 	for _, p := range owned {
-		structs, err := planets.Structures(ctx, p.ID)
-		if err != nil {
-			continue
-		}
-		for _, code := range game.RankedBuildings(structs, techs, n.Profile, e.rng) {
+		structs := structsByPlanet[p.ID]
+		local := n.Profile
+		local.Phase = game.DevelopmentTier(structs, techs)
+		for _, code := range game.RankedBuildings(structs, techs, local, e.rng) {
 			err := queues.StartBuilding(ctx, n.Universe, n.UserID, p.ID, code)
 			if err == nil {
 				return true
@@ -92,19 +137,13 @@ func (e *EventEngine) npcBuildDecide(ctx context.Context, n store.NPC, owned []s
 // planets (research is account-wide but gated on a planet's Research Center and
 // paid from its treasury) and, on each, attempts research candidates in
 // weighted-random order until one is accepted; soft failures fall through.
-func (e *EventEngine) npcResearchDecide(ctx context.Context, n store.NPC, owned []store.OwnedPlanet) bool {
-	planets := store.NewPlanetStore(e.db)
+func (e *EventEngine) npcResearchDecide(ctx context.Context, n store.NPC, owned []store.OwnedPlanet, techs map[string]int, structsByPlanet map[int64]map[string]int) bool {
 	queues := store.NewQueueStore(e.db)
-	techs, err := planets.Techs(ctx, n.UserID)
-	if err != nil {
-		return false
-	}
 	for _, p := range owned {
-		structs, err := planets.Structures(ctx, p.ID)
-		if err != nil {
-			continue
-		}
-		for _, code := range game.RankedResearch(structs, techs, n.Profile, e.rng) {
+		structs := structsByPlanet[p.ID]
+		local := n.Profile
+		local.Phase = game.DevelopmentTier(structs, techs)
+		for _, code := range game.RankedResearch(structs, techs, local, e.rng) {
 			err := queues.StartResearch(ctx, n.Universe, n.UserID, p.ID, code)
 			if err == nil {
 				return true
@@ -120,19 +159,13 @@ func (e *EventEngine) npcResearchDecide(ctx context.Context, n store.NPC, owned 
 // npcUnitDecide tries to queue one batch of ships or defense. It works through
 // the NPC's planets and, on each, walks the legal units in weighted-random
 // order until one is accepted; soft failures fall through.
-func (e *EventEngine) npcUnitDecide(ctx context.Context, n store.NPC, owned []store.OwnedPlanet) bool {
-	planets := store.NewPlanetStore(e.db)
+func (e *EventEngine) npcUnitDecide(ctx context.Context, n store.NPC, owned []store.OwnedPlanet, techs map[string]int, structsByPlanet map[int64]map[string]int) bool {
 	queues := store.NewQueueStore(e.db)
-	techs, err := planets.Techs(ctx, n.UserID)
-	if err != nil {
-		return false
-	}
 	for _, p := range owned {
-		structs, err := planets.Structures(ctx, p.ID)
-		if err != nil {
-			continue
-		}
-		for _, code := range game.RankedUnits(structs, techs, n.Profile, e.rng) {
+		structs := structsByPlanet[p.ID]
+		local := n.Profile
+		local.Phase = game.DevelopmentTier(structs, techs)
+		for _, code := range game.RankedUnits(structs, techs, local, e.rng) {
 			def, ok := game.Get(code)
 			if !ok {
 				continue
