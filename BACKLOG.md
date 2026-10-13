@@ -202,15 +202,26 @@ Read first; one item per session. Keep this file short.
   with an eye icon in the actions column. Tests:
   `internal/web/galaxy_test.go`, `internal/integration/galaxy_spy_test.go`.
 
+- **Alliance diplomacy** — NAP / war declarations between alliances (follow-up to
+  I6). One live relationship per unordered pair, lifecycle `PROPOSED → ACTIVE →
+  ENDED` (plus `REJECTED` / `WITHDRAWN`): a **war** is unilateral (active at
+  once), a **NAP** is a proposal the target's leader accepts or rejects; the
+  proposer may withdraw, and either leader may end an active pact (peace /
+  cancel). Leader-only (`CanManageAlliance`), transactional in `AllianceStore`
+  (`ProposeDiplomacy` / `RespondDiplomacy` / `WithdrawDiplomacy` /
+  `EndDiplomacy` / `Diplomacy` / `Targets`). New internal **Diplomacy** tab
+  (nav: Diplomacy) with the declaration form and per-relation actions; active
+  pacts/wars also show on the public alliance profile. `alliance_diplomacy`
+  table (migration `0011`, partial unique index on the live pair). Tests:
+  `internal/store/alliance_store_test.go`, `internal/web/alliance_test.go`,
+  `internal/integration/diplomacy_test.go`.
+
 ## Todo (ordered)
 
-**Next up — start here:** build **Alliance diplomacy** — NAP/war declarations
-between alliances (follow-up to I6; membership, ranks, applications and the
-shared board already land). Pick up at `AllianceStore` and the alliance
-screens.
+**Next up — start here:** build **Seasonal lifecycle** — automatic archive/reset
+at `ENDS_AT` and round seeding. Pick up at `internal/config` `ENDS_AT` and the
+scheduler's universe lifecycle.
 
-- [ ] **Alliance diplomacy** — NAP/war declarations between alliances (follow-up
-      to I6; membership, ranks, applications and the shared board already land).
 - [ ] **Seasonal lifecycle** — automatic archive/reset at `ENDS_AT`; round seeding.
 - [ ] **JSON API** — thin `/api/v1` surface for tooling/bots.
 - [ ] **Anti-farm / noob protection** — optional points-ratio guard.
@@ -348,7 +359,7 @@ build task in `info/sessions/`:
    Explosive Projectiles, Energy Focusing) can gate them.
 
 **Bigger but still self-contained** (own tables, no external dependency):
-Alliances (`I6`, *done* — diplomacy still open), Trade/market (`I7`, *done*),
+Alliances (`I6`, *done* — diplomacy now landed too), Trade/market (`I7`, *done*),
 Events feed (`I3`, *done* — derived, no table), Vacation mode + sanctions
 (`I9`, *done* — scheduler-supported).
 

@@ -145,6 +145,11 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /alliance/internal/settings", h.requireUser(h.AllianceSettingsPage))
 	mux.HandleFunc("POST /alliance/internal/settings", h.requireUser(h.AllianceSettingsSubmit))
 	mux.HandleFunc("POST /alliance/internal/close", h.requireUser(h.AllianceCloseSubmit))
+	mux.HandleFunc("GET /alliance/internal/diplomacy", h.requireUser(h.AllianceDiplomacyPage))
+	mux.HandleFunc("POST /alliance/internal/diplomacy/propose", h.requireUser(h.AllianceDiplomacyProposeSubmit))
+	mux.HandleFunc("POST /alliance/internal/diplomacy/{id}/respond", h.requireUser(h.AllianceDiplomacyRespondSubmit))
+	mux.HandleFunc("POST /alliance/internal/diplomacy/{id}/withdraw", h.requireUser(h.AllianceDiplomacyWithdrawSubmit))
+	mux.HandleFunc("POST /alliance/internal/diplomacy/{id}/end", h.requireUser(h.AllianceDiplomacyEndSubmit))
 	mux.HandleFunc("POST /alliance/{id}/join", h.requireUser(h.AllianceJoinSubmit))
 	mux.HandleFunc("POST /alliance/{id}/apply", h.requireUser(h.AllianceApplySubmit))
 	mux.HandleFunc("GET /alliance/{id}", h.requireUser(h.AllianceProfilePage))
@@ -318,6 +323,12 @@ func msg(err error) string {
 		return "That alliance is closed — send an application instead."
 	case errors.Is(err, store.ErrForbidden):
 		return "You do not have the rights to do that."
+	case errors.Is(err, store.ErrDiplomacyExists):
+		return "You already have a relationship with that alliance."
+	case errors.Is(err, store.ErrDiplomacySelf):
+		return "You cannot open diplomacy with your own alliance."
+	case errors.Is(err, store.ErrDiplomacyKind):
+		return "Unknown diplomacy kind."
 	case errors.Is(err, store.ErrNoTradingPost):
 		return "Build a Trading Post on that planet first."
 	case errors.Is(err, store.ErrTradeSlotsFull):
@@ -1550,6 +1561,18 @@ func (h *Handler) memberContext(ctx context.Context, userID int64) (*store.Allia
 	return a, m, true
 }
 
+// activeDiplomacy returns an alliance's currently active (NAP/war) relations.
+func (h *Handler) activeDiplomacy(ctx context.Context, allianceID int64) []store.AllianceDiplomacy {
+	rels, _ := h.alliances.Diplomacy(ctx, allianceID)
+	var out []store.AllianceDiplomacy
+	for _, r := range rels {
+		if r.Status == store.DiplomacyActive {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // allianceDetailView builds the header detail (points summed over members) and
 // the member list for an alliance.
 func (h *Handler) allianceDetailView(ctx context.Context, a *store.Alliance, scores map[int64]float64) (*allianceDetail, []store.AllianceMember) {
@@ -1586,6 +1609,7 @@ func (h *Handler) allianceScaffold(w http.ResponseWriter, r *http.Request, tab s
 		CanManageApplications: m.Rank.CanManageApplications(),
 		CanModerateBoard:      m.Rank.CanModerateBoard(),
 		CanManageAlliance:     m.Rank.CanManageAlliance(),
+		CanManageDiplomacy:    m.Rank.CanManageAlliance(),
 	}
 	detail, members := h.allianceDetailView(ctx, a, h.allianceScores(ctx))
 	d.Alliance = detail
@@ -1656,6 +1680,10 @@ func (h *Handler) AllianceProfilePage(w http.ResponseWriter, r *http.Request) {
 	detail, members := h.allianceDetailView(ctx, a, h.allianceScores(ctx))
 	d.Alliance = detail
 	d.Members = newMemberRows(members, userID)
+	for _, rel := range h.activeDiplomacy(ctx, id) {
+		row := newDiplomacyRows([]store.AllianceDiplomacy{rel}, id, false)
+		d.Diplomacy = append(d.Diplomacy, row...)
+	}
 	if _, m, ok := h.memberContext(ctx, userID); ok {
 		d.InAlliance = true
 		d.IsMyAlliance = m.AllianceID == id
@@ -1882,6 +1910,93 @@ func (h *Handler) AllianceCloseSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 	err := h.alliances.Close(r.Context(), userID, m.AllianceID)
 	flashRedirect(w, r, "/alliance", "Alliance closed.", msg(err))
+}
+
+// AllianceDiplomacyPage lists NAP/war relationships and (for leaders) the form
+// to declare a new one.
+func (h *Handler) AllianceDiplomacyPage(w http.ResponseWriter, r *http.Request) {
+	d, a, ok := h.allianceScaffold(w, r, "diplomacy")
+	if !ok {
+		return
+	}
+	rels, _ := h.alliances.Diplomacy(r.Context(), a.ID)
+	d.Diplomacy = newDiplomacyRows(rels, a.ID, d.CanManageDiplomacy)
+	if d.CanManageDiplomacy {
+		if targets, err := h.alliances.Targets(r.Context(), h.universeCode, a.ID); err == nil {
+			for _, t := range targets {
+				d.Targets = append(d.Targets, allianceListRow{ID: t.ID, Tag: t.Tag, Name: t.Name})
+			}
+		}
+	}
+	h.render(w, "alliance", http.StatusOK, d)
+}
+
+func (h *Handler) AllianceDiplomacyProposeSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	_, m, ok := h.memberContext(r.Context(), userID)
+	if !ok {
+		flashRedirect(w, r, "/alliance", "", "You are not in an alliance.")
+		return
+	}
+	targetID, _ := strconv.ParseInt(r.FormValue("targetID"), 10, 64)
+	kind := r.FormValue("kind")
+	message := strings.TrimSpace(r.FormValue("message"))
+	if targetID == 0 {
+		flashRedirect(w, r, "/alliance/internal/diplomacy", "", "Choose an alliance to address.")
+		return
+	}
+	if v := validateDiplomacyMessage(message); v != "" {
+		flashRedirect(w, r, "/alliance/internal/diplomacy", "", v)
+		return
+	}
+	_, err := h.alliances.ProposeDiplomacy(r.Context(), userID, m.AllianceID, targetID, kind, message)
+	flashRedirect(w, r, "/alliance/internal/diplomacy", "Declaration sent.", msg(err))
+}
+
+func (h *Handler) AllianceDiplomacyRespondSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	accept := r.FormValue("decision") == "accept"
+	err := h.alliances.RespondDiplomacy(r.Context(), userID, id, accept)
+	flashRedirect(w, r, "/alliance/internal/diplomacy", "Response recorded.", msg(err))
+}
+
+func (h *Handler) AllianceDiplomacyWithdrawSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	err := h.alliances.WithdrawDiplomacy(r.Context(), userID, id)
+	flashRedirect(w, r, "/alliance/internal/diplomacy", "Declaration withdrawn.", msg(err))
+}
+
+func (h *Handler) AllianceDiplomacyEndSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	err := h.alliances.EndDiplomacy(r.Context(), userID, id)
+	flashRedirect(w, r, "/alliance/internal/diplomacy", "Relationship ended.", msg(err))
+}
+
+func newDiplomacyRows(rels []store.AllianceDiplomacy, myAllianceID int64, canManage bool) []allianceDiplomacyRow {
+	var out []allianceDiplomacyRow
+	for _, d := range rels {
+		row := allianceDiplomacyRow{
+			ID: d.ID, Kind: d.Kind, Status: d.Status, Message: d.Message,
+			When: d.CreatedAt.Format("2006-01-02 15:04"),
+		}
+		if d.ProposerID == myAllianceID {
+			row.Outgoing = true
+			row.OtherID, row.OtherTag, row.OtherName = d.TargetID, d.TargetTag, d.TargetName
+		} else {
+			row.OtherID, row.OtherTag, row.OtherName = d.ProposerID, d.ProposerTag, d.ProposerName
+		}
+		row.CanRespond = canManage && !row.Outgoing && d.Status == store.DiplomacyProposed
+		row.CanWithdraw = canManage && row.Outgoing && d.Status == store.DiplomacyProposed
+		row.CanEnd = canManage && d.Status == store.DiplomacyActive
+		if d.DecidedAt.Valid {
+			row.Decided = d.DecidedAt.Time.Format("2006-01-02 15:04")
+		}
+		out = append(out, row)
+	}
+	return out
 }
 
 func newApplicationRows(apps []store.AllianceApplication) []allianceApplicationRow {

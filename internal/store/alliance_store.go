@@ -52,6 +52,32 @@ func (r AllianceRank) CanPost() bool {
 	return r == RankMember || r == RankOfficer || r == RankLeader
 }
 
+// Alliance diplomacy kinds and lifecycle states.
+const (
+	DiplomacyWar = "WAR"
+	DiplomacyNAP = "NAP"
+)
+
+const (
+	DiplomacyProposed  = "PROPOSED"
+	DiplomacyActive    = "ACTIVE"
+	DiplomacyRejected  = "REJECTED"
+	DiplomacyWithdrawn = "WITHDRAWN"
+	DiplomacyEnded     = "ENDED"
+)
+
+// ParseDiplomacyKind normalises a user-supplied kind (WAR | NAP).
+func ParseDiplomacyKind(s string) (string, bool) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case DiplomacyWar:
+		return DiplomacyWar, true
+	case DiplomacyNAP:
+		return DiplomacyNAP, true
+	default:
+		return "", false
+	}
+}
+
 // Membership is the caller's alliance and rank.
 type Membership struct {
 	AllianceID int64
@@ -676,4 +702,254 @@ func requireRow(res sql.Result) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// ---- diplomacy ----
+
+// Targets lists the alliances a diplomacy action may be aimed at: every other
+// alliance in the universe.
+func (s *AllianceStore) Targets(ctx context.Context, universeCode string, excludeID int64) ([]Alliance, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT a.id, a.tag, a.name
+		FROM alliances a
+		WHERE a.universe_id = (SELECT id FROM universes WHERE code_name = $1)
+		  AND a.id <> $2
+		ORDER BY a.name
+	`, universeCode, excludeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Alliance
+	for rows.Next() {
+		var a Alliance
+		if err := rows.Scan(&a.ID, &a.Tag, &a.Name); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// Diplomacy lists every relationship (all states) an alliance is party to,
+// active first then most recent.
+func (s *AllianceStore) Diplomacy(ctx context.Context, allianceID int64) ([]AllianceDiplomacy, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT d.id, d.kind, d.status, d.message,
+		       d.proposer_id, COALESCE(pa.tag, ''), COALESCE(pa.name, ''),
+		       d.target_id,   COALESCE(ta.tag, ''), COALESCE(ta.name, ''),
+		       d.created_at, d.decided_at
+		FROM alliance_diplomacy d
+		LEFT JOIN alliances pa ON pa.id = d.proposer_id
+		LEFT JOIN alliances ta ON ta.id = d.target_id
+		WHERE d.proposer_id = $1 OR d.target_id = $1
+		ORDER BY (d.status = 'ACTIVE') DESC, (d.status = 'PROPOSED') DESC, d.created_at DESC
+	`, allianceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []AllianceDiplomacy
+	for rows.Next() {
+		var d AllianceDiplomacy
+		if err := rows.Scan(&d.ID, &d.Kind, &d.Status, &d.Message,
+			&d.ProposerID, &d.ProposerTag, &d.ProposerName,
+			&d.TargetID, &d.TargetTag, &d.TargetName,
+			&d.CreatedAt, &d.DecidedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+// ProposeDiplomacy opens a relationship with another alliance. A war is
+// declared unilaterally (ACTIVE at once); a NAP is a proposal the target must
+// accept. The actor must be the alliance's leader.
+func (s *AllianceStore) ProposeDiplomacy(ctx context.Context, actorID, allianceID, targetID int64, kind, message string) (int64, error) {
+	if allianceID == targetID {
+		return 0, ErrDiplomacySelf
+	}
+	kind, ok := ParseDiplomacyKind(kind)
+	if !ok {
+		return 0, ErrDiplomacyKind
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	actor, err := actorRankTx(ctx, tx, allianceID, actorID)
+	if err != nil {
+		return 0, err
+	}
+	if !actor.CanManageAlliance() {
+		return 0, ErrForbidden
+	}
+
+	var myUniverse, theirUniverse string
+	if err := tx.QueryRowContext(ctx,
+		`SELECT universe_id::text FROM alliances WHERE id = $1`, allianceID).Scan(&myUniverse); err != nil {
+		return 0, err
+	}
+	err = tx.QueryRowContext(ctx,
+		`SELECT universe_id::text FROM alliances WHERE id = $1`, targetID).Scan(&theirUniverse)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, err
+	}
+	if myUniverse != theirUniverse {
+		return 0, ErrNotFound
+	}
+
+	status := DiplomacyProposed
+	if kind == DiplomacyWar {
+		status = DiplomacyActive
+	}
+
+	var id int64
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO alliance_diplomacy (universe_id, proposer_id, target_id, kind, status, message, decided_at)
+		VALUES ($1, $2, $3, $4, $5::varchar, $6, CASE WHEN $5::varchar = 'ACTIVE' THEN NOW() ELSE NULL END)
+		RETURNING id
+	`, myUniverse, allianceID, targetID, kind, status, message).Scan(&id)
+	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			return 0, ErrDiplomacyExists
+		}
+		return 0, err
+	}
+	return id, tx.Commit()
+}
+
+// RespondDiplomacy accepts or rejects a pending NAP. Only the target alliance's
+// leader may respond.
+func (s *AllianceStore) RespondDiplomacy(ctx context.Context, actorID, relationID int64, accept bool) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var targetID int64
+	var status string
+	err = tx.QueryRowContext(ctx,
+		`SELECT target_id, status FROM alliance_diplomacy WHERE id = $1 FOR UPDATE`,
+		relationID).Scan(&targetID, &status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if status != DiplomacyProposed {
+		return ErrNotFound
+	}
+	rank, err := actorRankTx(ctx, tx, targetID, actorID)
+	if err != nil {
+		return err
+	}
+	if !rank.CanManageAlliance() {
+		return ErrForbidden
+	}
+	newStatus := DiplomacyRejected
+	if accept {
+		newStatus = DiplomacyActive
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE alliance_diplomacy SET status = $2, decided_at = NOW() WHERE id = $1`,
+		relationID, newStatus); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// WithdrawDiplomacy cancels the proposer's own pending NAP.
+func (s *AllianceStore) WithdrawDiplomacy(ctx context.Context, actorID, relationID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var proposerID int64
+	var status string
+	err = tx.QueryRowContext(ctx,
+		`SELECT proposer_id, status FROM alliance_diplomacy WHERE id = $1 FOR UPDATE`,
+		relationID).Scan(&proposerID, &status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if status != DiplomacyProposed {
+		return ErrNotFound
+	}
+	rank, err := actorRankTx(ctx, tx, proposerID, actorID)
+	if err != nil {
+		return err
+	}
+	if !rank.CanManageAlliance() {
+		return ErrForbidden
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE alliance_diplomacy SET status = 'WITHDRAWN', decided_at = NOW() WHERE id = $1`,
+		relationID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// EndDiplomacy ends an active relationship (peace / cancel NAP). Either party's
+// leader may do so.
+func (s *AllianceStore) EndDiplomacy(ctx context.Context, actorID, relationID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var proposerID, targetID int64
+	var status string
+	err = tx.QueryRowContext(ctx,
+		`SELECT proposer_id, target_id, status FROM alliance_diplomacy WHERE id = $1 FOR UPDATE`,
+		relationID).Scan(&proposerID, &targetID, &status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if status != DiplomacyActive {
+		return ErrNotFound
+	}
+
+	allowed := false
+	for _, side := range []int64{proposerID, targetID} {
+		rank, rankErr := actorRankTx(ctx, tx, side, actorID)
+		if rankErr == nil {
+			if rank.CanManageAlliance() {
+				allowed = true
+			}
+			break
+		}
+		if !errors.Is(rankErr, ErrNotMember) {
+			return rankErr
+		}
+	}
+	if !allowed {
+		return ErrForbidden
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE alliance_diplomacy SET status = 'ENDED', decided_at = NOW() WHERE id = $1`,
+		relationID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

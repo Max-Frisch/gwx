@@ -108,6 +108,20 @@
 <h2>Members</h2>
 {{template "alliance-members" .}}
 
+{{if .Diplomacy}}
+<h2>Diplomacy</h2>
+<div class="panel">
+  {{range .Diplomacy}}
+  <div class="row" style="padding:4px 0">
+    {{if eq .Kind "WAR"}}<span class="tag bad">at war</span>{{else}}<span class="tag ok">NAP</span>{{end}}
+    <a href="/alliance/{{.OtherID}}">[{{.OtherTag}}] {{.OtherName}}</a>
+    <span class="spacer"></span>
+    <span class="muted">{{.When}}</span>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
 {{else}}
 {{/* internal member area */}}
 {{template "alliance-nav" .}}
@@ -123,6 +137,62 @@
 {{else if eq .Tab "members"}}
 <h2>Members</h2>
 {{template "alliance-members" .}}
+
+{{else if eq .Tab "diplomacy"}}
+<h2>Diplomacy</h2>
+{{if .CanManageDiplomacy}}
+<div class="panel" style="max-width:560px">
+  <h3 style="margin-top:0">New declaration</h3>
+  <form method="post" action="/alliance/internal/diplomacy/propose">
+    <div class="field"><label>Alliance</label>
+      <select name="targetID" required style="width:100%">
+        <option value="">— choose an alliance —</option>
+        {{range .Targets}}<option value="{{.ID}}">[{{.Tag}}] {{.Name}}</option>{{end}}
+      </select>
+    </div>
+    <div class="field"><label>Kind</label>
+      <select name="kind" style="width:100%">
+        <option value="NAP">Non-aggression pact</option>
+        <option value="WAR">War declaration</option>
+      </select>
+    </div>
+    <div class="field"><label>Message</label><textarea name="message" rows="3" maxlength="500" style="width:100%"></textarea></div>
+    <button type="submit">Send declaration</button>
+    <small class="muted">War takes effect immediately; a NAP must be accepted by the other alliance.</small>
+  </form>
+</div>
+{{else}}
+<div class="panel muted">Only the founder may conduct diplomacy.</div>
+{{end}}
+
+{{range .Diplomacy}}
+<div class="panel">
+  <div class="row">
+    {{if eq .Kind "WAR"}}<span class="tag bad">war</span>{{else}}<span class="tag ok">NAP</span>{{end}}
+    <b><a href="/alliance/{{.OtherID}}">[{{.OtherTag}}] {{.OtherName}}</a></b>
+    <span class="spacer"></span>
+    <span class="tag">{{.Status}}</span>
+    <span class="muted">{{if .Outgoing}}we proposed{{else}}they proposed{{end}} · {{.When}}{{if .Decided}} · decided {{.Decided}}{{end}}</span>
+  </div>
+  {{if .Message}}<p style="white-space:pre-wrap">{{.Message}}</p>{{end}}
+  {{if or .CanRespond .CanWithdraw .CanEnd}}
+  <div class="row">
+    {{if .CanRespond}}
+    <form method="post" action="/alliance/internal/diplomacy/{{.ID}}/respond"><input type="hidden" name="decision" value="accept"><button type="submit">Accept</button></form>
+    <form method="post" action="/alliance/internal/diplomacy/{{.ID}}/respond"><input type="hidden" name="decision" value="reject"><button class="ghost" type="submit">Reject</button></form>
+    {{else if .CanWithdraw}}
+    <form method="post" action="/alliance/internal/diplomacy/{{.ID}}/withdraw"><button class="ghost" type="submit">Withdraw</button></form>
+    {{else if .CanEnd}}
+    <form method="post" action="/alliance/internal/diplomacy/{{.ID}}/end" onsubmit="return confirm('End this relationship?')">
+      <button class="bad" type="submit">{{if eq .Kind "WAR"}}Seek peace{{else}}Cancel pact{{end}}</button>
+    </form>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="panel muted">No diplomacy on record.</div>
+{{end}}
 
 {{else if eq .Tab "board"}}
 <h2>Board</h2>
@@ -225,6 +295,7 @@
 <div class="tabs">
   <a href="/alliance/internal" class="{{if eq .Tab "dashboard"}}active{{end}}">Overview</a>
   <a href="/alliance/internal/members" class="{{if eq .Tab "members"}}active{{end}}">Members</a>
+  <a href="/alliance/internal/diplomacy" class="{{if eq .Tab "diplomacy"}}active{{end}}">Diplomacy</a>
   <a href="/alliance/internal/board" class="{{if eq .Tab "board"}}active{{end}}">Board</a>
   <a href="/alliance/internal/applications" class="{{if eq .Tab "applications"}}active{{end}}">Applications</a>
   <a href="/alliance/internal/settings" class="{{if eq .Tab "settings"}}active{{end}}">Management</a>

@@ -28,6 +28,11 @@ func TestAllianceTemplateRenders(t *testing.T) {
 	apps := []allianceApplicationRow{
 		{ID: 4, AllianceID: 3, Tag: "nWo", Name: "new World order", Username: "bandit", UserID: 9, Message: "let me in", When: "2026-10-12 09:00"},
 	}
+	diplomacy := []allianceDiplomacyRow{
+		{ID: 1, Kind: "WAR", Status: "ACTIVE", OtherID: 5, OtherTag: "Linux", OtherName: "Die Killer Pinguine", When: "2026-10-13 09:00", CanEnd: true},
+		{ID: 2, Kind: "NAP", Status: "PROPOSED", Outgoing: true, OtherID: 6, OtherTag: "PoppR", OtherName: "PoppR", When: "2026-10-13 10:00", CanWithdraw: true},
+		{ID: 3, Kind: "NAP", Status: "PROPOSED", OtherID: 7, OtherTag: "nWo", OtherName: "new World order", When: "2026-10-13 11:00", CanRespond: true},
+	}
 
 	cases := []allianceData{
 		{
@@ -62,6 +67,12 @@ func TestAllianceTemplateRenders(t *testing.T) {
 		{
 			baseData: baseData{Title: "Alliance"}, Tab: "settings",
 			Alliance: detail, InAlliance: true, CanManageAlliance: true,
+		},
+		{
+			baseData: baseData{Title: "Alliance"}, Tab: "diplomacy",
+			Alliance: detail, InAlliance: true, CanManageDiplomacy: true,
+			Diplomacy: diplomacy,
+			Targets:   []allianceListRow{{ID: 5, Tag: "Linux", Name: "Die Killer Pinguine"}},
 		},
 	}
 	for _, d := range cases {

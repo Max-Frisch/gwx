@@ -59,3 +59,12 @@ func validatePost(title, body string) string {
 	}
 	return ""
 }
+
+// validateDiplomacyMessage bounds the optional message that accompanies a NAP or
+// war declaration.
+func validateDiplomacyMessage(message string) string {
+	if len(message) > 500 {
+		return "Message must be at most 500 characters"
+	}
+	return ""
+}

@@ -170,6 +170,22 @@ type AllianceApplication struct {
 	CreatedAt  time.Time
 }
 
+// AllianceDiplomacy is one NAP/war relationship between two alliances.
+type AllianceDiplomacy struct {
+	ID           int64
+	Kind         string
+	Status       string
+	Message      string
+	ProposerID   int64
+	ProposerTag  string
+	ProposerName string
+	TargetID     int64
+	TargetTag    string
+	TargetName   string
+	CreatedAt    time.Time
+	DecidedAt    sql.NullTime
+}
+
 // AlliancePost is one shared-board entry.
 type AlliancePost struct {
 	ID         int64

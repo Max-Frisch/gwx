@@ -45,3 +45,21 @@ func TestZeroRankHasNoRights(t *testing.T) {
 		t.Error("the zero rank must hold no rights")
 	}
 }
+
+func TestParseDiplomacyKind(t *testing.T) {
+	cases := map[string]string{
+		"WAR":   DiplomacyWar,
+		"war":   DiplomacyWar,
+		" nap ": DiplomacyNAP,
+		"NAP":   DiplomacyNAP,
+	}
+	for in, want := range cases {
+		got, ok := ParseDiplomacyKind(in)
+		if !ok || got != want {
+			t.Errorf("ParseDiplomacyKind(%q) = (%q, %v), want %q", in, got, ok, want)
+		}
+	}
+	if _, ok := ParseDiplomacyKind("trade"); ok {
+		t.Error("unknown kind must not parse")
+	}
+}

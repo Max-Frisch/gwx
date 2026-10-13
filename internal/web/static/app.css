@@ -318,6 +318,7 @@ button.bad:hover, .btn.bad:hover { background: #a83f3f; }
 .tag { font-size: var(--t-xs); padding: 2px var(--s2); border-radius: var(--r1); border: 1px solid #33404f; color: #c2cad8; white-space: nowrap; }
 .tag.ok { color: var(--ok); border-color: rgba(110, 192, 110, .45); }
 .tag.busy { color: #d9b06a; border-color: rgba(217, 176, 106, .45); }
+.tag.bad { color: #e0736a; border-color: rgba(224, 115, 106, .45); }
 
 /* ---- unread badge (sidebar) ---- */
 .badge { margin-left: auto; min-width: 18px; padding: 1px 6px; border-radius: var(--r-pill);

@@ -404,6 +404,24 @@ type alliancePostRow struct {
 	CanDelete  bool
 }
 
+// allianceDiplomacyRow is one NAP/war relationship relative to the viewer's
+// alliance (Outgoing = we are the proposer).
+type allianceDiplomacyRow struct {
+	ID          int64
+	Kind        string
+	Status      string
+	Outgoing    bool
+	OtherID     int64
+	OtherTag    string
+	OtherName   string
+	Message     string
+	When        string
+	Decided     string
+	CanRespond  bool
+	CanWithdraw bool
+	CanEnd      bool
+}
+
 // allianceData backs both the public hub and the internal member area.
 type allianceData struct {
 	baseData
@@ -437,6 +455,11 @@ type allianceData struct {
 
 	// members
 	Members []allianceMemberRow
+
+	// diplomacy
+	Diplomacy          []allianceDiplomacyRow
+	Targets            []allianceListRow
+	CanManageDiplomacy bool
 
 	// board
 	Posts []alliancePostRow
