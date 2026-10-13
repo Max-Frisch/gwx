@@ -42,7 +42,7 @@
     {{if .ActivePlanetID}}
     <div class="planet-box">
       <select onchange="if(this.value)location.href=this.value">
-        {{range .Planets}}<option value="/overview/{{.ID}}" {{if eq .ID $.ActivePlanetID}}selected{{end}}>{{.Name}} · {{coords .Galaxy .System .Position}}</option>{{end}}
+        {{range .Planets}}<option value="/{{$.PlanetRoute}}/{{.ID}}" {{if eq .ID $.ActivePlanetID}}selected{{end}}>{{.Name}} · {{coords .Galaxy .System .Position}}</option>{{end}}
       </select>
       <span class="planet-coords">{{range .Planets}}{{if eq .ID $.ActivePlanetID}}{{coords .Galaxy .System .Position}}{{end}}{{end}}</span>
     </div>

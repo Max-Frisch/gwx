@@ -225,8 +225,36 @@ func (h *Handler) render(w http.ResponseWriter, name string, status int, data an
 	_, _ = buf.WriteTo(w)
 }
 
+// planetPageSections are the route prefixes scoped to a single planet. The
+// planet switcher preserves whichever one the viewer is currently on instead
+// of always dropping them on the overview.
+var planetPageSections = map[string]bool{
+	"overview":  true,
+	"buildings": true,
+	"resources": true,
+	"research":  true,
+	"shipyard":  true,
+	"defense":   true,
+	"fleet":     true,
+	"simulator": true,
+}
+
+// planetSection returns the planet-scoped route prefix of a request path
+// (e.g. "/buildings/5/build" -> "buildings"), falling back to "overview" for
+// paths that are not scoped to a planet.
+func planetSection(path string) string {
+	seg := strings.TrimPrefix(path, "/")
+	if i := strings.IndexByte(seg, '/'); i >= 0 {
+		seg = seg[:i]
+	}
+	if planetPageSections[seg] {
+		return seg
+	}
+	return "overview"
+}
+
 func (h *Handler) base(ctx context.Context, r *http.Request, userID int64, title string, activeID int64) baseData {
-	b := baseData{Title: title, ActivePlanetID: activeID}
+	b := baseData{Title: title, ActivePlanetID: activeID, PlanetSection: planetSection(r.URL.Path)}
 	b.Username, _ = h.auth.Username(ctx, userID)
 	b.Planets, _ = h.planets.ListOwned(ctx, userID)
 	if activeID != 0 {

@@ -18,6 +18,11 @@ type baseData struct {
 	Username       string
 	ActivePlanetID int64
 	Planets        []store.OwnedPlanet
+
+	// PlanetSection is the planet-scoped route the viewer is currently on
+	// (e.g. "buildings"), so the planet switcher can keep the same page when
+	// jumping between planets. Empty means "overview".
+	PlanetSection  string
 	Resources      *resView
 	NavRight       bool
 	MessagesUnread int
@@ -33,6 +38,15 @@ type baseData struct {
 	OnVacation   bool
 	Sanctioned   bool
 	SanctionNote string
+}
+
+// PlanetRoute is the route prefix the planet switcher links to: the page the
+// viewer is currently on, or "overview" for pages not scoped to a planet.
+func (b baseData) PlanetRoute() string {
+	if b.PlanetSection == "" {
+		return "overview"
+	}
+	return b.PlanetSection
 }
 
 type resView struct {
