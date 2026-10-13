@@ -11,10 +11,6 @@ RESEARCH_QUEUE_SLOTS ?= 4
 ENDS_AT        ?=
 DATABASE_URL   ?= postgres://postgres:password@localhost:5433/gwx?sslmode=disable
 
-DB_CONTAINER ?= gwx_postgres
-DB_USER      ?= postgres
-DB_NAME      ?= gwx
-
 export APP_ENV HTTP_ADDR UNIVERSE_CODE UNIVERSE_NAME GAME_SPEED FLEET_SPEED MAX_GALAXIES MAX_SYSTEMS BUILD_QUEUE_SLOTS RESEARCH_QUEUE_SLOTS ENDS_AT DATABASE_URL
 
 .PHONY: run build test lint migrate up down
@@ -31,13 +27,11 @@ test:
 lint:
 	go vet ./...
 
-# Applies every migration in order through the compose Postgres container
-# (no local psql needed). Migrations are idempotent, so this is safe to re-run.
+# Applies pending migrations through the ledger-aware runner (internal/store),
+# which records each file in schema_migrations and skips it on later runs. Safe
+# to re-run against a populated database. Pass a different dir: `make migrate ARGS=path`.
 migrate:
-	@for f in migrations/*.sql; do \
-		echo "applying $$f"; \
-		docker exec -i $(DB_CONTAINER) psql -U $(DB_USER) -d $(DB_NAME) -v ON_ERROR_STOP=1 < $$f || exit 1; \
-	done
+	go run ./cmd/migrate $(ARGS)
 
 up:
 	docker compose up -d

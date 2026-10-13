@@ -231,6 +231,17 @@ Read first; one item per session. Keep this file short.
   `internal/web/research_test.go`, `internal/integration/research_queue_test.go`,
   `internal/game/game_test.go`.
 
+- **Migration ledger** — `make migrate` used to replay every file in
+  `migrations/` on each run and lean on `IF NOT EXISTS`. That broke once `0009`
+  (and now `0012`) dropped a unique index an earlier migration `0001` created:
+  the replay recreated it and failed on a populated database. New
+  `store.Migrate` keeps a `schema_migrations` ledger, applies only pending files
+  (each in its own transaction, ordered, under a Postgres advisory lock), and
+  **baselines** a pre-ledger database on first contact (records the existing
+  files without re-running them). Exposed as `cmd/migrate`; the Makefile target
+  runs it and the integration harness bootstraps through the same runner. Tests:
+  `internal/store/migrate_test.go`, `internal/integration/migrate_test.go`.
+
 ## Todo (ordered)
 
 **Next up — start here:** build **Seasonal lifecycle** — automatic archive/reset

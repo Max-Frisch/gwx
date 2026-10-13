@@ -22,7 +22,7 @@ storage protects a share of its resources from plunder.
 ```bash
 cp .env.example .env          # edit DATABASE_URL if needed
 docker compose up -d          # Postgres 16 on :5433
-make migrate                  # apply migrations/0001_init.sql
+make migrate                  # apply pending migrations (ledger-tracked, idempotent)
 make run                      # http://localhost:8090
 ```
 

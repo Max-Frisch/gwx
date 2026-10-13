@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -165,25 +164,8 @@ func applyMigrations(t *testing.T, db *sql.DB) {
 		t.Fatal("cannot locate migrations")
 	}
 	dir := filepath.Join(filepath.Dir(file), "..", "..", "migrations")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("read migrations dir: %v", err)
-	}
-	var names []string
-	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), ".sql") {
-			names = append(names, e.Name())
-		}
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		body, err := os.ReadFile(filepath.Join(dir, name))
-		if err != nil {
-			t.Fatalf("read %s: %v", name, err)
-		}
-		if _, err := db.Exec(string(body)); err != nil {
-			t.Fatalf("apply %s: %v", name, err)
-		}
+	if _, err := store.Migrate(context.Background(), db, dir); err != nil {
+		t.Fatalf("apply migrations: %v", err)
 	}
 }
 
