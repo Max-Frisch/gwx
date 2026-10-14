@@ -44,7 +44,7 @@
 <table>
   <tr><th>Mission</th><th>From</th><th>Arrives</th></tr>
   {{range .Incoming}}
-  <tr><td class="bad">{{.Mission}}</td><td>{{coords .OriginG .OriginS .OriginP}}</td><td>{{.Remaining}}</td></tr>
+  <tr><td class="bad">{{.Mission}}</td><td>{{.From}}</td><td>{{.Remaining}}</td></tr>
   {{end}}
 </table>
 {{else}}<span class="muted">No incoming fleets detected.</span>{{end}}
