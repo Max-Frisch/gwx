@@ -50,7 +50,7 @@
       <div class="side-group">
         <div class="label">Planet</div>
         <a href="/overview/{{.ActivePlanetID}}" class="{{if eq .Title "Overview"}}active{{end}}"><svg class="ic"><use href="#i-home"/></svg>Overview</a>
-        <a href="/buildings/{{.ActivePlanetID}}" class="{{if or (eq .Title "Buildings") (eq .Title "Resources")}}active{{end}}"><svg class="ic"><use href="#i-build"/></svg>Construction</a>
+        <a href="/buildings/{{.ActivePlanetID}}" class="{{if or (eq .Title "Buildings") (eq .Title "Resources") (eq .Title "Colony Builder")}}active{{end}}"><svg class="ic"><use href="#i-build"/></svg>Construction</a>
         <a href="/research/{{.ActivePlanetID}}" class="{{if eq .Title "Research"}}active{{end}}"><svg class="ic"><use href="#i-flask"/></svg>Research</a>
         <a href="/shipyard/{{.ActivePlanetID}}" class="{{if eq .Title "Shipyard"}}active{{end}}"><svg class="ic"><use href="#i-ship"/></svg>Ships</a>
         <a href="/defense/{{.ActivePlanetID}}" class="{{if eq .Title "Defense"}}active{{end}}"><svg class="ic"><use href="#i-shield"/></svg>Defense</a>
@@ -100,7 +100,7 @@
     </header>
     {{end}}
     <main class="content"><div class="inner">
-      {{if or (eq .Title "Buildings") (eq .Title "Resources")}}{{template "tabs" .}}{{end}}
+      {{if or (eq .Title "Buildings") (eq .Title "Resources") (eq .Title "Colony Builder")}}{{template "tabs" .}}{{end}}
       {{if .Sanctioned}}<div class="error">Your account is sanctioned{{if .SanctionNote}} — {{.SanctionNote}}{{end}}. Actions are restricted; see <a href="/settings/sanction">Settings &rarr; Sanctions</a>.</div>{{end}}
       {{if .OnVacation}}<div class="flash">You are in <a href="/settings/vacation">vacation mode</a> — production is frozen and you cannot attack or be attacked.</div>{{end}}
       {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
@@ -111,6 +111,7 @@
 <div class="tabs">
   <a href="/buildings/{{.ActivePlanetID}}" class="{{if eq .Title "Buildings"}}active{{end}}">Buildings</a>
   <a href="/resources/{{.ActivePlanetID}}" class="{{if eq .Title "Resources"}}active{{end}}">Resources</a>
+  <a href="/builder/{{.ActivePlanetID}}" class="{{if eq .Title "Colony Builder"}}active{{end}}">Colony Builder</a>
 </div>
 {{end}}
 

@@ -31,6 +31,11 @@ type EventEngine struct {
 	npcRaid NPCRaidConfig
 	// npcRaidLeft is the remaining ATTACK dispatches this tick may spend.
 	npcRaidLeft int
+	// builderBatch caps how many Colony Builder accounts one tick drives, and
+	// builderInterval is how often each enabled account is re-checked (see
+	// SetBuilderBatch / SetBuilderInterval).
+	builderBatch    int
+	builderInterval time.Duration
 }
 
 // NPCRaidConfig is the opt-in NPC offense configuration. Enabled=false (the
@@ -50,10 +55,12 @@ const defaultNPCRaidMax = 5
 // NewEventEngine constructs an EventEngine.
 func NewEventEngine(db *sql.DB) *EventEngine {
 	return &EventEngine{
-		db:       db,
-		rng:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		npcBatch: defaultNPCBbatch,
-		npcRaid:  NPCRaidConfig{ChanceScale: 1, MaxPerTick: defaultNPCRaidMax},
+		db:              db,
+		rng:             rand.New(rand.NewSource(time.Now().UnixNano())),
+		npcBatch:        defaultNPCBbatch,
+		npcRaid:         NPCRaidConfig{ChanceScale: 1, MaxPerTick: defaultNPCRaidMax},
+		builderBatch:    defaultBuilderBatch,
+		builderInterval: defaultBuilderInterval,
 	}
 }
 
@@ -158,6 +165,7 @@ func (e *EventEngine) processDue(ctx context.Context) {
 	e.processQueues(ctx)
 	e.processFleets(ctx)
 	e.processNPCs(ctx)
+	e.processColonyBuilder(ctx)
 }
 
 // processVacations auto-ends any vacation whose 21-day window has elapsed. The

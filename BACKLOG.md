@@ -202,6 +202,20 @@ Read first; one item per session. Keep this file short.
   with an eye icon in the actions column. Tests:
   `internal/web/galaxy_test.go`, `internal/integration/galaxy_spy_test.go`.
 
+- **Colony Builder (`B1`)** — an account-wide target-level template per building
+  (`users.build_template` + `builder_enabled` + `builder_next_check_at`, migration
+  `0014`); the durable scheduler's new `processColonyBuilder` phase fills every
+  owned planet's free construction slots toward it, reusing
+  `QueueStore.StartBuilding` so costs/prereqs/fields/slot-cap/vacation/sanction
+  all apply unchanged. Pure `game.BuildPlan`/`ExpandTemplate` auto-expand
+  prerequisites transitively and order by fraction-of-target; the plan counts
+  already-queued levels so it never overshoots. New Construction **Colony
+  Builder** tab (`/builder/{id}` editor + `POST /builder/{id}/run` "queue now"),
+  per-planet progress, `BUILDER_BATCH`/`BUILDER_INTERVAL_SECONDS` knobs. Tests:
+  `internal/game/builder_test.go`, `internal/web/builder_test.go`,
+  `internal/integration/builder_test.go`. Plan:
+  `info/sessions/B1-colony-builder.md`.
+
 - **Alliance diplomacy** — NAP / war declarations between alliances (follow-up to
   I6). One live relationship per unordered pair, lifecycle `PROPOSED → ACTIVE →
   ENDED` (plus `REJECTED` / `WITHDRAWN`): a **war** is unilateral (active at

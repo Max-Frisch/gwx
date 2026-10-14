@@ -49,6 +49,12 @@ type Config struct {
 	NPCRaid       bool
 	NPCRaidChance float64
 	NPCRaidMax    int
+
+	// BuilderBatch caps how many Colony Builder accounts one scheduler tick may
+	// drive, and BuilderIntervalSeconds is how often each enabled account is
+	// re-checked. Default 25 / 30s.
+	BuilderBatch           int
+	BuilderIntervalSeconds int
 }
 
 // Load reads and validates configuration. DATABASE_URL is the only required
@@ -111,25 +117,35 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	builderBatch, err := intEnv("BUILDER_BATCH", 25)
+	if err != nil {
+		return nil, err
+	}
+	builderInterval, err := intEnv("BUILDER_INTERVAL_SECONDS", 30)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
-		Env:                getenv("APP_ENV", "development"),
-		HTTPAddr:           getenv("HTTP_ADDR", ":8090"),
-		DatabaseURL:        dbURL,
-		UniverseCode:       getenv("UNIVERSE_CODE", "universe_gwx_1"),
-		UniverseName:       getenv("UNIVERSE_NAME", "Classic Universe"),
-		GameSpeed:          gameSpeed,
-		FleetSpeed:         fleetSpeed,
-		MaxGalaxies:        maxGal,
-		MaxSystems:         maxSys,
-		EndsAt:             endsAt,
-		BuildQueueSlots:    queueSlots,
-		ResearchQueueSlots: researchSlots,
-		NPCCount:           npcCount,
-		NPCBatch:           npcBatch,
-		NPCRaid:            npcRaid,
-		NPCRaidChance:      npcRaidChance,
-		NPCRaidMax:         npcRaidMax,
+		Env:                    getenv("APP_ENV", "development"),
+		HTTPAddr:               getenv("HTTP_ADDR", ":8090"),
+		DatabaseURL:            dbURL,
+		UniverseCode:           getenv("UNIVERSE_CODE", "universe_gwx_1"),
+		UniverseName:           getenv("UNIVERSE_NAME", "Classic Universe"),
+		GameSpeed:              gameSpeed,
+		FleetSpeed:             fleetSpeed,
+		MaxGalaxies:            maxGal,
+		MaxSystems:             maxSys,
+		EndsAt:                 endsAt,
+		BuildQueueSlots:        queueSlots,
+		ResearchQueueSlots:     researchSlots,
+		NPCCount:               npcCount,
+		NPCBatch:               npcBatch,
+		NPCRaid:                npcRaid,
+		NPCRaidChance:          npcRaidChance,
+		NPCRaidMax:             npcRaidMax,
+		BuilderBatch:           builderBatch,
+		BuilderIntervalSeconds: builderInterval,
 	}, nil
 }
 

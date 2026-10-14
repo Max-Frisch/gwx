@@ -68,6 +68,8 @@ func main() {
 	if cfg.NPCRaid {
 		log.Printf("[INIT] NPC raiding enabled (chance x%.2f, max %d/tick)", cfg.NPCRaidChance, cfg.NPCRaidMax)
 	}
+	eventEngine.SetBuilderBatch(cfg.BuilderBatch)
+	eventEngine.SetBuilderInterval(time.Duration(cfg.BuilderIntervalSeconds) * time.Second)
 	go eventEngine.StartScheduler(ctx)
 
 	mux := http.NewServeMux()

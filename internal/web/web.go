@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"gwx/internal/auth"
+	"gwx/internal/engine"
 	"gwx/internal/game"
 	"gwx/internal/store"
 )
@@ -49,6 +50,7 @@ type Handler struct {
 	stats        *store.StatsStore
 	alliances    *store.AllianceStore
 	trade        *store.TradeStore
+	builders     *store.BuilderStore
 	tmpl         *template.Template
 }
 
@@ -73,6 +75,7 @@ func New(db *sql.DB, universeCode string) *Handler {
 		stats:        store.NewStatsStore(db),
 		alliances:    store.NewAllianceStore(db),
 		trade:        store.NewTradeStore(db),
+		builders:     store.NewBuilderStore(db),
 		tmpl:         tmpl,
 	}
 }
@@ -94,6 +97,9 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /resources/{id}", h.requireUser(h.ResourcesPage))
 	mux.HandleFunc("GET /partials/resources/{id}", h.requireUser(h.ResourceCellsPartial))
 	mux.HandleFunc("GET /partials/queue/{id}", h.requireUser(h.QueuePartial))
+	mux.HandleFunc("GET /builder/{id}", h.requireUser(h.BuilderPage))
+	mux.HandleFunc("POST /builder/{id}", h.requireUser(h.BuilderSubmit))
+	mux.HandleFunc("POST /builder/{id}/run", h.requireUser(h.BuilderRunSubmit))
 	mux.HandleFunc("GET /research/{id}", h.requireUser(h.ResearchPage))
 	mux.HandleFunc("POST /research/{id}/start", h.requireUser(h.ResearchSubmit))
 	mux.HandleFunc("GET /shipyard/{id}", h.requireUser(h.ShipyardPage))
@@ -232,6 +238,7 @@ func (h *Handler) render(w http.ResponseWriter, name string, status int, data an
 var planetPageSections = map[string]bool{
 	"overview":  true,
 	"buildings": true,
+	"builder":   true,
 	"resources": true,
 	"research":  true,
 	"shipyard":  true,
@@ -603,6 +610,134 @@ func (h *Handler) buildingsView(ctx context.Context, r *http.Request, userID, id
 		if rows := byGroup[g]; len(rows) > 0 {
 			d.Sections = append(d.Sections, buildingSection{Name: g, Rows: rows})
 		}
+	}
+	return d, true
+}
+
+// maxBuilderTarget caps a template target so the number input stays sane.
+const maxBuilderTarget = 50
+
+// BuilderPage is the Colony Builder: an account-wide target-level template the
+// durable scheduler drives every owned planet toward.
+func (h *Handler) BuilderPage(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id := pathID(r)
+	d, ok := h.builderView(r.Context(), r, userID, id)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	h.render(w, "builder", http.StatusOK, d)
+}
+
+// BuilderSubmit saves the account's template and enabled flag.
+func (h *Handler) BuilderSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id := pathID(r)
+	if _, ok := h.owned(r.Context(), userID, id); !ok {
+		http.NotFound(w, r)
+		return
+	}
+	tpl := game.BuildTemplate{}
+	for _, def := range game.DefsOf(game.KindBuilding) {
+		raw := strings.TrimSpace(r.FormValue("target_" + def.Code))
+		if raw == "" {
+			continue
+		}
+		n, err := strconv.Atoi(raw)
+		if err != nil || n <= 0 {
+			continue
+		}
+		if n > maxBuilderTarget {
+			n = maxBuilderTarget
+		}
+		tpl[def.Code] = n
+	}
+	okMsg, errMsg := "Builder plan saved.", ""
+	if err := h.builders.SaveTemplate(r.Context(), userID, tpl, r.FormValue("enabled") != ""); err != nil {
+		okMsg, errMsg = "", "Could not save the builder plan."
+	}
+	if h.renderHXContent(w, r, userID, "builder", id, okMsg, errMsg) {
+		return
+	}
+	flashRedirect(w, r, "/builder/"+strconv.FormatInt(id, 10), okMsg, errMsg)
+}
+
+// BuilderRunSubmit queues the plan onto the active planet immediately, without
+// waiting for the scheduler's next cadence.
+func (h *Handler) BuilderRunSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	id := pathID(r)
+	if _, ok := h.owned(r.Context(), userID, id); !ok {
+		http.NotFound(w, r)
+		return
+	}
+	tpl, _, err := h.builders.LoadTemplate(r.Context(), userID)
+	okMsg, errMsg := "Construction queued.", ""
+	if err != nil {
+		okMsg, errMsg = "", "Could not load the builder plan."
+	} else if len(tpl) == 0 {
+		okMsg, errMsg = "", "Set a target level for at least one building first."
+	} else if err := engine.FillPlanetTowardTemplate(r.Context(), h.db, h.universeCode, userID, id, tpl); err != nil {
+		okMsg, errMsg = "", msg(err)
+	}
+	if h.renderHXContent(w, r, userID, "builder", id, okMsg, errMsg) {
+		return
+	}
+	flashRedirect(w, r, "/builder/"+strconv.FormatInt(id, 10), okMsg, errMsg)
+}
+
+// builderView assembles the Colony Builder page data for one active planet.
+func (h *Handler) builderView(ctx context.Context, r *http.Request, userID, id int64) (builderData, bool) {
+	if _, ok := h.owned(ctx, userID, id); !ok {
+		return builderData{}, false
+	}
+	tpl, enabled, _ := h.builders.LoadTemplate(ctx, userID)
+	structs, _ := h.planets.Structures(ctx, id)
+	effective := game.ExpandTemplate(tpl)
+
+	d := builderData{baseData: h.base(ctx, r, userID, "Colony Builder", id)}
+	d.Enabled = enabled
+	d.HasTemplate = len(tpl) > 0
+
+	byGroup := map[string][]builderRow{}
+	for _, def := range sortedDefs(game.KindBuilding) {
+		row := builderRow{
+			Code:      def.Code,
+			Name:      def.Name,
+			Group:     def.Group,
+			Icon:      def.Icon,
+			Current:   structs[def.Code],
+			Target:    tpl[def.Code],
+			Effective: effective[def.Code],
+		}
+		row.Implied = row.Effective > row.Target
+		row.AtTarget = row.Effective > 0 && row.Current >= row.Effective
+		if row.Icon == "" {
+			row.Icon = "i-build"
+		}
+		group := def.Group
+		if group == "" {
+			group = "Buildings"
+		}
+		byGroup[group] = append(byGroup[group], row)
+	}
+	for _, g := range buildingGroups {
+		if rows := byGroup[g]; len(rows) > 0 {
+			d.Sections = append(d.Sections, builderSection{Name: g, Rows: rows})
+		}
+	}
+
+	// Per-planet progress across the whole account.
+	for _, p := range d.Planets {
+		ps, _ := h.planets.Structures(ctx, p.ID)
+		done, total := game.BuilderProgress(ps, tpl)
+		d.PlanetsProgress = append(d.PlanetsProgress, builderPlanetRow{
+			Name:   p.Name,
+			Coords: coords(p.Galaxy, p.System, p.Position),
+			Done:   done,
+			Total:  total,
+		})
 	}
 	return d, true
 }
@@ -2723,6 +2858,14 @@ func (h *Handler) renderHXContent(w http.ResponseWriter, r *http.Request, userID
 		}
 		d.HX, d.Flash, d.Error = true, okMsg, errMsg
 		name, data = "buildings-content", d
+	case "builder":
+		d, ok := h.builderView(ctx, r, userID, id)
+		if !ok {
+			http.NotFound(w, r)
+			return true
+		}
+		d.HX, d.Flash, d.Error = true, okMsg, errMsg
+		name, data = "builder-content", d
 	case "research":
 		d, ok := h.researchView(ctx, r, userID, id)
 		if !ok {

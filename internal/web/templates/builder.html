@@ -1,0 +1,64 @@
+{{define "builder"}}
+{{template "head" .}}
+<div id="page-content">{{template "builder-content" .}}</div>
+{{template "foot" .}}
+{{end}}
+
+{{define "builder-content"}}
+{{template "banners" .}}
+<h1>Colony Builder</h1>
+<p class="muted">Set a target level per building. While the builder is enabled,
+every colony you own is automatically queued toward those targets — the required
+prerequisites included — using that planet's own resources and construction
+slots. New colonies are picked up automatically. Leave a target empty to ignore
+that building.</p>
+
+<form method="post" action="/builder/{{.ActivePlanetID}}"
+      hx-post="/builder/{{.ActivePlanetID}}" hx-target="#page-content" hx-swap="innerHTML" hx-disabled-elt="find button">
+  <div class="row">
+    <label class="check"><input type="checkbox" name="enabled" value="1" {{if .Enabled}}checked{{end}}> Enable the Colony Builder</label>
+  </div>
+  {{range .Sections}}
+  <h2 class="section-head">{{.Name}}</h2>
+  <div class="panel">
+    <table>
+      <tr>
+        <th style="width:40px"></th>
+        <th>Building</th>
+        <th style="width:130px">On this planet</th>
+        <th style="width:170px">Target level</th>
+      </tr>
+      {{range .Rows}}
+      <tr>
+        <td><svg class="ic"><use href="#{{.Icon}}"/></svg></td>
+        <td>{{.Name}}{{if .Implied}} <span class="muted">(needed for another target)</span>{{end}}</td>
+        <td>{{if .Current}}Level {{.Current}}{{else}}<span class="muted">—</span>{{end}}{{if .AtTarget}} <span class="v-ok">✓</span>{{end}}</td>
+        <td><input type="number" min="0" max="50" name="target_{{.Code}}" value="{{if .Target}}{{.Target}}{{end}}" placeholder="off" style="width:90px"></td>
+      </tr>
+      {{end}}
+    </table>
+  </div>
+  {{end}}
+  <div class="row">
+    <button type="submit">Save builder plan</button>
+    {{if .HasTemplate}}
+    <button type="submit" formaction="/builder/{{.ActivePlanetID}}/run"
+            hx-post="/builder/{{.ActivePlanetID}}/run" hx-target="#page-content" hx-swap="innerHTML"
+            hx-include="closest form">Queue now</button>
+    {{end}}
+  </div>
+</form>
+
+{{if .HasTemplate}}
+<h2 class="section-head">Colony progress</h2>
+<div class="panel">
+  <table>
+    <tr><th>Planet</th><th style="width:140px">Coordinates</th><th style="width:150px">Buildings at target</th></tr>
+    {{range .PlanetsProgress}}
+    <tr><td>{{.Name}}</td><td class="muted">{{.Coords}}</td><td>{{.Done}} / {{.Total}}</td></tr>
+    {{end}}
+  </table>
+</div>
+{{end}}
+{{template "hx-extras" .}}
+{{end}}

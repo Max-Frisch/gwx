@@ -493,6 +493,31 @@ func (s *QueueStore) StartUnits(ctx context.Context, universeCode string, userID
 	return tx.Commit()
 }
 
+// QueuedBuildings returns how many active building orders target each code on a
+// planet. The Colony Builder uses it so a plan never queues past its target when
+// levels are already in flight.
+func (s *QueueStore) QueuedBuildings(ctx context.Context, planetID int64) (map[string]int, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT code, COUNT(*) FROM queues
+		WHERE planet_id = $1 AND kind = 'building' AND status = 'IN_PROGRESS'
+		GROUP BY code
+	`, planetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var code string
+		var n int
+		if err := rows.Scan(&code, &n); err != nil {
+			return nil, err
+		}
+		out[code] = n
+	}
+	return out, rows.Err()
+}
+
 // Active returns in-progress queues for a planet and account.
 func (s *QueueStore) Active(ctx context.Context, planetID, userID int64) ([]Queue, error) {
 	rows, err := s.db.QueryContext(ctx, `

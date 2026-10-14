@@ -519,6 +519,43 @@ type buildingsData struct {
 	QueueFull  bool
 }
 
+// builderRow is one building line in the Colony Builder template editor.
+// Target is the player's own template value (the input); Effective includes
+// prerequisites the builder will auto-add; Implied marks a target that exists
+// only because something else needs it.
+type builderRow struct {
+	Code      string
+	Name      string
+	Group     string
+	Icon      string
+	Current   int
+	Target    int
+	Effective int
+	Implied   bool
+	AtTarget  bool
+}
+
+type builderSection struct {
+	Name string
+	Rows []builderRow
+}
+
+// builderPlanetRow is the per-planet progress summary.
+type builderPlanetRow struct {
+	Name   string
+	Coords string
+	Done   int
+	Total  int
+}
+
+type builderData struct {
+	baseData
+	Sections        []builderSection
+	PlanetsProgress []builderPlanetRow
+	Enabled         bool
+	HasTemplate     bool
+}
+
 // resProdRow is one line of the resources overview table. The four resource
 // cells are pre-formatted (signed for production, plain for capacity) so the
 // template stays logic-free.

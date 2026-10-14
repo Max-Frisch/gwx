@@ -123,6 +123,9 @@ func newHarness(t *testing.T) *harness {
 		stop:     make(chan struct{}),
 		done:     make(chan struct{}),
 	}
+	// The Colony Builder's default cadence is 30s; drive it on the same fast
+	// tick as everything else so tests do not wait real seconds.
+	h.engine.SetBuilderInterval(10 * tickInterval)
 
 	mux := http.NewServeMux()
 	web.New(db, h.universe).Mount(mux)

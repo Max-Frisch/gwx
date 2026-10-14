@@ -14,6 +14,7 @@ DATABASE_URL   ?= postgres://postgres:password@localhost:5433/gwx?sslmode=disabl
 # Note: NPC_COUNT and NPC_BATCH are intentionally NOT exported here — exporting
 # them (even with `?=`) would place them in the process environment and shadow
 # any value set in `.env`, because godotenv does not override real env vars.
+# The same applies to BUILDER_BATCH / BUILDER_INTERVAL_SECONDS.
 # Set them in `.env` (see `.env.example`) instead.
 export APP_ENV HTTP_ADDR UNIVERSE_CODE UNIVERSE_NAME GAME_SPEED FLEET_SPEED MAX_GALAXIES MAX_SYSTEMS BUILD_QUEUE_SLOTS RESEARCH_QUEUE_SLOTS ENDS_AT DATABASE_URL
 
