@@ -108,6 +108,7 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /galaxy", h.requireUser(h.GalaxyRedirect))
 	mux.HandleFunc("GET /galaxy/{galaxy}/{system}", h.requireUser(h.GalaxyPage))
 	mux.HandleFunc("POST /galaxy/spy", h.requireUser(h.GalaxySpySubmit))
+	mux.HandleFunc("POST /galaxy/colonize", h.requireUser(h.GalaxyColonizeSubmit))
 	mux.HandleFunc("GET /reports", h.requireUser(h.ReportsPage))
 	mux.HandleFunc("GET /events", h.requireUser(h.EventsPage))
 	mux.HandleFunc("GET /messages", h.requireUser(h.MessagesPage))
@@ -932,12 +933,30 @@ func (h *Handler) FleetPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GalaxyRedirect(w http.ResponseWriter, r *http.Request) {
 	userID, _ := h.userID(r)
-	home := h.homeID(r.Context(), userID)
+	ctx := r.Context()
+	// The galaxy jump form submits GET /galaxy?g=..&s=..; honour those
+	// coordinates instead of always snapping back to the homeworld.
+	if g, err := strconv.Atoi(r.URL.Query().Get("g")); err == nil && g > 0 {
+		s, _ := strconv.Atoi(r.URL.Query().Get("s"))
+		_, _, _, maxG, maxS := h.universeSpeeds(ctx)
+		if g > maxG {
+			g = maxG
+		}
+		if s < 1 {
+			s = 1
+		}
+		if s > maxS {
+			s = maxS
+		}
+		http.Redirect(w, r, "/galaxy/"+strconv.Itoa(g)+"/"+strconv.Itoa(s), http.StatusSeeOther)
+		return
+	}
+	home := h.homeID(ctx, userID)
 	if home == 0 {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	p, err := h.planets.Get(r.Context(), home)
+	p, err := h.planets.Get(ctx, home)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -964,8 +983,9 @@ func (h *Handler) GalaxyPage(w http.ResponseWriter, r *http.Request) {
 		s = maxS
 	}
 
+	home := h.homeID(ctx, userID)
 	d := galaxyData{
-		baseData:   h.base(ctx, r, userID, "Galaxy", h.homeID(ctx, userID)),
+		baseData:   h.base(ctx, r, userID, "Galaxy", home),
 		Galaxy:     g,
 		System:     s,
 		PrevSystem: maxInt(1, s-1),
@@ -974,6 +994,8 @@ func (h *Handler) GalaxyPage(w http.ResponseWriter, r *http.Request) {
 	if st, err := h.auth.Settings(ctx, userID); err == nil {
 		d.SpyCount = st.SpyShortcutCount
 	}
+	homeShips, _ := h.planets.Units(ctx, home, "ship")
+	hasColonyShip := homeShips["colony_ship"] > 0
 	rows, _ := h.planets.Scan(ctx, h.universeCode, g, s)
 	tags, _ := h.alliances.TagsByUser(ctx, h.universeCode)
 	byPos := map[int]store.ScanRow{}
@@ -996,6 +1018,7 @@ func (h *Handler) GalaxyPage(w http.ResponseWriter, r *http.Request) {
 			gr.IsNPC = row.IsNPC
 		}
 		gr.CanSpy = d.SpyCount > 0 && gr.PlanetID != 0 && gr.OwnerID != 0 && gr.OwnerID != userID
+		gr.CanColonize = hasColonyShip && gr.PlanetID == 0
 		d.Rows = append(d.Rows, gr)
 	}
 	h.render(w, "galaxy", http.StatusOK, d)
@@ -1033,6 +1056,34 @@ func (h *Handler) GalaxySpySubmit(w http.ResponseWriter, r *http.Request) {
 		Ships:    map[string]int64{"spy_probe": int64(st.SpyShortcutCount)},
 	})
 	flashRedirect(w, r, back, "Spy probes dispatched.", msg(err))
+}
+
+// GalaxyColonizeSubmit is the one-click "colonize" action from the galaxy view.
+// It dispatches a single colony ship as a COLONIZE flight from the homeworld to
+// the clicked empty coordinates, carrying no cargo.
+func (h *Handler) GalaxyColonizeSubmit(w http.ResponseWriter, r *http.Request) {
+	userID, _ := h.userID(r)
+	ctx := r.Context()
+	g, _ := strconv.Atoi(r.FormValue("g"))
+	s, _ := strconv.Atoi(r.FormValue("s"))
+	pos, _ := strconv.Atoi(r.FormValue("p"))
+	back := "/galaxy/" + strconv.Itoa(g) + "/" + strconv.Itoa(s)
+
+	origin := h.homeID(ctx, userID)
+	if origin == 0 {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	_, err := h.fleets.Dispatch(ctx, store.DispatchParams{
+		UniverseCode: h.universeCode,
+		UserID:       userID,
+		OriginID:     origin,
+		Mission:      "COLONIZE",
+		TargetG:      g, TargetS: s, TargetP: pos,
+		SpeedPct: 1,
+		Ships:    map[string]int64{"colony_ship": 1},
+	})
+	flashRedirect(w, r, back, "Colony ship dispatched.", msg(err))
 }
 
 func (h *Handler) ReportsPage(w http.ResponseWriter, r *http.Request) {

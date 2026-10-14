@@ -187,6 +187,7 @@ type galaxyRow struct {
 	IsHomeworld bool
 	IsNPC       bool
 	CanSpy      bool
+	CanColonize bool
 }
 
 type reportRow struct {

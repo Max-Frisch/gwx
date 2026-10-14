@@ -22,7 +22,7 @@ func TestGalaxyTemplateRenders(t *testing.T) {
 		Rows: []galaxyRow{
 			{Position: 1, PlanetID: 9, Name: "Home", OwnerID: 5, OwnerName: "me"},
 			{Position: 2, PlanetID: 10, Name: "Target", OwnerID: 6, OwnerName: "rival", CanSpy: true},
-			{Position: 3},
+			{Position: 3, CanColonize: true},
 		},
 	}
 	var buf bytes.Buffer
@@ -34,8 +34,11 @@ func TestGalaxyTemplateRenders(t *testing.T) {
 	if strings.Count(out, `action="/galaxy/spy"`) != 1 {
 		t.Errorf("expected exactly one spy action for the rival planet, got %d", strings.Count(out, `action="/galaxy/spy"`))
 	}
+	if strings.Count(out, `action="/galaxy/colonize"`) != 1 {
+		t.Errorf("expected exactly one colonize action for the empty slot, got %d", strings.Count(out, `action="/galaxy/colonize"`))
+	}
 	for _, want := range []string{
-		"Galaxy", "1:2", `name="p" value="2"`, "Send 3 spy probe(s)", "i-eye",
+		"Galaxy", "1:2", `name="p" value="2"`, "Send 3 spy probe(s)", "i-eye", "Colonize",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("galaxy page missing %q", want)
